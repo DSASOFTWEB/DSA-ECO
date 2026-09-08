@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    [x-cloak] { display: none !important; }
+    html { @apply scroll-smooth; }
+    ::selection { @apply bg-sky-200 text-sky-950 dark:bg-sky-700 dark:text-white; }
+    :focus-visible { @apply outline-none ring-2 ring-sky-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900; }
+
+    /* Avisa o navegador que a página tem um tema escuro de verdade — sem
+       isso, o Chrome/Firefox pode pintar sozinho o fundo de campos nativos
+       (input/select sem bg explícito, ícone do date picker, etc.) só que
+       sem ajustar a cor do texto junto, o que deixava o texto digitado
+       invisível (fundo escuro "de graça" do navegador + texto escuro
+       herdado do Tailwind). */
+    html.dark { color-scheme: dark; }
+
+    /* Muitos formulários pela aplicação usam classes de input soltas, sem
+       declarar as variantes dark de fundo e texto em cada campo. Esta é a
+       rede de segurança: todo campo de texto ganha um par fundo+texto
+       legível por padrão nos dois temas; qualquer classe mais específica no
+       próprio elemento (ex.: dark:bg-gray-800 explícito) continua vencendo,
+       porque seletor de classe tem mais especificidade que seletor de tag. */
+    input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']),
+    select,
+    textarea {
+        @apply bg-white text-gray-800 dark:bg-gray-900 dark:text-white/90;
+    }
+
+    /* Mesmo problema, mas em texto comum: dezenas de telas foram escritas só
+       com a paleta clara (text-slate-600 a text-slate-900 / text-gray-600 a
+       text-gray-900), sem o par "dark:" correspondente. No tema escuro isso
+       vira texto escuro sobre fundo escuro — quase ilegível. Rede de
+       segurança igual à dos campos acima: aplica um tom claro por padrão no
+       dark mode; como isto fica no layer "base" (antes de
+       "@tailwind utilities"), qualquer "dark:text-*" explícito no próprio
+       elemento continua vencendo o empate de especificidade. */
+    .dark .text-slate-600, .dark .text-slate-700, .dark .text-slate-800, .dark .text-slate-900,
+    .dark .text-gray-600, .dark .text-gray-700, .dark .text-gray-800, .dark .text-gray-900 {
+        @apply text-gray-100;
+    }
+    .dark .text-slate-500, .dark .text-gray-500 {
+        @apply text-gray-400;
+    }
+
+    html { scrollbar-color: theme('colors.gray.400') theme('colors.gray.100'); }
+    html.dark { scrollbar-color: theme('colors.gray.600') theme('colors.gray.900'); }
+
+    ::-webkit-scrollbar { width: 12px; height: 12px; }
+    ::-webkit-scrollbar-track { @apply bg-gray-100 dark:bg-gray-900; }
+    ::-webkit-scrollbar-thumb { @apply rounded-full bg-gray-400 border-2 border-solid border-gray-100 dark:bg-gray-600 dark:border-gray-900; }
+    ::-webkit-scrollbar-thumb:hover { @apply bg-gray-500 dark:bg-gray-500; }
+}
+
+@layer components {
+    .icon-button { @apply inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white; }
+    .form-label { @apply mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300; }
+    .form-control { @apply block w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-sm transition placeholder:text-gray-400 focus:border-sky-500 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-white; }
+}
+
+@layer utilities { .shadow-theme-sm { box-shadow: 0 1px 3px rgb(16 24 40 / .1), 0 1px 2px rgb(16 24 40 / .06); } }

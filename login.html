@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Entrar · Parque Aquatico SaaS</title>
+    <link rel="preload" as="style" href="http://localhost:8000/build/assets/app-C60ioKG1.css" /><link rel="modulepreload" href="http://localhost:8000/build/assets/app-DMsN-rLE.js" /><link rel="stylesheet" href="http://localhost:8000/build/assets/app-C60ioKG1.css" /><script type="module" src="http://localhost:8000/build/assets/app-DMsN-rLE.js"></script></head>
+<body class="flex min-h-screen items-center justify-center bg-sky-900 px-4">
+    <div class="w-full max-w-sm rounded-2xl bg-white p-8 shadow-xl">
+        <div class="mb-6 text-center">
+            <div class="text-3xl">🌊</div>
+            <h1 class="mt-2 text-xl font-bold text-slate-800">Parque Aquatico SaaS</h1>
+            <p class="text-sm text-slate-500">Acesse o painel de gestão</p>
+        </div>
+
+        
+        <form method="POST" action="http://localhost:8000/login" class="space-y-4">
+            <input type="hidden" name="_token" value="LlTO2Uf8fJiu0MgzFV7rxt2TyocZVpavQJpUbrRT" autocomplete="off">            <div>
+                <label class="block text-sm font-medium text-slate-700">E-mail</label>
+                <input type="email" name="email" value="" required autofocus
+                       class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Senha</label>
+                <input type="password" name="password" required
+                       class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+            </div>
+            <label class="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" name="lembrar" class="rounded border-slate-300">
+                Lembrar de mim
+            </label>
+            <button type="submit" class="w-full rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-800">
+                Entrar
+            </button>
+        </form>
+    </div>
+</body>
+</html>

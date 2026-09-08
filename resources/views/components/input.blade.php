@@ -1,0 +1,3 @@
+@props(['label' => null, 'name', 'type' => 'text', 'value' => null, 'help' => null])
+@php($id = $attributes->get('id', $name))
+<div>@if($label)<label for="{{ $id }}" class="form-label">{{ $label }}</label>@endif<input type="{{ $type }}" name="{{ $name }}" id="{{ $id }}" value="{{ old($name, $value) }}" {{ $attributes->except('id')->class(['form-control', 'border-rose-500 focus:border-rose-500 focus:ring-rose-500' => $errors->has($name)]) }}>@error($name)<p class="mt-1.5 text-xs text-rose-600 dark:text-rose-400">{{ $message }}</p>@else @if($help)<p class="mt-1.5 text-xs text-gray-500">{{ $help }}</p>@endif @enderror</div>

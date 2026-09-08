@@ -1,0 +1,36 @@
+# Dependências instaladas dentro da própria imagem — nunca do host
+/vendor
+/node_modules
+
+# Nunca deixar segredo/config local vazar para dentro da imagem. .env.docker
+# é o único env file que a imagem/compose usa, então ele NÃO entra aqui.
+.env
+.env.testing
+.env.backup
+.env.production
+
+.git
+.gitignore
+.gitattributes
+
+# Cache/logs locais — regenerados dentro do container
+/storage/logs/*
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/framework/testing/*
+/bootstrap/cache/*.php
+.phpunit.cache
+.phpunit.result.cache
+
+# Build de assets local — o estágio "assets" do Dockerfile gera o seu próprio
+/public/build
+
+/.vscode
+/.idea
+/.fleet
+/.nova
+/.zed
+
+*.zip
+*.log

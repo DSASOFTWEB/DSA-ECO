@@ -1,0 +1,134 @@
+name: parque-aquatico
+
+services:
+  # Painel web (Apache + PHP-FPM embutido) — na primeira subida, o
+  # entrypoint.sh roda migrations + seed de demonstração automaticamente.
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: parque_app
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    ports:
+      - "9091:80"
+    volumes:
+      - app_storage:/var/www/html/storage/app
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - parque
+
+  # Worker de fila: processa envio de cobrança por WhatsApp e o
+  # processamento assíncrono do webhook do Mercado Pago (app/Jobs/*).
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: parque_queue
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    command: ["php", "artisan", "queue:work", "--tries=3", "--sleep=3"]
+    volumes:
+      - app_storage:/var/www/html/storage/app
+    depends_on:
+      app:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - parque
+
+  # Substitui o cron do sistema: chama "php artisan schedule:run" a cada
+  # minuto, exatamente como o cron faria em produção (ver routes/console.php
+  # para a lista de tarefas agendadas — geração de mensalidade, cobrança,
+  # inadimplência, expiração de carteirinha).
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: parque_scheduler
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        entrypoint.sh true
+        while true; do
+          php artisan schedule:run --no-interaction
+          sleep 60
+        done
+    volumes:
+      - app_storage:/var/www/html/storage/app
+    depends_on:
+      app:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - parque
+
+  # Banco de dados. Credenciais aqui precisam bater com DB_* em .env.docker.
+  db:
+    image: mysql:8.0
+    container_name: parque_db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: parque_aquatico
+      MYSQL_USER: parque_user
+      MYSQL_PASSWORD: parque_pass
+      MYSQL_ROOT_PASSWORD: parque_root
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      # Só localhost: MySQL não deve ficar alcançável por fora da máquina/rede
+      # onde o compose está rodando (nem em dev, quanto mais num servidor
+      # com IP público).
+      - "127.0.0.1:3308:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pparque_root"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks:
+      - parque
+
+  # Interface web para inspecionar o banco (http://localhost:9092).
+  # Opcional — remova este serviço se não precisar.
+  phpmyadmin:
+    image: phpmyadmin:5
+    container_name: parque_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: parque_root
+    ports:
+      # Só localhost: interface de administração completa do banco não deve
+      # ficar exposta publicamente.
+      - "127.0.0.1:9092:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - parque
+
+volumes:
+  # Dados do MySQL sobrevivem a "docker compose down" (sem -v).
+  db_data:
+  # storage/app do Laravel (carteirinhas geradas, uploads, e o flag que
+  # controla se o seed de demonstração já rodou). Compartilhado entre
+  # app/queue/scheduler porque os três usam a mesma imagem/caminho.
+  app_storage:
+
+networks:
+  parque:
+    driver: bridge

@@ -22,6 +22,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Produção atrás de Cloudflare/HTTPS: força scheme https nas URLs
+        // geradas (asset, route, signed) quando APP_URL já é https.
+        if ($this->app->environment('production')) {
+            $appUrl = (string) config('app.url');
+            if (str_starts_with($appUrl, 'https://')) {
+                \Illuminate\Support\Facades\URL::forceScheme('https');
+            }
+        }
+
         // Login (web e API mobile) e autocadastro de empresa não tinham
         // nenhum limite de tentativas — força bruta/credential stuffing
         // ilimitado. Limita por e-mail+IP (não só IP, pra não travar um

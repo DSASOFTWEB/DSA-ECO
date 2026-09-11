@@ -29,6 +29,10 @@ class SecurityHeaders
     {
         $response = $next($request);
 
+        // Remover vazamento de stack (Apache/PHP).
+        $response->headers->remove('X-Powered-By');
+        $response->headers->remove('Server');
+
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');

@@ -47,12 +47,18 @@ return Application::configure(basePath: dirname(__DIR__))
             return array_values(array_unique($hosts));
         });
 
-        // Só entra em ação se as requisições realmente chegarem via um
-        // proxy nessas faixas privadas (ex.: nginx/load balancer na mesma
-        // rede) — não afeta o Apache local, que recebe a conexão direto.
+        // Proxies: rede Docker + Cloudflare (ver config/parque.php).
+        // Sem isso, atrás do CF o Laravel não vê HTTPS (X-Forwarded-Proto)
+        // e cookies/URLs/CSRF ficam inconsistentes.
+        $trusted = config('parque.trusted_proxies', []);
+        $trustAll = $trusted === ['*'] || (count($trusted) === 1 && ($trusted[0] ?? '') === '*');
         $middleware->trustProxies(
-            at: ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'],
-            headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_HOST | Request::HEADER_X_FORWARDED_PORT | Request::HEADER_X_FORWARDED_PROTO,
+            at: $trustAll ? '*' : $trusted,
+            headers: Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO
+                | Request::HEADER_X_FORWARDED_AWS_ELB,
         );
     })
     ->withExceptions(function (Exceptions $exceptions) {

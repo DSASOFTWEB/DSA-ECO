@@ -6,22 +6,38 @@
 /storage/*.key
 /storage/pail
 /vendor
+/auth.json
+
+# --- Env / segredos (NUNCA commitar produção) ---
 .env
 .env.backup
 .env.production
+.env.local
+.env.*.local
+.env.prod
+.env.staging
+# Mantidos no repo de propósito (dev/docker/testes):
+#   .env.example  .env.docker  .env.testing
+
 .phpactor.json
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml
 npm-debug.log
 yarn-error.log
-/auth.json
+
+# IDE / agentes locais
 /.fleet
 /.idea
 /.nova
 /.vscode
 /.zed
+/.claude
+/.cursor
+
+# Lixo local / backups
 cookies.txt
 /te.sql
-
 *.zip
+*.sql.backup
+login.html

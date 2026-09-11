@@ -255,7 +255,7 @@ docker-compose.yml      app + queue + scheduler + db (MySQL) + phpmyadmin
 .env.docker             Env pronto para os containers (ver "Subir com Docker")
 ```
 
-#usuarios
+##usuarios
 Admin do parque: admin@parqueaquatico.com.br / trocar@123
 Super (SaaS): super@parqueaquatico.com.br / trocar@123
 

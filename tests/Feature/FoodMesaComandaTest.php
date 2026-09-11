@@ -9,8 +9,8 @@ use App\Models\Produto;
 use App\Models\Unidade;
 use App\Models\User;
 use App\Services\Food\AtendimentoService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
@@ -126,7 +126,7 @@ class FoodMesaComandaTest extends TestCase
             'capacidade' => 4,
             'ordem' => 0,
             'status' => 'bloqueada',
-        ])->assertStatus(422);
+        ])->assertRedirect()->assertSessionHas('erro', 'Não é possível alterar uma mesa ou comanda com atendimento em andamento.');
 
         $this->assertDatabaseHas('pontos_atendimento', [
             'id' => $mesa->id,

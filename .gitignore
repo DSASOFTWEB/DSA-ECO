@@ -12,12 +12,13 @@
 .env
 .env.backup
 .env.production
+!.env.production.example
 .env.local
 .env.*.local
 .env.prod
 .env.staging
-# Mantidos no repo de propósito (dev/docker/testes):
-#   .env.example  .env.docker  .env.testing
+# Mantidos no repo de propósito (dev/docker/testes/modelo prod):
+#   .env.example  .env.docker  .env.testing  .env.production.example
 
 .phpactor.json
 .phpunit.result.cache

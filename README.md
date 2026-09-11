@@ -255,9 +255,14 @@ docker-compose.yml      app + queue + scheduler + db (MySQL) + phpmyadmin
 .env.docker             Env pronto para os containers (ver "Subir com Docker")
 ```
 
-##usuarios
-Admin do parque: admin@parqueaquatico.com.br / trocar@123
-Super (SaaS): super@parqueaquatico.com.br / trocar@123
+## Deploy na VPS
 
+Stack de produção (Docker atrás do Nginx do host): veja [docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md).  
+Arquivos: `Dockerfile.prod`, `docker-compose.prod.yml`, `deploy/`.
+
+## Usuários de demonstração (somente Docker local / seed)
+
+Admin do parque: `admin@parqueaquatico.com.br` / `trocar@123`  
+Super (SaaS): `super@parqueaquatico.com.br` / `trocar@123`
 
 Veja o [ARQUITETURA.md](ARQUITETURA.md) para o detalhamento de cada decisão.

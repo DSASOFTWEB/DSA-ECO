@@ -1,0 +1,103 @@
+# Produção — Parque Aquático SaaS (DSA-ECO)
+# Uso na VPS:
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# Nginx do host faz reverse proxy para 127.0.0.1:9080 (ver deploy/nginx-dsa-eco.conf).
+# MySQL NÃO é publicado em porta externa. Sem phpMyAdmin.
+
+name: parque-aquatico-prod
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: parque_prod_app
+    restart: always
+    env_file:
+      - .env.production
+    ports:
+      - "127.0.0.1:9080:80"
+    volumes:
+      - app_storage:/var/www/html/storage/app
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - parque_prod
+
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: parque_prod_queue
+    restart: always
+    env_file:
+      - .env.production
+    command: ["php", "artisan", "queue:work", "--tries=3", "--sleep=3", "--max-time=3600"]
+    volumes:
+      - app_storage:/var/www/html/storage/app
+    depends_on:
+      app:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - parque_prod
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: parque_prod_scheduler
+    restart: always
+    env_file:
+      - .env.production
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        entrypoint.sh true
+        while true; do
+          php artisan schedule:run --no-interaction
+          sleep 60
+        done
+    volumes:
+      - app_storage:/var/www/html/storage/app
+    depends_on:
+      app:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - parque_prod
+
+  db:
+    image: mysql:8.0
+    container_name: parque_prod_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-parque_aquatico}
+      MYSQL_USER: ${DB_USERNAME:-parque_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      - parque_prod
+
+volumes:
+  db_data:
+  app_storage:
+
+networks:
+  parque_prod:
+    driver: bridge

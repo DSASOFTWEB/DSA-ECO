@@ -9,8 +9,8 @@
 #   - PROIBIDO em produção: docker compose ... down -v  (o -v APAGA o MySQL)
 #   - Senhas DB_* só definem o banco na PRIMEIRA criação do volume; depois não troque
 #
-# EasyPanel fica com 80/443. Este stack NÃO mexe nisso.
-# App público na porta 9080: http://SEU_IP:9080  (ou domínio:9080)
+# EasyPanel fica com 80/443 e faz reverse para este app em :9080.
+# Usuário acessa http://softplanerp.com.br (sem porta). Ver deploy/traefik-dsa-eco.custom.yaml
 # MySQL NÃO é publicado. Sem phpMyAdmin.
 
 name: parque-aquatico-prod

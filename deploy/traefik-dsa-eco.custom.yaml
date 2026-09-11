@@ -1,0 +1,40 @@
+# Reverse proxy — softplanerp.com.br → app :9080
+#
+# Nesta VPS o EasyPanel (Traefik) já ocupa 80/443.
+# Não use certbot/Nginx do host. Só acrescente esta rota no Traefik.
+#
+# 1) Descubra o gateway Docker (host):
+#      ip -4 addr show docker0 | awk '/inet /{print $2}' | cut -d/ -f1
+#    (costuma ser 172.17.0.1)
+#
+# 2) Confira entrypoints:
+#      TRAEFIK=$(docker ps -q -f name=easypanel-traefik | head -1)
+#      docker inspect "$TRAEFIK" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -i ENTRYPOINT
+#    EasyPanel costuma usar: http / https
+#
+# 3) Instale:
+#      mkdir -p /etc/easypanel/traefik/config
+#      cp deploy/traefik-dsa-eco.custom.yaml /etc/easypanel/traefik/config/custom.yaml
+#      # edite a URL do loadBalancer se o gateway não for 172.17.0.1
+#      # Reinicie Traefik no EasyPanel (Settings → Traefik → Restart)
+#      # ou: docker service update --force $(docker service ls -q -f name=easypanel-traefik)
+#
+# 4) APP_URL sem porta:
+#      APP_URL=http://softplanerp.com.br
+#      (ou https:// quando o TLS estiver ativo)
+#
+# 5) DNS A softplanerp.com.br → IP desta VPS
+
+http:
+  routers:
+    dsa-eco:
+      rule: "Host(`softplanerp.com.br`) || Host(`www.softplanerp.com.br`)"
+      entryPoints:
+        - http
+      service: dsa-eco
+
+  services:
+    dsa-eco:
+      loadBalancer:
+        servers:
+          - url: "http://172.17.0.1:9080"

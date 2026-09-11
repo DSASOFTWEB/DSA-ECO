@@ -346,15 +346,24 @@ mkdir -p /var/www/dsa-eco
 git clone git@github.com:DSASOFTWEB/DSA-ECO.git /var/www/dsa-eco
 cd /var/www/dsa-eco
 
-cp .env.production.example .env.production
-nano .env.production   # APP_KEY, APP_URL, DB_PASSWORD, DB_ROOT_PASSWORD
+# Gera .env.production + APP_KEY (não mexe no banco)
+bash deploy/gerar-env-production.sh
+nano .env.production   # APP_URL + DB_PASSWORD + DB_ROOT_PASSWORD (senhas fortes)
 
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 docker compose -f docker-compose.prod.yml ps
 curl -I http://127.0.0.1:9080/login
 ```
 
-Crie o admin (prod **não** faz seed). Exemplo via tinker ou, só se consciente, `db:seed` uma vez.
+**Banco no Docker (não apaga sozinho):**
+
+| Ação | MySQL |
+|------|--------|
+| rebuild / `deploy.sh` / `compose down` | Mantém (volume `parque_aquatico_prod_db`) |
+| `compose down -v` | **Apaga o banco** — proibido em produção |
+| Trocar senha DB depois da 1ª subida | Pode quebrar — não faça |
+
+O container só cria tabelas novas (`migrate`). Não roda seed. Crie o admin via tinker.
 
 ### 4. Nginx + SSL
 
@@ -378,6 +387,7 @@ ssh vps-dsa-eco "bash /var/www/dsa-eco/deploy/deploy.sh"
 - Não commitar `.env.production` (já no `.gitignore`).
 - MySQL e porta `9080` só em localhost; firewall: 22/80/443.
 - `APP_DEBUG=false` e `SESSION_SECURE_COOKIE=true` com HTTPS.
+- Nunca `docker compose ... down -v` em produção.
 
 ## Usuários de demonstração (somente Docker local / seed)
 

@@ -30,9 +30,11 @@ git checkout "$BRANCH"
 git pull --ff-only origin "$BRANCH"
 
 echo "[deploy] docker compose build + up..."
+# NUNCA use "down -v" aqui — o volume db_data guarda o MySQL de produção.
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build --remove-orphans
 
 echo "[deploy] status:"
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 
 echo "[deploy] OK — app em http://127.0.0.1:9080 (Nginx do host deve fazer proxy + SSL)"
+echo "[deploy] Banco: volume Docker 'db_data' (persistente). Não use down -v."

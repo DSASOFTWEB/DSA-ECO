@@ -1,6 +1,13 @@
 # Produção — Parque Aquático SaaS (DSA-ECO)
 # Uso na VPS:
+#   bash deploy/gerar-env-production.sh
+#   nano .env.production   # APP_URL + senhas DB (só na 1ª vez)
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# PERSISTÊNCIA DO BANCO:
+#   - Volume nomeado "db_data" → dados sobrevivem a restart, rebuild e "compose down"
+#   - PROIBIDO em produção: docker compose ... down -v  (o -v APAGA o MySQL)
+#   - Senhas DB_* só definem o banco na PRIMEIRA criação do volume; depois não troque
 #
 # Nginx do host faz reverse proxy para 127.0.0.1:9080 (ver deploy/nginx-dsa-eco.conf).
 # MySQL NÃO é publicado em porta externa. Sem phpMyAdmin.
@@ -95,8 +102,12 @@ services:
       - parque_prod
 
 volumes:
+  # MySQL de produção — NÃO remover. "docker compose down" mantém; "down -v" APAGA.
   db_data:
+    name: parque_aquatico_prod_db
+  # Uploads / carteirinhas / flag de storage — também persistente.
   app_storage:
+    name: parque_aquatico_prod_storage
 
 networks:
   parque_prod:

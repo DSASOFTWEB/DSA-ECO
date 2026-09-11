@@ -82,34 +82,37 @@ nginx -v
 
 ## 4. Primeiro deploy
 
+Pré-requisitos: `docker`, `docker compose`, `nginx` na VPS.
+
 ```bash
 mkdir -p /var/www/dsa-eco
 git clone git@github.com:DSASOFTWEB/DSA-ECO.git /var/www/dsa-eco
 cd /var/www/dsa-eco
 
-cp .env.production.example .env.production
-nano .env.production
-```
+# Cria .env.production e gera APP_KEY (não apaga banco — volume separado)
+bash deploy/gerar-env-production.sh
+nano .env.production   # APP_URL + DB_PASSWORD + DB_ROOT_PASSWORD (senhas fortes)
 
-Preencha no mínimo:
-
-- `APP_KEY` — gere com `php artisan key:generate --show` (ou num container one-off)
-- `APP_URL` — `https://seu-dominio.com.br`
-- `DB_PASSWORD` / `DB_ROOT_PASSWORD` — senhas fortes
-- Integrações (Evolution / Mercado Pago) se for usar
-
-Subir stack:
-
-```bash
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 docker compose -f docker-compose.prod.yml ps
 curl -I http://127.0.0.1:9080/login
 ```
 
-**Primeiro usuário admin:** o entrypoint de produção **não** roda seed. Crie o admin manualmente (tinker) ou rode uma vez, só se quiser dados demo:
+### Persistência do banco (importante)
+
+| Ação | O que acontece com o MySQL |
+|------|----------------------------|
+| `up -d --build` / restart / `deploy.sh` | Mantém dados (volume `parque_aquatico_prod_db`) |
+| `docker compose ... down` | Para containers, **mantém** o volume |
+| `docker compose ... down -v` | **APAGA o banco** — nunca use em produção |
+| Trocar `DB_PASSWORD` depois da 1ª subida | Não recria o user; pode quebrar o login no DB |
+
+O entrypoint de produção só roda `migrate` (schema). **Não** roda `db:seed`.
+
+**Primeiro usuário admin:** crie manualmente (tinker) ou, só se consciente, `db:seed` uma vez:
 
 ```bash
-# Opcional e consciente — NÃO use senha padrão em produção pública:
+# Opcional — NÃO use senha padrão em produção pública:
 # docker compose -f docker-compose.prod.yml --env-file .env.production exec app php artisan db:seed --force
 ```
 
@@ -152,6 +155,7 @@ bash /var/www/dsa-eco/deploy/deploy.sh
 - Não commite `.env.production`.
 - `APP_DEBUG=false` e `SESSION_SECURE_COOKIE=true` com HTTPS.
 - Firewall: 22/80/443; nada de 3306/9080 para o mundo (9080 só localhost).
+- **Nunca** `docker compose ... down -v` em produção (apaga o volume do MySQL).
 
 ## Troubleshooting
 

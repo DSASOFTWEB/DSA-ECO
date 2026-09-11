@@ -307,7 +307,25 @@ validação de assinatura), isolamento entre tenants e Policies. Antes de ir par
 esses são os próximos testes a escrever, nessa ordem de prioridade (maior risco
 financeiro/segurança primeiro).
 
-## 14. Próximos passos sugeridos
+## 14. Módulo Food: mesas e comandas
+
+O módulo em `app/Services/Food` porta as regras operacionais do ZeusFOOD para a
+arquitetura multiempresa do SaaS. `pontos_atendimento` unifica mesa e comanda sem
+misturar seus mapas; cada ponto pode ter um `atendimento` aberto ou pré-fechado.
+Itens preservam preço praticado, desconto, observação e cancelamento auditável.
+
+A transferência para um ponto livre move integralmente o atendimento. Para um
+ponto ocupado, os itens ativos são unidos à conta de destino e a origem é encerrada
+como transferida. O fechamento é transacional: valida caixa e pagamentos, cria a
+`Venda`, baixa estoque, registra `Pagamento`/`CaixaMovimentacao`, calcula comissão e
+só então libera o ponto. A pré-conta pode ser impressa em HTML ou ESC/POS sem fechar
+ou movimentar estoque/caixa.
+
+Arquivos de entrada: `FoodController`, `AtendimentoService`, models
+`PontoAtendimento`/`Atendimento`/`AtendimentoItem`, views `resources/views/food` e
+rotas nomeadas `food.*` em `routes/web.php`.
+
+## 15. Próximos passos sugeridos
 
 1. Validar o schema real: `docker compose up -d --build` (ver README.md, seção "Subir
    com Docker") faz isso sozinho — build, `migrate`, seed e `php artisan test` ficam

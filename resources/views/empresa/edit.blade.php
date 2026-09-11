@@ -109,6 +109,57 @@
             </div>
         </div>
 
+        @php $imp = $empresa->configuracaoImpressao(); @endphp
+
+        <div class="border-t border-gray-100 pt-6 dark:border-gray-800">
+            <h2 class="text-sm font-semibold text-slate-700">Impressão do cupom (PDV)</h2>
+            <p class="mt-1 text-xs text-slate-400">
+                Define como o comprovante de venda é impresso após finalizar no PDV.
+                <strong>DOM 80mm</strong> usa a impressora do navegador; <strong>ESC/POS</strong> envia bytes
+                direto pra impressora térmica (agente local ou Web Serial).
+            </p>
+
+            <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 [&_input]:min-h-11 [&_input]:border-gray-300 [&_input]:bg-white [&_input]:text-gray-900 [&_input]:outline-none [&_input]:transition [&_input]:focus:border-brand-500 [&_input]:focus:ring-3 [&_input]:focus:ring-brand-500/10 dark:[&_input]:border-gray-700 dark:[&_input]:bg-gray-900 dark:[&_input]:text-white">
+                <div class="sm:col-span-2">
+                    <label class="form-label">Modo de impressão</label>
+                    <select name="impressao_modo" class="form-control mt-1">
+                        <option value="dom" @selected(old('impressao_modo', $imp['modo']) === 'dom')>Somente DOM 80mm (navegador)</option>
+                        <option value="escpos" @selected(old('impressao_modo', $imp['modo']) === 'escpos')>Somente ESC/POS (térmica)</option>
+                        <option value="ambos" @selected(old('impressao_modo', $imp['modo']) === 'ambos')>Ambos (padrão destacado conforme escolha)</option>
+                    </select>
+                    @error('impressao_modo')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </div>
+
+                <div>
+                    <label class="form-label">Colunas ESC/POS</label>
+                    <select name="impressao_colunas" class="form-control mt-1">
+                        <option value="48" @selected((int) old('impressao_colunas', $imp['colunas']) === 48)>48 — bobina 80mm</option>
+                        <option value="42" @selected((int) old('impressao_colunas', $imp['colunas']) === 42)>42 — bobina ~72mm</option>
+                        <option value="40" @selected((int) old('impressao_colunas', $imp['colunas']) === 40)>40 — bobina ~72mm</option>
+                        <option value="32" @selected((int) old('impressao_colunas', $imp['colunas']) === 32)>32 — bobina 58mm</option>
+                    </select>
+                    @error('impressao_colunas')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </div>
+
+                <div>
+                    <label class="form-label">URL do agente ESC/POS</label>
+                    <input type="url" name="impressao_agente_url" value="{{ old('impressao_agente_url', $imp['agente_url']) }}" placeholder="http://127.0.0.1:9110" class="form-control mt-1">
+                    <p class="mt-1 text-xs text-slate-400">Serviço local na máquina do caixa (POST /print). Deixe o padrão se usar Web Serial ou download .bin.</p>
+                    @error('impressao_agente_url')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                        <input type="checkbox" name="impressao_auto_imprimir" value="1" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" @checked(old('impressao_auto_imprimir', $imp['auto_imprimir']))>
+                        <span>
+                            <span class="font-medium text-slate-700 dark:text-white/90">Imprimir automaticamente ao abrir o comprovante</span>
+                            <span class="mt-0.5 block text-xs text-slate-400">Dispara o modo escolhido assim que a tela do cupom carrega (útil no fluxo do PDV).</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
         <div class="flex justify-end">
             <button class="h-11 rounded-lg bg-brand-500 px-5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">Salvar alterações</button>
         </div>

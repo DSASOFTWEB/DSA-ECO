@@ -35,6 +35,19 @@ class UpdateEmpresaRequest extends FormRequest
             'evolution_base_url' => ['nullable', 'url', 'max:255'],
             'evolution_api_key' => ['nullable', 'string', 'max:255'],
             'evolution_instance' => ['nullable', 'string', 'max:100'],
+
+            // Impressão do cupom PDV
+            'impressao_modo' => ['required', 'in:dom,escpos,ambos'],
+            'impressao_colunas' => ['required', 'integer', 'in:32,40,42,48'],
+            'impressao_agente_url' => ['nullable', 'url', 'max:255'],
+            'impressao_auto_imprimir' => ['nullable', 'boolean'],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'impressao_auto_imprimir' => $this->boolean('impressao_auto_imprimir'),
+        ]);
     }
 }

@@ -41,6 +41,21 @@ class DemoDataSeeder extends Seeder
         );
         $admin->syncRoles(['admin']);
 
+        // Conta operacional da equipe do SaaS (bypass via Gate::before).
+        // Sem empresa — enxerga todos os tenants. Não aparece no cadastro
+        // público de empresa nem no formulário de papéis do tenant.
+        $super = User::withoutGlobalScopes()->firstOrCreate(
+            ['email' => 'super@parqueaquatico.com.br'],
+            [
+                'empresa_id' => null,
+                'unidade_id' => null,
+                'name' => 'Super Admin',
+                'password' => Hash::make('trocar@123'),
+                'status' => 'ativo',
+            ]
+        );
+        $super->syncRoles(['super_admin']);
+
         collect([
             ['nome' => 'Plano Individual', 'valor' => 129.90, 'max_dependentes' => 0],
             ['nome' => 'Plano Família (até 4)', 'valor' => 349.90, 'max_dependentes' => 3],
@@ -57,5 +72,6 @@ class DemoDataSeeder extends Seeder
         ));
 
         $this->command?->info('Login do administrador: admin@parqueaquatico.com.br / trocar@123 (altere após o primeiro acesso).');
+        $this->command?->info('Login super_admin (SaaS): super@parqueaquatico.com.br / trocar@123');
     }
 }

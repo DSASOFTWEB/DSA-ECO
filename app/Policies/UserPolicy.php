@@ -13,7 +13,7 @@ class UserPolicy
 
     public function view(User $user, User $alvo): bool
     {
-        return $user->can('usuarios.visualizar') && $user->empresa_id === $alvo->empresa_id;
+        return $user->can('usuarios.visualizar') && $this->mesmaEmpresa($user, $alvo);
     }
 
     public function create(User $user): bool
@@ -23,20 +23,26 @@ class UserPolicy
 
     public function update(User $user, User $alvo): bool
     {
-        return $user->can('usuarios.editar') && $user->empresa_id === $alvo->empresa_id;
+        // Alvo ainda não persistido (binding quebrado) nunca deve passar —
+        // evita 403 ambíguo; o controller responde 404 antes.
+        if (! $alvo->exists) {
+            return false;
+        }
+
+        return $user->can('usuarios.editar') && $this->mesmaEmpresa($user, $alvo);
     }
 
     public function delete(User $user, User $alvo): bool
     {
         // Ninguém pode se autoexcluir e apenas admin remove outros usuários.
         return $user->can('usuarios.excluir')
-            && $user->empresa_id === $alvo->empresa_id
+            && $this->mesmaEmpresa($user, $alvo)
             && $user->id !== $alvo->id;
     }
 
     public function gerenciarPapeis(User $user, User $alvo): bool
     {
-        return $user->hasRole('admin') && $user->empresa_id === $alvo->empresa_id;
+        return $user->hasRole('admin') && $this->mesmaEmpresa($user, $alvo);
     }
 
     /**
@@ -47,5 +53,18 @@ class UserPolicy
     public function atribuirAdmin(User $user): bool
     {
         return $user->hasRole('admin');
+    }
+
+    /**
+     * Compara empresa_id com cast para int — PDO/MySQL pode devolver string
+     * e o === estrito falhava com 403 falso-positivo no mesmo tenant.
+     */
+    private function mesmaEmpresa(User $user, User $alvo): bool
+    {
+        if ($user->empresa_id === null || $alvo->empresa_id === null) {
+            return false;
+        }
+
+        return (int) $user->empresa_id === (int) $alvo->empresa_id;
     }
 }

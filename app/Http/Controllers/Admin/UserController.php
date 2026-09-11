@@ -65,6 +65,10 @@ class UserController extends Controller
      */
     public function edit(User $usuario): View
     {
+        // Binding quebrado (parâmetro de rota ≠ tipagem) injeta User novo
+        // sem id — a Policy responde 403 e mascara o problema real.
+        abort_unless($usuario->exists, 404);
+
         $this->authorize('update', $usuario);
 
         $unidades = Unidade::ativas()->get();
@@ -75,6 +79,8 @@ class UserController extends Controller
 
     public function update(UpdateUserRequest $request, User $usuario): RedirectResponse
     {
+        abort_unless($usuario->exists, 404);
+
         $dados = $request->validated();
         $roles = $dados['roles'] ?? null;
         unset($dados['roles']);
@@ -105,6 +111,8 @@ class UserController extends Controller
 
     public function destroy(User $usuario): RedirectResponse
     {
+        abort_unless($usuario->exists, 404);
+
         $this->authorize('delete', $usuario);
 
         $usuario->update(['status' => 'inativo']);

@@ -16,6 +16,7 @@ class StoreVendaRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'caixa_id' => ['required', 'integer', Rule::exists('caixas', 'id')->where('empresa_id', $this->user()->empresa_id)],
             'cliente_id' => ['nullable', Rule::exists('clientes', 'id')->where('empresa_id', $this->user()->empresa_id)],
             'forma_pagamento' => ['required', 'in:dinheiro,cartao_credito,cartao_debito,pix'],
             'observacao' => ['nullable', 'string', 'max:1000'],

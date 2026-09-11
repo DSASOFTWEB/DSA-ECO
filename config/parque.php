@@ -21,4 +21,15 @@ return [
 
     // Após quantos dias de atraso a mensalidade passa de "atrasado" para bloquear o acesso
     'dias_atraso_bloqueia_acesso' => (int) env('DIAS_ATRASO_BLOQUEIA_ACESSO', 5),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Impressão ESC/POS (cupom térmico)
+    |--------------------------------------------------------------------------
+    | colunas: 48 ≈ 80mm, 42 ≈ 72mm, 32 ≈ 58mm
+    | agente_url: serviço local opcional (ex.: http://127.0.0.1:9110) no estilo
+    | do agente USB do GestorWEB — POST /print com { lines|payload_base64, cut }
+    */
+    'escpos_colunas' => (int) env('ESCPOS_COLUNAS', 48),
+    'escpos_agente_url' => env('ESCPOS_AGENTE_URL', 'http://127.0.0.1:9110'),
 ];

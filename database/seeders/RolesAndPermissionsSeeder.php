@@ -23,6 +23,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'caixa.visualizar', 'caixa.abrir', 'caixa.fechar', 'caixa.movimentar',
         'estoque.visualizar', 'estoque.criar', 'estoque.editar', 'estoque.excluir', 'estoque.ajustar',
         'vendas.visualizar', 'vendas.criar', 'vendas.cancelar',
+        'food.visualizar', 'food.operar', 'food.fechar', 'food.configurar',
         'pousada.visualizar', 'pousada.gerenciar', 'pousada.reservar', 'pousada.checkin', 'pousada.checkout', 'pousada.consumos',
         'tipos_entrada.visualizar', 'tipos_entrada.gerenciar',
         'comissoes.visualizar', 'comissoes.visualizar_proprias', 'comissoes.pagar',
@@ -59,6 +60,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'carteirinhas.visualizar', 'carteirinhas.emitir', 'carteirinhas.bloquear',
                 'acessos.validar', 'acessos.cortesia',
                 'vendas.visualizar', 'vendas.criar',
+                'food.visualizar', 'food.operar', 'food.fechar',
                 'pousada.visualizar', 'pousada.reservar', 'pousada.checkin', 'pousada.checkout', 'pousada.consumos',
                 'estoque.visualizar',
             ]);
@@ -68,6 +70,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'clientes.visualizar', 'clientes.criar',
                 'contratos.visualizar', 'contratos.criar',
                 'vendas.visualizar', 'vendas.criar',
+                'food.visualizar', 'food.operar',
                 'comissoes.visualizar_proprias',
                 'caixa.visualizar',
                 'estoque.visualizar',
@@ -84,5 +87,9 @@ class RolesAndPermissionsSeeder extends Seeder
                 'clientes.visualizar',
                 'auditoria.visualizar',
             ]);
+
+        // Após recriar permissões/papéis, o cache do Spatie (se existir)
+        // pode negar checagens válidas e virar 403 em telas como /usuarios/{id}/edit.
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
     }
 }

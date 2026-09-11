@@ -28,6 +28,19 @@
         @apply bg-white text-gray-800 dark:bg-gray-900 dark:text-white/90;
     }
 
+    /* Dropdown nativo do Windows/Chrome no dark mode: a lista abre com fundo
+       claro, mas herda texto claro do color-scheme:dark — fica ilegível.
+       Força o popup do <select> em esquema claro (texto escuro) e opções
+       explícitas. */
+    select {
+        color-scheme: light;
+    }
+    select option,
+    select optgroup {
+        color: #111827;
+        background-color: #ffffff;
+    }
+
     /* Mesmo problema, mas em texto comum: dezenas de telas foram escritas só
        com a paleta clara (text-slate-600 a text-slate-900 / text-gray-600 a
        text-gray-900), sem o par "dark:" correspondente. No tema escuro isso

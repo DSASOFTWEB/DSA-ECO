@@ -48,6 +48,11 @@ class Produto extends Model
         return $this->hasMany(VendaItem::class);
     }
 
+    public function itensAtendimento(): HasMany
+    {
+        return $this->hasMany(AtendimentoItem::class);
+    }
+
     public function estoqueAbaixoDoMinimo(): bool
     {
         return $this->controla_estoque && $this->estoque_atual <= $this->estoque_minimo;

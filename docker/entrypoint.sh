@@ -34,14 +34,35 @@ if [ "$1" = "apache2-foreground" ]; then
         echo "[entrypoint] Rodando seeders de demonstração (users=${USER_COUNT})..."
         php artisan db:seed --force
         touch "$SEED_FLAG"
+        # Garante que o cache Spatie não fique com IDs velhos após o seed
+        # (sintoma clássico: admin loga, mas /usuarios/*/edit responde 403).
+        php artisan permission:cache-reset || true
     else
         echo "[entrypoint] Seed já aplicado anteriormente, pulando db:seed."
     fi
     php artisan storage:link --force
-    echo "[entrypoint] Cacheando config/rotas/views..."
-    php artisan config:cache
-    php artisan route:cache
-    php artisan view:cache
+
+    # Banco dedicado aos testes Feature/Unit (phpunit.xml → parque_aquatico_test).
+    # Sem ele, ou pior — com `config:cache` apontando pro DB da app — o
+    # RefreshDatabase dos testes apaga users/sessões e o login cai em 419
+    # (CSRF) ou "Credenciais inválidas".
+    php -r "try { \$p=new PDO('mysql:host=${DB_HOST};port=${DB_PORT}','${DB_USERNAME}','${DB_PASSWORD}'); \$p->exec('CREATE DATABASE IF NOT EXISTS parque_aquatico_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); echo \"[entrypoint] Banco parque_aquatico_test ok.\\n\"; } catch (Throwable \$e) { echo '[entrypoint] Aviso ao criar parque_aquatico_test: '.$e->getMessage().PHP_EOL; }" || true
+
+    if [ "${APP_ENV}" = "production" ] || [ "${APP_ENV}" = "staging" ]; then
+        echo "[entrypoint] Cacheando config/rotas/views (APP_ENV=${APP_ENV})..."
+        php artisan config:cache
+        php artisan route:cache
+        php artisan view:cache
+    else
+        # Local/dev: NUNCA config:cache. O arquivo bootstrap/cache/config.php
+        # congela DB_DATABASE=parque_aquatico e o PHPUnit deixa de conseguir
+        # redirecionar testes para parque_aquatico_test.
+        echo "[entrypoint] APP_ENV=${APP_ENV}: limpando config cache; cacheando só rotas/views..."
+        php artisan config:clear
+        php artisan route:cache
+        php artisan view:cache
+    fi
+
     # Tudo acima roda como root (é assim que o container inicia). O Dockerfile
     # já tinha dado chown em storage/ e bootstrap/cache/ pra www-data na hora
     # do build, mas migrate/seed/*:cache acabaram de criar arquivos NOVOS

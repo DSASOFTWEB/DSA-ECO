@@ -51,6 +51,11 @@ class Unidade extends Model
         return $this->hasMany(Hospedagem::class);
     }
 
+    public function pontosAtendimento(): HasMany
+    {
+        return $this->hasMany(PontoAtendimento::class);
+    }
+
     public function scopeAtivas($query)
     {
         return $query->where('status', 'ativo');

@@ -88,4 +88,40 @@ class Empresa extends Model
             'instance' => (string) Arr::get($this->configuracoes, 'evolution.instance', ''),
         ];
     }
+
+    /**
+     * Preferências de impressão do cupom PDV (DOM 80mm vs ESC/POS).
+     * Guardado em configuracoes->impressao.
+     *
+     * @return array{modo: string, colunas: int, agente_url: string, auto_imprimir: bool}
+     */
+    public function configuracaoImpressao(): array
+    {
+        $modo = (string) Arr::get($this->configuracoes, 'impressao.modo', 'dom');
+        if (! in_array($modo, ['dom', 'escpos', 'ambos'], true)) {
+            $modo = 'dom';
+        }
+
+        $colunas = (int) Arr::get(
+            $this->configuracoes,
+            'impressao.colunas',
+            config('parque.escpos_colunas', 48)
+        );
+        if (! in_array($colunas, [32, 40, 42, 48], true)) {
+            $colunas = 48;
+        }
+
+        $agente = (string) Arr::get(
+            $this->configuracoes,
+            'impressao.agente_url',
+            config('parque.escpos_agente_url', 'http://127.0.0.1:9110')
+        );
+
+        return [
+            'modo' => $modo,
+            'colunas' => $colunas,
+            'agente_url' => $agente,
+            'auto_imprimir' => (bool) Arr::get($this->configuracoes, 'impressao.auto_imprimir', false),
+        ];
+    }
 }

@@ -12,13 +12,15 @@ use App\Models\User;
 use App\Models\Venda;
 use App\Services\BarcodeService;
 use App\Services\CaixaService;
+use App\Services\Impressao\EscPosCupomBuilder;
 use App\Services\QrCodeService;
 use App\Services\Relatorios\VoucherEntradaPdfExport;
 use App\Services\VendaService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class VendaController extends Controller
 {
@@ -53,6 +55,8 @@ class VendaController extends Controller
             'sku' => $produto->sku,
             'nome' => $produto->nome,
             'preco' => (float) $produto->preco_venda,
+            'controla_estoque' => (bool) $produto->controla_estoque,
+            'estoque' => (int) $produto->estoque_atual,
         ])->values();
 
         $tiposEntradaJson = $tiposEntrada->map(fn (TipoEntrada $tipo) => [
@@ -100,11 +104,8 @@ class VendaController extends Controller
     {
         $this->authorize('view', $venda);
 
-        $venda->load(['itens.produto', 'itens.tipoEntrada', 'cliente', 'unidade']);
+        $venda->load(['itens.produto', 'itens.tipoEntrada', 'cliente', 'unidade', 'vendedor', 'empresa']);
 
-        // Um QR/código de barras por ticket (por Acesso), igual ao voucher em
-        // PDF — mesma ideia de VoucherEntradaPdfExport, só que embutido
-        // direto na bobina em vez de um PDF separado.
         $acessos = $venda->acessos()->whereNotNull('venda_item_id')->with('vendaItem.tipoEntrada')->get();
 
         $qrCodes = $acessos->mapWithKeys(fn ($acesso) => [
@@ -115,10 +116,116 @@ class VendaController extends Controller
             $acesso->id => $acesso->codigo_validacao ? $this->barcodeService->gerarDataUri($acesso->codigo_validacao) : null,
         ]);
 
-        return view('vendas.comprovante', compact('venda', 'acessos', 'qrCodes', 'barcodes'));
+        $meta = $this->metaCupom($venda);
+        $impressao = $venda->empresa?->configuracaoImpressao() ?? [
+            'modo' => 'dom',
+            'colunas' => (int) config('parque.escpos_colunas', 48),
+            'agente_url' => (string) config('parque.escpos_agente_url', 'http://127.0.0.1:9110'),
+            'auto_imprimir' => false,
+        ];
+
+        return view('vendas.comprovante', [
+            'venda' => $venda,
+            'acessos' => $acessos,
+            'qrCodes' => $qrCodes,
+            'barcodes' => $barcodes,
+            'empresaNome' => $meta['empresaNome'],
+            'empresaCnpj' => $meta['empresaCnpj'],
+            'empresaTelefone' => $meta['empresaTelefone'],
+            'empresaEndereco' => $meta['empresaEndereco'],
+            'valorRecebido' => $meta['valorRecebido'],
+            'troco' => $meta['troco'],
+            'obsLimpa' => $meta['obsLimpa'],
+            'escposUrl' => route('vendas.comprovante.escpos', $venda),
+            'escposAgenteUrl' => $impressao['agente_url'],
+            'escposColunas' => $impressao['colunas'],
+            'impressaoModo' => $impressao['modo'],
+            'impressaoAuto' => $impressao['auto_imprimir'],
+        ]);
     }
 
-    public function voucher(Venda $venda, VoucherEntradaPdfExport $export): Response
+    /**
+     * Cupom em bytes ESC/POS (bobina 80mm). O browser pode:
+     * - baixar o .bin
+     * - enviar via Web Serial
+     * - POST no agente local (ESCPOS_AGENTE_URL)
+     */
+    public function comprovanteEscpos(Venda $venda): Response
+    {
+        $this->authorize('view', $venda);
+
+        $venda->load(['itens.produto', 'itens.tipoEntrada', 'cliente', 'unidade', 'vendedor', 'empresa']);
+
+        $colunas = $venda->empresa?->configuracaoImpressao()['colunas']
+            ?? (int) config('parque.escpos_colunas', EscPosCupomBuilder::COLUNAS_80MM);
+
+        $bytes = (new EscPosCupomBuilder($colunas))->montar($venda, $this->metaCupom($venda));
+
+        $nome = 'cupom-venda-'.str_pad((string) $venda->id, 6, '0', STR_PAD_LEFT).'.bin';
+
+        return response($bytes, 200, [
+            'Content-Type' => 'application/octet-stream',
+            'Content-Disposition' => 'attachment; filename="'.$nome.'"',
+            'X-Escpos-Columns' => (string) $colunas,
+        ]);
+    }
+
+    /**
+     * @return array{empresaNome: string, empresaCnpj: ?string, empresaTelefone: ?string, empresaEndereco: ?string, valorRecebido: ?float, troco: ?float, obsLimpa: ?string}
+     */
+    protected function metaCupom(Venda $venda): array
+    {
+        $empresa = $venda->empresa;
+        $unidade = $venda->unidade;
+
+        [$valorRecebido, $troco, $obsLimpa] = $this->extrairTrocoDaObservacao($venda->observacao);
+
+        return [
+            'empresaNome' => $empresa?->nome ?? $unidade?->nome ?? config('app.name'),
+            'empresaCnpj' => $unidade?->cnpj ?: $empresa?->cnpj,
+            'empresaTelefone' => $unidade?->telefone ?: $empresa?->telefone,
+            'empresaEndereco' => collect([
+                $unidade?->endereco,
+                $unidade?->numero,
+                $unidade?->bairro,
+                $unidade?->cidade && $unidade?->uf ? "{$unidade->cidade}/{$unidade->uf}" : ($unidade?->cidade ?? null),
+            ])->filter()->implode(', ') ?: null,
+            'valorRecebido' => $valorRecebido,
+            'troco' => $troco,
+            'obsLimpa' => $obsLimpa,
+        ];
+    }
+
+    /**
+     * O PDV grava troco na observação no formato
+     * "Recebido: R$ 50,00 | Troco: R$ 5,00" (ou misturado com texto livre).
+     *
+     * @return array{0: ?float, 1: ?float, 2: ?string}
+     */
+    protected function extrairTrocoDaObservacao(?string $observacao): array
+    {
+        if (! $observacao) {
+            return [null, null, null];
+        }
+
+        $valorRecebido = null;
+        $troco = null;
+
+        if (preg_match('/Recebido:\s*R\$\s*([\d.,]+)/iu', $observacao, $m)) {
+            $valorRecebido = (float) str_replace(['.', ','], ['', '.'], $m[1]);
+        }
+        if (preg_match('/Troco:\s*R\$\s*([\d.,]+)/iu', $observacao, $m)) {
+            $troco = (float) str_replace(['.', ','], ['', '.'], $m[1]);
+        }
+
+        $obsLimpa = trim(preg_replace('/\s*\|\s*Recebido:.*?Troco:\s*R\$\s*[\d.,]+/iu', '', $observacao) ?? '');
+        $obsLimpa = trim(preg_replace('/Recebido:\s*R\$\s*[\d.,]+\s*\|\s*Troco:\s*R\$\s*[\d.,]+/iu', '', $obsLimpa) ?? '');
+        $obsLimpa = $obsLimpa !== '' ? $obsLimpa : null;
+
+        return [$valorRecebido, $troco, $obsLimpa];
+    }
+
+    public function voucher(Venda $venda, VoucherEntradaPdfExport $export): SymfonyResponse
     {
         $this->authorize('view', $venda);
 

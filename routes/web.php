@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\ContratoController;
 use App\Http\Controllers\Admin\CortesiaController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\FinanceiroController;
+use App\Http\Controllers\Admin\FoodController;
 use App\Http\Controllers\Admin\DependenteController;
 use App\Http\Controllers\Admin\EmpresaController;
 use App\Http\Controllers\Admin\MensalidadeController;
@@ -140,8 +141,22 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('vendas', VendaController::class)->only(['index', 'create', 'store', 'show']);
     Route::get('vendas/{venda}/comprovante', [VendaController::class, 'comprovante'])->name('vendas.comprovante');
+    Route::get('vendas/{venda}/comprovante.escpos', [VendaController::class, 'comprovanteEscpos'])->name('vendas.comprovante.escpos');
     Route::get('vendas/{venda}/voucher', [VendaController::class, 'voucher'])->name('vendas.voucher');
     Route::post('vendas/{venda}/cancelar', [VendaController::class, 'cancelar'])->name('vendas.cancelar');
+
+    Route::get('food', [FoodController::class, 'index'])->name('food.index');
+    Route::post('food/pontos', [FoodController::class, 'storePonto'])->name('food.pontos.store');
+    Route::put('food/pontos/{ponto}', [FoodController::class, 'updatePonto'])->name('food.pontos.update');
+    Route::post('food/pontos/{ponto}/abrir', [FoodController::class, 'abrir'])->name('food.pontos.abrir');
+    Route::get('food/atendimentos/{atendimento}', [FoodController::class, 'show'])->name('food.atendimentos.show');
+    Route::post('food/atendimentos/{atendimento}/itens', [FoodController::class, 'adicionarItem'])->name('food.atendimentos.itens.store');
+    Route::delete('food/atendimentos/{atendimento}/itens/{item}', [FoodController::class, 'cancelarItem'])->name('food.atendimentos.itens.cancelar');
+    Route::post('food/atendimentos/{atendimento}/pre-fechar', [FoodController::class, 'preFechar'])->name('food.atendimentos.pre-fechar');
+    Route::post('food/atendimentos/{atendimento}/transferir', [FoodController::class, 'transferir'])->name('food.atendimentos.transferir');
+    Route::post('food/atendimentos/{atendimento}/fechar', [FoodController::class, 'fechar'])->name('food.atendimentos.fechar');
+    Route::get('food/atendimentos/{atendimento}/conta', [FoodController::class, 'conta'])->name('food.atendimentos.conta');
+    Route::get('food/atendimentos/{atendimento}/conta.escpos', [FoodController::class, 'contaEscpos'])->name('food.atendimentos.conta.escpos');
 
     Route::resource('quartos', QuartoController::class)->only(['index', 'create', 'store', 'edit', 'update']);
 
@@ -209,7 +224,10 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('unidades', UnidadeController::class)->only(['index', 'create', 'store', 'edit', 'update']);
     Route::get('link-vendas', [UnidadeController::class, 'linkExterno'])->name('unidades.link-externo');
-    Route::resource('usuarios', UserController::class)->except(['show']);
+    // "parameters" explícito: evita o bug clássico do inflector com plurais
+    // em português (model binding injetar User vazio → Policy nega com 403).
+    Route::resource('usuarios', UserController::class, ['parameters' => ['usuarios' => 'usuario']])
+        ->except(['show']);
 
     Route::get('auditoria', [AuditoriaController::class, 'index'])->name('auditoria.index');
 

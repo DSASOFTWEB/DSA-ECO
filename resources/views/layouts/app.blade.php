@@ -21,6 +21,7 @@
             ['terminais', 'terminais.index', 'Terminais', 'terminal'],
             ['caixas', 'caixas.index', 'Caixa', 'wallet'],
             ['vendas', 'vendas.index', 'Vendas (PDV)', 'cart'],
+            ['food', 'food.index', 'Mesas e Comandas', 'table'],
             ['hospedagens', 'hospedagens.index', 'Pousada', 'bed'],
             ['quartos', 'quartos.index', 'Quartos', 'door'],
             ['tipos-entrada', 'tipos-entrada.index', 'Tipos de Entrada', 'ticket'],
@@ -34,10 +35,10 @@
             ['relatorios', 'relatorios.index', 'Relatórios', 'report'],
             ['unidades', 'unidades.index', 'Unidades', 'building'],
             ['empresa', 'empresa.edit', 'Minha Empresa', 'settings'],
-            ['app-validador', 'app-validador.index', 'App Validador', 'qr-scan'],
-            ['link-vendas', 'unidades.link-externo', 'Link de Vendas Externa', 'link'],
             ['usuarios', 'usuarios.index', 'Usuários', 'key'],
             ['auditoria', 'auditoria.index', 'Auditoria', 'search'],
+            ['app-validador', 'app-validador.index', 'App Validador', 'qr-scan'],
+            ['link-vendas', 'unidades.link-externo', 'Link de Vendas Externa', 'link'],
         ];
     @endphp
 
@@ -58,11 +59,16 @@
             <div class="space-y-1">
                 @foreach ($menu as [$match, $routeName, $label, $icon])
                     @if (\Illuminate\Support\Facades\Route::has($routeName))
-                        @php($active = request()->routeIs($match) || request()->routeIs($match.'.*'))
-                        <a href="{{ route($routeName) }}" @click="sidebarOpen = false" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $active ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white' }}" @if($active) aria-current="page" @endif>
-                            <x-nav-icon :name="$icon" class="h-5 w-5 shrink-0" />
-                            <span>{{ $label }}</span>
-                        </a>
+                        @php
+                            $active = request()->routeIs($match) || request()->routeIs($match.'.*') || request()->routeIs($routeName);
+                            $precisaPermissao = $routeName === 'empresa.edit';
+                        @endphp
+                        @if (! $precisaPermissao || auth()->user()?->can('empresa.gerenciar'))
+                            <a href="{{ route($routeName) }}" @click="sidebarOpen = false" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $active ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white' }}" @if($active) aria-current="page" @endif>
+                                <x-nav-icon :name="$icon" class="h-5 w-5 shrink-0" />
+                                <span>{{ $label }}</span>
+                            </a>
+                        @endif
                     @endif
                 @endforeach
             </div>
@@ -80,6 +86,13 @@
                 </button>
                 @auth
                     <div class="hidden text-right md:block"><p class="max-w-40 truncate text-sm font-medium">{{ auth()->user()->name }}</p><p class="max-w-40 truncate text-xs text-gray-500">{{ $unidadeAtual->nome ?? 'Todas as unidades' }}</p></div>
+                    @can('empresa.gerenciar')
+                        @if (\Illuminate\Support\Facades\Route::has('empresa.edit'))
+                            <a href="{{ route('empresa.edit') }}" class="icon-button" aria-label="Minha Empresa" title="Minha Empresa / Impressão">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-width="1.8" d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8.4-3a7.9 7.9 0 0 0-.15-1.5l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2.6-1.5L15 2h-4l-.4 2.9a7.6 7.6 0 0 0-2.6 1.5l-2.4-1-2 3.4 2 1.6a8 8 0 0 0 0 3l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 2.6 1.5L11 22h4l.4-2.9a7.6 7.6 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.6c.1-.5.15-1 .15-1.5Z"/></svg>
+                            </a>
+                        @endif
+                    @endcan
                     @if (\Illuminate\Support\Facades\Route::has('logout'))
                         <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="icon-button" aria-label="Sair" title="Sair"><svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-width="1.8" d="M15 8l4 4-4 4m4-4H9m3 7H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h7"/></svg></button></form>
                     @endif

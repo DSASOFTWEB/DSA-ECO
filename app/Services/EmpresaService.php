@@ -15,6 +15,7 @@ class EmpresaService
         $camposIntegracao = [
             'mercadopago_access_token', 'mercadopago_public_key', 'mercadopago_webhook_secret',
             'evolution_base_url', 'evolution_api_key', 'evolution_instance',
+            'impressao_modo', 'impressao_colunas', 'impressao_agente_url', 'impressao_auto_imprimir',
         ];
         $integracoes = array_intersect_key($dados, array_flip($camposIntegracao));
 
@@ -43,6 +44,17 @@ class EmpresaService
             'api_key' => $integracoes['evolution_api_key'] ?? null,
             'instance' => $integracoes['evolution_instance'] ?? null,
         ]);
+
+        // Impressão: campos com default explícito — sempre grava (não usa mesclarSemApagar
+        // de senha), inclusive checkbox desmarcado e troca de modo.
+        $configuracoes['impressao'] = [
+            'modo' => $integracoes['impressao_modo'] ?? 'dom',
+            'colunas' => (int) ($integracoes['impressao_colunas'] ?? 48),
+            'agente_url' => filled($integracoes['impressao_agente_url'] ?? null)
+                ? $integracoes['impressao_agente_url']
+                : (string) config('parque.escpos_agente_url', 'http://127.0.0.1:9110'),
+            'auto_imprimir' => (bool) ($integracoes['impressao_auto_imprimir'] ?? false),
+        ];
 
         $dados['configuracoes'] = $configuracoes;
 

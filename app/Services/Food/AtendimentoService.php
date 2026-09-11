@@ -76,6 +76,81 @@ class AtendimentoService
         });
     }
 
+    /**
+     * Cadastra uma faixa de mesas ou comandas na empresa do operador.
+     * Números já existentes na mesma unidade+tipo geram NegocioException.
+     *
+     * @return array{criados: int, tipo: string, inicial: int, final: int}
+     */
+    public function criarPontosEmFaixa(User $operador, array $dados): array
+    {
+        $empresaId = (int) $operador->empresa_id;
+        $unidadeId = (int) $dados['unidade_id'];
+        $tipo = (string) $dados['tipo'];
+        $inicial = (int) $dados['numero_inicial'];
+        $final = (int) $dados['numero_final'];
+        $capacidade = isset($dados['capacidade']) ? (int) $dados['capacidade'] : null;
+
+        if ($empresaId <= 0) {
+            throw new NegocioException('Usuário sem empresa vinculada — não é possível cadastrar pontos.');
+        }
+
+        if ($final < $inicial) {
+            throw new NegocioException('O número final deve ser maior ou igual ao inicial.');
+        }
+
+        $qtd = $final - $inicial + 1;
+        if ($qtd > 200) {
+            throw new NegocioException('A faixa não pode ter mais de 200 números por vez.');
+        }
+
+        return DB::transaction(function () use ($empresaId, $unidadeId, $tipo, $inicial, $final, $capacidade, $qtd) {
+            $existentes = PontoAtendimento::query()
+                ->where('empresa_id', $empresaId)
+                ->where('unidade_id', $unidadeId)
+                ->where('tipo', $tipo)
+                ->whereBetween('numero', [$inicial, $final])
+                ->orderBy('numero')
+                ->pluck('numero')
+                ->all();
+
+            if ($existentes !== []) {
+                $lista = implode(', ', array_slice($existentes, 0, 15));
+                $extra = count($existentes) > 15 ? '…' : '';
+                $rotulo = $tipo === 'mesa' ? 'mesa(s)' : 'comanda(s)';
+                throw new NegocioException(
+                    "Já existem {$rotulo} com número(s) {$lista}{$extra} nesta unidade. Ajuste a faixa."
+                );
+            }
+
+            $agora = now();
+            $linhas = [];
+            for ($numero = $inicial; $numero <= $final; $numero++) {
+                $linhas[] = [
+                    'empresa_id' => $empresaId,
+                    'unidade_id' => $unidadeId,
+                    'tipo' => $tipo,
+                    'numero' => $numero,
+                    'nome' => null,
+                    'capacidade' => $capacidade,
+                    'status' => 'livre',
+                    'ordem' => $numero,
+                    'created_at' => $agora,
+                    'updated_at' => $agora,
+                ];
+            }
+
+            PontoAtendimento::insert($linhas);
+
+            return [
+                'criados' => $qtd,
+                'tipo' => $tipo,
+                'inicial' => $inicial,
+                'final' => $final,
+            ];
+        });
+    }
+
     public function adicionarItem(Atendimento $atendimento, array $dados, User $operador): AtendimentoItem
     {
         return DB::transaction(function () use ($atendimento, $dados, $operador) {

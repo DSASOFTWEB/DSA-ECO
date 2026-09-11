@@ -135,6 +135,96 @@ class FoodMesaComandaTest extends TestCase
         ]);
     }
 
+    public function test_configurador_gera_faixa_de_mesas_na_empresa(): void
+    {
+        [$empresa, $unidade, $operador] = $this->criarOperador();
+
+        $this->actingAs($operador)
+            ->post(route('food.pontos.store'), [
+                'unidade_id' => $unidade->id,
+                'tipo' => 'mesa',
+                'numero_inicial' => 1,
+                'numero_final' => 5,
+                'capacidade' => 4,
+            ])
+            ->assertRedirect(route('food.index', ['unidade_id' => $unidade->id, 'tipo' => 'mesa']));
+
+        $this->assertSame(5, PontoAtendimento::where('empresa_id', $empresa->id)
+            ->where('unidade_id', $unidade->id)
+            ->where('tipo', 'mesa')
+            ->count());
+        $this->assertDatabaseHas('pontos_atendimento', [
+            'empresa_id' => $empresa->id,
+            'unidade_id' => $unidade->id,
+            'tipo' => 'mesa',
+            'numero' => 1,
+            'capacidade' => 4,
+            'status' => 'livre',
+        ]);
+        $this->assertDatabaseHas('pontos_atendimento', [
+            'empresa_id' => $empresa->id,
+            'tipo' => 'mesa',
+            'numero' => 5,
+        ]);
+    }
+
+    public function test_configurador_gera_faixa_de_comandas(): void
+    {
+        [$empresa, $unidade, $operador] = $this->criarOperador();
+
+        $this->actingAs($operador)
+            ->post(route('food.pontos.store'), [
+                'unidade_id' => $unidade->id,
+                'tipo' => 'comanda',
+                'numero_inicial' => 10,
+                'numero_final' => 12,
+            ])
+            ->assertRedirect(route('food.index', ['unidade_id' => $unidade->id, 'tipo' => 'comanda']));
+
+        $this->assertSame(3, PontoAtendimento::where([
+            'empresa_id' => $empresa->id,
+            'unidade_id' => $unidade->id,
+            'tipo' => 'comanda',
+        ])->count());
+    }
+
+    public function test_faixa_rejeita_numeros_ja_existentes(): void
+    {
+        [$empresa, $unidade, $operador] = $this->criarOperador();
+        $this->criarPonto($empresa, $unidade, 'mesa', 3);
+
+        $this->actingAs($operador)
+            ->from(route('food.index', ['unidade_id' => $unidade->id, 'tipo' => 'mesa']))
+            ->post(route('food.pontos.store'), [
+                'unidade_id' => $unidade->id,
+                'tipo' => 'mesa',
+                'numero_inicial' => 1,
+                'numero_final' => 5,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('erro');
+
+        $this->assertSame(1, PontoAtendimento::where('empresa_id', $empresa->id)->where('tipo', 'mesa')->count());
+    }
+
+    public function test_faixa_nao_usa_unidade_de_outra_empresa(): void
+    {
+        [, , $operador] = $this->criarOperador();
+        $outraEmpresa = Empresa::factory()->create();
+        $outraUnidade = Unidade::factory()->create(['empresa_id' => $outraEmpresa->id]);
+
+        $this->actingAs($operador)
+            ->post(route('food.pontos.store'), [
+                'unidade_id' => $outraUnidade->id,
+                'tipo' => 'mesa',
+                'numero_inicial' => 1,
+                'numero_final' => 3,
+            ])
+            ->assertSessionHasErrors('unidade_id');
+
+        $this->assertSame(0, PontoAtendimento::withoutGlobalScopes()->where('unidade_id', $outraUnidade->id)->count());
+    }
+
     protected function criarOperador(): array
     {
         $empresa = Empresa::factory()->create();

@@ -26,12 +26,12 @@ if [ "$1" = "apache2-foreground" ]; then
     # storage/app, que é um volume nomeado (ver docker-compose.yml) — então
     # sobrevive a "docker compose down" (sem -v) e a rebuilds da imagem.
     SEED_FLAG="/var/www/html/storage/app/.seeded"
-    # Também re-semeia se o flag existir mas o banco estiver vazio (ex.: volume
-    # db_data apagado com -v, ou banco recriado, enquanto app_storage manteve
-    # o .seeded — senão o login falha com "Credenciais inválidas").
-    USER_COUNT=$(php -r "try { \$p=new PDO('mysql:host=${DB_HOST};port=${DB_PORT};dbname=${DB_DATABASE}','${DB_USERNAME}','${DB_PASSWORD}'); echo (int)\$p->query('SELECT COUNT(*) FROM users')->fetchColumn(); } catch (Throwable \$e) { echo 0; }" 2>/dev/null || echo 0)
-    if [ ! -f "$SEED_FLAG" ] || [ "$USER_COUNT" = "0" ]; then
-        echo "[entrypoint] Rodando seeders de demonstração (users=${USER_COUNT})..."
+    # Também re-semeia se o flag existir mas uma das contas documentadas não
+    # estiver no banco. Conferir apenas COUNT(*) de users não basta: um banco
+    # pode ter usuários reais e ainda assim não ter as credenciais do README.
+    DEMO_USER_COUNT=$(php -r "try { \$p=new PDO('mysql:host=${DB_HOST};port=${DB_PORT};dbname=${DB_DATABASE}','${DB_USERNAME}','${DB_PASSWORD}'); echo (int)\$p->query(\"SELECT COUNT(*) FROM users WHERE email IN ('admin@parqueaquatico.com.br','super@parqueaquatico.com.br') AND deleted_at IS NULL\")->fetchColumn(); } catch (Throwable \$e) { echo 0; }" 2>/dev/null || echo 0)
+    if [ ! -f "$SEED_FLAG" ] || [ "$DEMO_USER_COUNT" != "2" ]; then
+        echo "[entrypoint] Rodando seeders de demonstração (contas encontradas=${DEMO_USER_COUNT}/2)..."
         php artisan db:seed --force
         touch "$SEED_FLAG"
         # Garante que o cache Spatie não fique com IDs velhos após o seed
@@ -46,7 +46,7 @@ if [ "$1" = "apache2-foreground" ]; then
     # Sem ele, ou pior — com `config:cache` apontando pro DB da app — o
     # RefreshDatabase dos testes apaga users/sessões e o login cai em 419
     # (CSRF) ou "Credenciais inválidas".
-    php -r "try { \$p=new PDO('mysql:host=${DB_HOST};port=${DB_PORT}','${DB_USERNAME}','${DB_PASSWORD}'); \$p->exec('CREATE DATABASE IF NOT EXISTS parque_aquatico_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); echo \"[entrypoint] Banco parque_aquatico_test ok.\\n\"; } catch (Throwable \$e) { echo '[entrypoint] Aviso ao criar parque_aquatico_test: '.$e->getMessage().PHP_EOL; }" || true
+    php -r "try { \$p=new PDO('mysql:host=${DB_HOST};port=${DB_PORT}','${DB_USERNAME}','${DB_PASSWORD}'); \$p->exec('CREATE DATABASE IF NOT EXISTS parque_aquatico_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); echo \"[entrypoint] Banco parque_aquatico_test ok.\\n\"; } catch (Throwable \$e) { echo '[entrypoint] Aviso ao criar parque_aquatico_test: '.\$e->getMessage().PHP_EOL; }" || true
 
     if [ "${APP_ENV}" = "production" ] || [ "${APP_ENV}" = "staging" ]; then
         echo "[entrypoint] Cacheando config/rotas/views (APP_ENV=${APP_ENV})..."

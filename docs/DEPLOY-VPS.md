@@ -1,19 +1,22 @@
 # Deploy na VPS — DSA-ECO / Parque Aquático SaaS
 
-Publicação com **Docker Compose de produção** atrás do **Nginx do host** (reverse proxy + SSL). Isola este projeto dos outros em `/var/www/` (ex.: `farmaciatrabalhadorpm.com.br`).
+Publicação com **Docker Compose** na **porta 9080**. Nesta VPS o EasyPanel já usa 80/443 — não mexa nisso. Detalhes: [DEPLOY-EASYPANEL-TRAEFIK.md](DEPLOY-EASYPANEL-TRAEFIK.md).
 
 ## Arquitetura
 
 | Camada | Onde | Função |
 |--------|------|--------|
-| Nginx + Certbot | host | HTTPS, `proxy_pass` → `127.0.0.1:9080` |
-| `parque_prod_app` | Docker | Laravel + Apache (porta só localhost) |
+| EasyPanel Traefik | Docker | 80/443 dos outros apps (não tocar) |
+| `parque_prod_app` | Docker | Laravel + Apache em **:9080** |
 | `parque_prod_queue` | Docker | `queue:work` |
 | `parque_prod_scheduler` | Docker | `schedule:run` a cada minuto |
 | `parque_prod_db` | Docker | MySQL 8 (sem porta pública) |
 
 Código em: `/var/www/dsa-eco`  
 Repo: `git@github.com:DSASOFTWEB/DSA-ECO.git`
+
+Acesso: `http://IP:9080` ou `http://dominio:9080` (`APP_URL` com a porta).
+
 
 ## 1. Chave do PC → VPS
 
@@ -82,7 +85,7 @@ nginx -v
 
 ## 4. Primeiro deploy
 
-Pré-requisitos: `docker`, `docker compose`, `nginx` na VPS.
+Pré-requisitos: `docker` e `docker compose` na VPS.
 
 ```bash
 mkdir -p /var/www/dsa-eco
@@ -91,7 +94,7 @@ cd /var/www/dsa-eco
 
 # Cria .env.production e gera APP_KEY (não apaga banco — volume separado)
 bash deploy/gerar-env-production.sh
-nano .env.production   # APP_URL + DB_PASSWORD + DB_ROOT_PASSWORD (senhas fortes)
+nano .env.production   # APP_URL=http://dominio:9080 + senhas DB
 
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 docker compose -f docker-compose.prod.yml ps
@@ -123,17 +126,16 @@ docker compose -f docker-compose.prod.yml --env-file .env.production exec app ph
 # User::create([...]); syncRoles(['admin']);
 ```
 
-## 5. Nginx + SSL
+## 5. Acesso público (porta 9080)
 
-```bash
-cp /var/www/dsa-eco/deploy/nginx-dsa-eco.conf /etc/nginx/sites-available/dsa-eco
-nano /etc/nginx/sites-available/dsa-eco   # troque SEU_DOMINIO.com.br
-ln -sf /etc/nginx/sites-available/dsa-eco /etc/nginx/sites-enabled/dsa-eco
-nginx -t && systemctl reload nginx
+EasyPanel permanece em 80/443. Abra a porta **9080** no firewall e use:
 
-# DNS A do domínio → IP da VPS, depois:
-certbot --nginx -d seu-dominio.com.br -d www.seu-dominio.com.br
+```text
+http://SEU_IP:9080
+http://seu-dominio.com.br:9080
 ```
+
+`APP_URL` no `.env.production` deve incluir a porta (`http://...:9080`).
 
 ## 6. Atualizações seguintes
 
@@ -153,8 +155,7 @@ bash /var/www/dsa-eco/deploy/deploy.sh
 
 - Não publique MySQL nem phpMyAdmin em porta pública (o compose de prod já evita isso).
 - Não commite `.env.production`.
-- `APP_DEBUG=false` e `SESSION_SECURE_COOKIE=true` com HTTPS.
-- Firewall: 22/80/443; nada de 3306/9080 para o mundo (9080 só localhost).
+- Firewall: 22, 80/443 (EasyPanel), **9080** (este app). Sem 3306 público.
 - **Nunca** `docker compose ... down -v` em produção (apaga o volume do MySQL).
 
 ## Troubleshooting

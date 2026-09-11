@@ -36,5 +36,5 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build --remove-
 echo "[deploy] status:"
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 
-echo "[deploy] OK — app em http://127.0.0.1:9080 (Nginx do host deve fazer proxy + SSL)"
+echo "[deploy] OK — app em http://0.0.0.0:9080 (EasyPanel permanece em 80/443)"
 echo "[deploy] Banco: volume Docker 'db_data' (persistente). Não use down -v."

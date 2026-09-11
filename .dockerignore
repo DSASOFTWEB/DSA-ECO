@@ -31,6 +31,9 @@
 /.fleet
 /.nova
 /.zed
+/.claude
+/.agents
+/.codex
 
 *.zip
 *.log

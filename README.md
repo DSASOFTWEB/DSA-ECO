@@ -339,7 +339,7 @@ ssh -T git@github.com
 
 ### 3. Primeiro deploy
 
-Pré-requisitos: `docker`, `docker compose`, `nginx` na VPS.
+Pré-requisitos: `docker` e `docker compose` na VPS.
 
 ```bash
 mkdir -p /var/www/dsa-eco
@@ -348,7 +348,7 @@ cd /var/www/dsa-eco
 
 # Gera .env.production + APP_KEY (não mexe no banco)
 bash deploy/gerar-env-production.sh
-nano .env.production   # APP_URL + DB_PASSWORD + DB_ROOT_PASSWORD (senhas fortes)
+nano .env.production   # APP_URL=http://dominio:9080 + senhas DB
 
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 docker compose -f docker-compose.prod.yml ps
@@ -365,15 +365,10 @@ curl -I http://127.0.0.1:9080/login
 
 O container só cria tabelas novas (`migrate`). Não roda seed. Crie o admin via tinker.
 
-### 4. Nginx + SSL
+### 4. Acesso (porta 9080)
 
-```bash
-cp /var/www/dsa-eco/deploy/nginx-dsa-eco.conf /etc/nginx/sites-available/dsa-eco
-nano /etc/nginx/sites-available/dsa-eco   # troque SEU_DOMINIO.com.br
-ln -sf /etc/nginx/sites-available/dsa-eco /etc/nginx/sites-enabled/dsa-eco
-nginx -t && systemctl reload nginx
-certbot --nginx -d seu-dominio.com.br -d www.seu-dominio.com.br
-```
+Libere **9080** no firewall. URL: `http://IP:9080` ou `http://dominio:9080`.
+EasyPanel permanece em 80/443.
 
 ### 5. Atualizações seguintes
 
@@ -385,8 +380,8 @@ ssh vps-dsa-eco "bash /var/www/dsa-eco/deploy/deploy.sh"
 ### Segurança
 
 - Não commitar `.env.production` (já no `.gitignore`).
-- MySQL e porta `9080` só em localhost; firewall: 22/80/443.
-- `APP_DEBUG=false` e `SESSION_SECURE_COOKIE=true` com HTTPS.
+- Firewall: 22, 80/443 (EasyPanel), **9080** (este app). Sem 3306 público.
+- `APP_DEBUG=false`.
 - Nunca `docker compose ... down -v` em produção.
 
 ## Usuários de demonstração (somente Docker local / seed)

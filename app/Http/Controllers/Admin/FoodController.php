@@ -41,9 +41,19 @@ class FoodController extends Controller
 
     public function storePonto(StorePontoAtendimentoRequest $request): RedirectResponse
     {
-        PontoAtendimento::create($request->validated() + ['empresa_id' => $request->user()->empresa_id]);
+        $resultado = $this->atendimentos->criarPontosEmFaixa($request->user(), $request->validated());
 
-        return back()->with('sucesso', ucfirst($request->input('tipo')).' cadastrada com sucesso.');
+        $rotulo = $resultado['tipo'] === 'mesa' ? 'mesa(s)' : 'comanda(s)';
+        $msg = $resultado['criados'] === 1
+            ? '1 '.$rotulo.' cadastrada com sucesso (nº '.$resultado['inicial'].').'
+            : $resultado['criados'].' '.$rotulo.' cadastradas (nº '.$resultado['inicial'].' a '.$resultado['final'].').';
+
+        return redirect()
+            ->route('food.index', [
+                'unidade_id' => $request->integer('unidade_id'),
+                'tipo' => $resultado['tipo'],
+            ])
+            ->with('sucesso', $msg);
     }
 
     public function updatePonto(UpdatePontoAtendimentoRequest $request, PontoAtendimento $ponto): RedirectResponse

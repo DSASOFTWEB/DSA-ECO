@@ -9,7 +9,9 @@
 #   - PROIBIDO em produção: docker compose ... down -v  (o -v APAGA o MySQL)
 #   - Senhas DB_* só definem o banco na PRIMEIRA criação do volume; depois não troque
 #
-# Nginx do host faz reverse proxy para 127.0.0.1:9080 (ver deploy/nginx-dsa-eco.conf).
+# Nginx do host NÃO controla 80/443 nesta VPS — quem controla é o
+# EasyPanel Traefik (easypanel-traefik). Ver docs/DEPLOY-EASYPANEL-TRAEFIK.md.
+# O app fica em 127.0.0.1:9080 para o Traefik (ou labels) fazer o proxy + SSL.
 # MySQL NÃO é publicado em porta externa. Sem phpMyAdmin.
 
 name: parque-aquatico-prod

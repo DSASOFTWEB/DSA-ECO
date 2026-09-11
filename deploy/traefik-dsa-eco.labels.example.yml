@@ -1,0 +1,28 @@
+# Exemplo de labels Traefik (EasyPanel) para o serviço "app".
+# Copie para docker-compose.prod.yml sob services.app e ajuste:
+#   - nome da rede external (docker network ls / inspect do traefik)
+#   - certResolver (inspect env do easypanel-traefik)
+#
+# networks:
+#   easypanel:
+#     external: true
+#     name: NOME_DA_REDE_DO_TRAEFIK
+#
+# services:
+#   app:
+#     networks:
+#       - parque_prod
+#       - easypanel
+#     labels:
+#       - traefik.enable=true
+#       - traefik.docker.network=NOME_DA_REDE_DO_TRAEFIK
+#       - traefik.http.routers.dsa-eco.rule=Host(`softplanerp.com.br`) || Host(`www.softplanerp.com.br`)
+#       - traefik.http.routers.dsa-eco.entrypoints=https
+#       - traefik.http.routers.dsa-eco.tls=true
+#       - traefik.http.routers.dsa-eco.tls.certresolver=letsencrypt
+#       - traefik.http.services.dsa-eco.loadbalancer.server.port=80
+#       - traefik.http.routers.dsa-eco-http.rule=Host(`softplanerp.com.br`) || Host(`www.softplanerp.com.br`)
+#       - traefik.http.routers.dsa-eco-http.entrypoints=http
+#       - traefik.http.routers.dsa-eco-http.middlewares=dsa-eco-https-redirect
+#       - traefik.http.middlewares.dsa-eco-https-redirect.redirectscheme.scheme=https
+#       - traefik.http.middlewares.dsa-eco-https-redirect.redirectscheme.permanent=true

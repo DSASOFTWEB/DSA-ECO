@@ -35,6 +35,7 @@ yarn-error.log
 /.zed
 /.claude
 /.cursor
+/.agents
 
 # Lixo local / backups
 cookies.txt

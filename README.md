@@ -254,28 +254,28 @@ deploy/                 nginx-dsa-eco.conf, deploy.sh (VPS)
 Dockerfile              Build multi-stage: assets (Node) + app (PHP/Apache) — local
 Dockerfile.prod         Imagem de produção (composer --no-dev, sem seed)
 docker-compose.yml      app + queue + scheduler + db + phpmyadmin (local)
-docker-compose.prod.yml Produção: app em 127.0.0.1:9080, sem phpMyAdmin
+docker-compose.prod.yml Produção: app na porta pública 9080, sem phpMyAdmin
 .env.docker             Env pronto para os containers locais
 .env.production.example Modelo de env de produção (não commitar .env.production)
 docs/DEPLOY-VPS.md      Guia espelhado da seção Deploy na VPS
+docs/DEPLOY-EASYPANEL-TRAEFIK.md  EasyPanel em 80/443; app em :9080
 ```
 
 ## Deploy na VPS (produção)
 
-Publicação com **Docker Compose de produção** atrás do **Nginx do host** (reverse proxy + SSL). Isola este projeto dos outros em `/var/www/` (ex.: `farmaciatrabalhadorpm.com.br`).
+Publicação com **Docker Compose** na **porta 9080**. EasyPanel continua em 80/443 — não alterar.
 
 | Camada | Onde | Função |
 |--------|------|--------|
-| Nginx + Certbot | host | HTTPS → `127.0.0.1:9080` |
-| `parque_prod_app` | Docker | Laravel + Apache (só localhost) |
+| EasyPanel | Docker | 80/443 (outros apps) |
+| `parque_prod_app` | Docker | Laravel + Apache em **:9080** |
 | `parque_prod_queue` | Docker | `queue:work` |
 | `parque_prod_scheduler` | Docker | `schedule:run` a cada minuto |
 | `parque_prod_db` | Docker | MySQL 8 (sem porta pública) |
 
 - Pasta no servidor: `/var/www/dsa-eco`
 - Repo: `git@github.com:DSASOFTWEB/DSA-ECO.git`
-- Arquivos: `Dockerfile.prod`, `docker-compose.prod.yml`, `deploy/`, `.env.production.example`
-- Guia detalhado: [docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md)
+- Guia: [docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md)
 
 **Premissas:** sem phpMyAdmin em produção; entrypoint de prod **não** roda seed de demonstração (só `migrate`).
 

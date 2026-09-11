@@ -34,9 +34,18 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
 
-        // Deriva do APP_URL configurado por ambiente — evita Host Header
-        // Injection (envenenamento de link/cache) sem hardcodar domínio.
-        $middleware->trustHosts(at: fn () => [parse_url((string) config('app.url'), PHP_URL_HOST)]);
+        // Host permitido = domínio do APP_URL + localhost (healthcheck Docker
+        // faz curl em http://localhost/...; sem isso o TrustHosts devolve 400
+        // e o container fica "unhealthy" mesmo com a app no ar).
+        $middleware->trustHosts(at: function () {
+            $hosts = ['localhost', '127.0.0.1'];
+            $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+            if (is_string($appHost) && $appHost !== '') {
+                $hosts[] = $appHost;
+            }
+
+            return array_values(array_unique($hosts));
+        });
 
         // Só entra em ação se as requisições realmente chegarem via um
         // proxy nessas faixas privadas (ex.: nginx/load balancer na mesma

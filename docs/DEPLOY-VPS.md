@@ -161,7 +161,8 @@ bash /var/www/dsa-eco/deploy/deploy.sh
 
 | Sintoma | Checagem |
 |---------|----------|
-| 502 Bad Gateway | `docker compose ... ps` — app healthy? `curl -I http://127.0.0.1:9080/login` |
+| 502 Bad Gateway | `docker compose ... ps` — app healthy? `curl -I http://127.0.0.1:9080/up` |
+| `parque_prod_app` unhealthy | `docker logs parque_prod_app --tail 100` — APP_KEY vazia? migrate? |
 | Migrate falha | logs: `docker compose -f docker-compose.prod.yml logs app` |
 | Git pull denied | deploy key no GitHub + `IdentityFile` no `/root/.ssh/config` |
 | SSH do PC falha | chave em `authorized_keys` + `HostName` com IP correto |

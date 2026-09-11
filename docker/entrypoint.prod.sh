@@ -10,13 +10,18 @@ set -e
 mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache/data storage/logs bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache
 
-echo "[entrypoint.prod] Aguardando o MySQL (${DB_HOST}:${DB_PORT})..."
-until php -r "new PDO('mysql:host=${DB_HOST};port=${DB_PORT}', '${DB_USERNAME}', '${DB_PASSWORD}');" 2>/dev/null; do
+echo "[entrypoint.prod] Aguardando o MySQL (${DB_HOST}:${DB_PORT}/${DB_DATABASE})..."
+until php -r "new PDO('mysql:host=${DB_HOST};port=${DB_PORT};dbname=${DB_DATABASE}', '${DB_USERNAME}', '${DB_PASSWORD}');" 2>/dev/null; do
     sleep 2
 done
 echo "[entrypoint.prod] MySQL disponível."
 
 if [ "$1" = "apache2-foreground" ]; then
+    if [ -z "${APP_KEY:-}" ]; then
+        echo "[entrypoint.prod] ERRO: APP_KEY vazia. Rode: bash deploy/gerar-env-production.sh" >&2
+        exit 1
+    fi
+
     php artisan package:discover --ansi || true
 
     echo "[entrypoint.prod] Rodando migrations..."

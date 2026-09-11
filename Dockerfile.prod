@@ -50,8 +50,10 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
     && chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 80
-HEALTHCHECK --interval=15s --timeout=5s --start-period=90s --retries=8 \
-    CMD curl -f http://localhost/login || exit 1
+# /up = health nativo do Laravel (não depende de sessão/login).
+# start-period alto: migrate + config:cache na 1ª subida demora.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=120s --retries=10 \
+    CMD curl -fsS http://127.0.0.1/up || exit 1
 
 ENTRYPOINT ["entrypoint.sh"]
 CMD ["apache2-foreground"]

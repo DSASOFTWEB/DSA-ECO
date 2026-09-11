@@ -249,16 +249,135 @@ database/
 resources/views/        Blade + Tailwind (painel admin)
 routes/                 web.php, api.php, console.php (scheduler)
 tests/Feature/          Testes de integração dos fluxos críticos
-docker/                 apache-vhost.conf, entrypoint.sh (usados pelo Dockerfile)
-Dockerfile              Build multi-stage: assets (Node) + app (PHP/Apache)
-docker-compose.yml      app + queue + scheduler + db (MySQL) + phpmyadmin
-.env.docker             Env pronto para os containers (ver "Subir com Docker")
+docker/                 apache-vhost.conf, entrypoint.sh / entrypoint.prod.sh
+deploy/                 nginx-dsa-eco.conf, deploy.sh (VPS)
+Dockerfile              Build multi-stage: assets (Node) + app (PHP/Apache) — local
+Dockerfile.prod         Imagem de produção (composer --no-dev, sem seed)
+docker-compose.yml      app + queue + scheduler + db + phpmyadmin (local)
+docker-compose.prod.yml Produção: app em 127.0.0.1:9080, sem phpMyAdmin
+.env.docker             Env pronto para os containers locais
+.env.production.example Modelo de env de produção (não commitar .env.production)
+docs/DEPLOY-VPS.md      Guia espelhado da seção Deploy na VPS
 ```
 
-## Deploy na VPS
+## Deploy na VPS (produção)
 
-Stack de produção (Docker atrás do Nginx do host): veja [docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md).  
-Arquivos: `Dockerfile.prod`, `docker-compose.prod.yml`, `deploy/`.
+Publicação com **Docker Compose de produção** atrás do **Nginx do host** (reverse proxy + SSL). Isola este projeto dos outros em `/var/www/` (ex.: `farmaciatrabalhadorpm.com.br`).
+
+| Camada | Onde | Função |
+|--------|------|--------|
+| Nginx + Certbot | host | HTTPS → `127.0.0.1:9080` |
+| `parque_prod_app` | Docker | Laravel + Apache (só localhost) |
+| `parque_prod_queue` | Docker | `queue:work` |
+| `parque_prod_scheduler` | Docker | `schedule:run` a cada minuto |
+| `parque_prod_db` | Docker | MySQL 8 (sem porta pública) |
+
+- Pasta no servidor: `/var/www/dsa-eco`
+- Repo: `git@github.com:DSASOFTWEB/DSA-ECO.git`
+- Arquivos: `Dockerfile.prod`, `docker-compose.prod.yml`, `deploy/`, `.env.production.example`
+- Guia detalhado: [docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md)
+
+**Premissas:** sem phpMyAdmin em produção; entrypoint de prod **não** roda seed de demonstração (só `migrate`).
+
+### 1. Chave SSH do PC → VPS
+
+No PC (já gerada para este projeto):
+
+- Privada: `~/.ssh/id_ed25519_dsa_eco`
+- Pública: `~/.ssh/id_ed25519_dsa_eco.pub`
+- Alias: `vps-dsa-eco` em `~/.ssh/config`
+
+Chave pública (cole na VPS):
+
+```
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAB3ujnwlhyBJrvKa14DUDQi2RSQEHIdZkae7RfFAbw9 dsa-eco-vps-deploy@idtecnologia
+```
+
+Na VPS, como root:
+
+```bash
+mkdir -p /root/.ssh && chmod 700 /root/.ssh
+echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAB3ujnwlhyBJrvKa14DUDQi2RSQEHIdZkae7RfFAbw9 dsa-eco-vps-deploy@idtecnologia' >> /root/.ssh/authorized_keys
+chmod 600 /root/.ssh/authorized_keys
+```
+
+No PC, `~/.ssh/config` deve ter algo assim (troque `HostName` pelo **IP** se o hostname não resolver):
+
+```
+Host vps-dsa-eco
+  HostName v33654orikic
+  User root
+  IdentityFile ~/.ssh/id_ed25519_dsa_eco
+  IdentitiesOnly yes
+```
+
+Teste: `ssh vps-dsa-eco`
+
+### 2. Deploy key da VPS → GitHub (somente leitura)
+
+Chave **diferente** da do PC — gerada na VPS:
+
+```bash
+ssh-keygen -t ed25519 -f /root/.ssh/id_ed25519_dsa_eco_deploy -N "" -C "vps-dsa-eco-github-deploy"
+cat /root/.ssh/id_ed25519_dsa_eco_deploy.pub
+```
+
+GitHub → repo **DSA-ECO** → **Settings → Deploy keys → Add deploy key** (sem write).  
+Na VPS, aponte o SSH do GitHub para essa chave:
+
+```bash
+cat >> /root/.ssh/config <<'EOF'
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile /root/.ssh/id_ed25519_dsa_eco_deploy
+  IdentitiesOnly yes
+EOF
+chmod 600 /root/.ssh/config
+ssh -T git@github.com
+```
+
+### 3. Primeiro deploy
+
+Pré-requisitos: `docker`, `docker compose`, `nginx` na VPS.
+
+```bash
+mkdir -p /var/www/dsa-eco
+git clone git@github.com:DSASOFTWEB/DSA-ECO.git /var/www/dsa-eco
+cd /var/www/dsa-eco
+
+cp .env.production.example .env.production
+nano .env.production   # APP_KEY, APP_URL, DB_PASSWORD, DB_ROOT_PASSWORD
+
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+docker compose -f docker-compose.prod.yml ps
+curl -I http://127.0.0.1:9080/login
+```
+
+Crie o admin (prod **não** faz seed). Exemplo via tinker ou, só se consciente, `db:seed` uma vez.
+
+### 4. Nginx + SSL
+
+```bash
+cp /var/www/dsa-eco/deploy/nginx-dsa-eco.conf /etc/nginx/sites-available/dsa-eco
+nano /etc/nginx/sites-available/dsa-eco   # troque SEU_DOMINIO.com.br
+ln -sf /etc/nginx/sites-available/dsa-eco /etc/nginx/sites-enabled/dsa-eco
+nginx -t && systemctl reload nginx
+certbot --nginx -d seu-dominio.com.br -d www.seu-dominio.com.br
+```
+
+### 5. Atualizações seguintes
+
+```powershell
+git push origin main
+ssh vps-dsa-eco "bash /var/www/dsa-eco/deploy/deploy.sh"
+```
+
+### Segurança
+
+- Não commitar `.env.production` (já no `.gitignore`).
+- MySQL e porta `9080` só em localhost; firewall: 22/80/443.
+- `APP_DEBUG=false` e `SESSION_SECURE_COOKIE=true` com HTTPS.
 
 ## Usuários de demonstração (somente Docker local / seed)
 

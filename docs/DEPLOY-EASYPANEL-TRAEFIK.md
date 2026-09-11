@@ -43,8 +43,19 @@ curl -I -H 'Host: softplanerp.com.br' http://127.0.0.1/up
 curl -I http://softplanerp.com.br/up
 ```
 
-## HTTPS (depois)
+## HTTPS
 
-No EasyPanel, ative HTTPS no domínio ou acrescente router `https` + `tls.certResolver`
-no custom (nome do resolver: inspecione env do container Traefik).
-Aí mude `APP_URL=https://softplanerp.com.br` e `SESSION_SECURE_COOKIE=true`.
+O arquivo `deploy/traefik-dsa-eco.custom.yaml` já contém routers para os entrypoints
+`http` e `https`. O router HTTPS usa `tls: {}` para aproveitar o certificado gerenciado
+pelo EasyPanel. Depois que o domínio estiver com certificado válido, configure:
+
+```dotenv
+APP_URL=https://softplanerp.com.br
+SESSION_SECURE_COOKIE=true
+```
+
+Recrie o app para aplicar as variáveis, sem remover volumes:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate app
+```

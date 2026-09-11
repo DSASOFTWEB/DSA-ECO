@@ -11,6 +11,7 @@ use App\Http\Requests\Food\UpdatePontoAtendimentoRequest;
 use App\Models\Atendimento;
 use App\Models\AtendimentoItem;
 use App\Models\Caixa;
+use App\Models\CategoriaProduto;
 use App\Models\PontoAtendimento;
 use App\Models\Produto;
 use App\Models\Unidade;
@@ -49,7 +50,7 @@ class FoodController extends Controller
             : $resultado['criados'].' '.$rotulo.' cadastradas (nº '.$resultado['inicial'].' a '.$resultado['final'].').';
 
         return redirect()
-            ->route('food.index', [
+            ->route('empresa.edit', [
                 'unidade_id' => $request->integer('unidade_id'),
                 'tipo' => $resultado['tipo'],
             ])
@@ -76,15 +77,22 @@ class FoodController extends Controller
     {
         $this->authorize('view', $atendimento);
         $atendimento->load(['ponto', 'unidade', 'cliente', 'abertoPor', 'itens.produto']);
-        $produtos = Produto::ativos()->where(fn ($query) => $query
-            ->whereNull('unidade_id')->orWhere('unidade_id', $atendimento->unidade_id))
-            ->orderBy('nome')->get();
+        $produtos = Produto::ativos()
+            ->with('categoria')
+            ->where(fn ($query) => $query
+                ->whereNull('unidade_id')->orWhere('unidade_id', $atendimento->unidade_id))
+            ->orderBy('nome')
+            ->get();
+        $categorias = CategoriaProduto::query()
+            ->whereIn('id', $produtos->pluck('categoria_id')->filter()->unique())
+            ->orderBy('nome')
+            ->get();
         $destinos = PontoAtendimento::where('unidade_id', $atendimento->unidade_id)
             ->where('id', '!=', $atendimento->ponto_atendimento_id)
             ->whereNotIn('status', ['reservada', 'bloqueada'])->orderBy('tipo')->orderBy('numero')->get();
         $caixas = Caixa::where('unidade_id', $atendimento->unidade_id)->where('status', 'aberto')->with('terminal')->get();
 
-        return view('food.atendimento', compact('atendimento', 'produtos', 'destinos', 'caixas'));
+        return view('food.atendimento', compact('atendimento', 'produtos', 'categorias', 'destinos', 'caixas'));
     }
 
     public function adicionarItem(StoreAtendimentoItemRequest $request, Atendimento $atendimento): RedirectResponse

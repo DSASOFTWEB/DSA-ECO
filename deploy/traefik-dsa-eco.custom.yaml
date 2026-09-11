@@ -9,7 +9,7 @@
 #
 # 2) Confira entrypoints:
 #      TRAEFIK=$(docker ps -q -f name=easypanel-traefik | head -1)
-#      docker inspect "$TRAEFIK" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -i ENTRYPOINT
+#      docker inspect "$TRAEFIK" | grep -i ENTRYPOINT
 #    EasyPanel costuma usar: http / https
 #
 # 3) Instale:
@@ -32,6 +32,13 @@ http:
       entryPoints:
         - http
       service: dsa-eco
+
+    dsa-eco-secure:
+      rule: "Host(`softplanerp.com.br`) || Host(`www.softplanerp.com.br`)"
+      entryPoints:
+        - https
+      service: dsa-eco
+      tls: {}
 
   services:
     dsa-eco:

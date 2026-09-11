@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Empresa\UpdateEmpresaRequest;
 use App\Models\Empresa;
+use App\Models\PontoAtendimento;
+use App\Models\Unidade;
 use App\Services\EmpresaService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -25,8 +27,22 @@ class EmpresaController extends Controller
         Gate::authorize('empresa.gerenciar');
 
         $empresa = Empresa::findOrFail(request()->user()->empresa_id);
+        $unidades = Unidade::ativas()->orderBy('nome')->get();
+        $unidadeFoodId = (int) request()->integer('unidade_id')
+            ?: (request()->user()->unidade_id ?: $unidades->first()?->id);
+        $tipoFood = in_array(request()->input('tipo'), ['mesa', 'comanda'], true)
+            ? request()->input('tipo')
+            : 'mesa';
+        $pontosFood = $unidadeFoodId
+            ? PontoAtendimento::query()
+                ->where('unidade_id', $unidadeFoodId)
+                ->where('tipo', $tipoFood)
+                ->orderBy('ordem')
+                ->orderBy('numero')
+                ->get()
+            : collect();
 
-        return view('empresa.edit', compact('empresa'));
+        return view('empresa.edit', compact('empresa', 'unidades', 'unidadeFoodId', 'tipoFood', 'pontosFood'));
     }
 
     public function update(UpdateEmpresaRequest $request): RedirectResponse

@@ -164,4 +164,94 @@
             <button class="h-11 rounded-lg bg-brand-500 px-5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">Salvar alterações</button>
         </div>
     </form>
+
+    @can('create', App\Models\PontoAtendimento::class)
+    @if($unidades->isNotEmpty())
+    <section class="mt-8 max-w-3xl space-y-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
+        <div>
+            <h2 class="text-sm font-semibold text-slate-700 dark:text-white/90">Mesas e comandas (Food)</h2>
+            <p class="mt-1 text-xs text-slate-400">Cadastro em faixa por unidade. O mapa operacional fica em Mesas e Comandas.</p>
+        </div>
+
+        <form method="GET" action="{{ route('empresa.edit') }}" class="flex flex-wrap items-end gap-3">
+            <label class="text-sm font-medium text-slate-700 dark:text-white/80">Unidade
+                <select name="unidade_id" class="form-control mt-1" onchange="this.form.submit()">
+                    @foreach($unidades as $unidade)
+                        <option value="{{ $unidade->id }}" @selected($unidade->id === $unidadeFoodId)>{{ $unidade->nome }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="text-sm font-medium text-slate-700 dark:text-white/80">Tipo
+                <select name="tipo" class="form-control mt-1" onchange="this.form.submit()">
+                    <option value="mesa" @selected($tipoFood === 'mesa')>Mesas</option>
+                    <option value="comanda" @selected($tipoFood === 'comanda')>Comandas</option>
+                </select>
+            </label>
+        </form>
+
+        <div>
+            <h3 class="text-sm font-semibold text-slate-700 dark:text-white/90">
+                Cadastrar {{ $tipoFood === 'mesa' ? 'mesas' : 'comandas' }} em faixa
+            </h3>
+            <p class="mt-1 text-xs text-slate-400">
+                Números únicos por tipo nesta unidade. Ex.: 1 a 20 cria as {{ $tipoFood }}s 1…20.
+            </p>
+            <form method="POST" action="{{ route('food.pontos.store') }}" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                @csrf
+                <input type="hidden" name="unidade_id" value="{{ $unidadeFoodId }}">
+                <input type="hidden" name="tipo" value="{{ $tipoFood }}">
+
+                <label class="text-sm font-medium text-slate-700 dark:text-white/80">
+                    {{ $tipoFood === 'mesa' ? 'Mesa inicial' : 'Comanda inicial' }}
+                    <input type="number" name="numero_inicial" min="1" max="9999" required value="{{ old('numero_inicial') }}"
+                           class="form-control mt-1 @error('numero_inicial') border-rose-500 @enderror">
+                    @error('numero_inicial')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </label>
+
+                <label class="text-sm font-medium text-slate-700 dark:text-white/80">
+                    {{ $tipoFood === 'mesa' ? 'Mesa final' : 'Comanda final' }}
+                    <input type="number" name="numero_final" min="1" max="9999" required value="{{ old('numero_final') }}"
+                           class="form-control mt-1 @error('numero_final') border-rose-500 @enderror">
+                    @error('numero_final')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </label>
+
+                <label class="text-sm font-medium text-slate-700 dark:text-white/80">
+                    Capacidade (opcional)
+                    <input type="number" name="capacidade" min="1" max="999" value="{{ old('capacidade') }}"
+                           class="form-control mt-1 @error('capacidade') border-rose-500 @enderror" placeholder="Ex.: 4">
+                    @error('capacidade')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </label>
+
+                <div class="flex items-end">
+                    <button type="submit" class="h-11 w-full rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">
+                        Gerar faixa
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div>
+            <h3 class="text-sm font-semibold text-slate-700 dark:text-white/90">
+                {{ $tipoFood === 'mesa' ? 'Mesas' : 'Comandas' }} cadastradas
+                <span class="font-normal text-slate-400">({{ $pontosFood->count() }})</span>
+            </h3>
+            @if($pontosFood->isEmpty())
+                <p class="mt-2 text-sm text-slate-500">Nenhuma {{ $tipoFood }} nesta unidade.</p>
+            @else
+                <ul class="mt-3 max-h-56 divide-y overflow-y-auto rounded-xl border border-gray-200 dark:divide-gray-800 dark:border-gray-800">
+                    @foreach($pontosFood as $ponto)
+                        <li class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                            <span class="font-medium">{{ $ponto->identificacao }}</span>
+                            <span class="capitalize text-slate-500">{{ $ponto->status }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+                <a href="{{ route('food.index', ['unidade_id' => $unidadeFoodId, 'tipo' => $tipoFood]) }}" class="mt-3 inline-block text-sm font-semibold text-sky-600 hover:underline">
+                    Abrir mapa operacional →
+                </a>
+            @endif
+        </div>
+    </section>
+    @endif
+    @endcan
 @endsection

@@ -85,52 +85,13 @@
                 @endcan
             </article>
         @empty
-            <div class="col-span-full rounded-2xl border border-dashed border-gray-300 p-10 text-center text-gray-500">Nenhuma {{ $tipo }} cadastrada nesta unidade.</div>
+            <div class="col-span-full rounded-2xl border border-dashed border-gray-300 p-10 text-center text-gray-500">
+                Nenhuma {{ $tipo }} cadastrada nesta unidade.
+                @can('create', App\Models\PontoAtendimento::class)
+                    <a href="{{ route('empresa.edit', ['tipo' => $tipo, 'unidade_id' => $unidadeId]) }}" class="mt-3 block text-sm font-semibold text-sky-600 hover:underline">Cadastrar em faixa em Minha Empresa</a>
+                @endcan
+            </div>
         @endforelse
     </div>
-
-    @can('create', App\Models\PontoAtendimento::class)
-    <x-card
-        :title="$tipo === 'mesa' ? 'Cadastrar mesas em faixa' : 'Cadastrar comandas em faixa'"
-        subtitle="Vinculadas à empresa logada e à unidade selecionada acima. Números únicos por tipo nesta unidade."
-    >
-        <form method="POST" action="{{ route('food.pontos.store') }}" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            @csrf
-            <input type="hidden" name="unidade_id" value="{{ $unidadeId }}">
-            <input type="hidden" name="tipo" value="{{ $tipo }}">
-
-            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {{ $tipo === 'mesa' ? 'Mesa inicial' : 'Comanda inicial' }}
-                <input type="number" name="numero_inicial" min="1" max="9999" required value="{{ old('numero_inicial') }}"
-                       class="mt-1 w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 @error('numero_inicial') border-rose-500 @enderror">
-                @error('numero_inicial')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
-            </label>
-
-            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {{ $tipo === 'mesa' ? 'Mesa final' : 'Comanda final' }}
-                <input type="number" name="numero_final" min="1" max="9999" required value="{{ old('numero_final') }}"
-                       class="mt-1 w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 @error('numero_final') border-rose-500 @enderror">
-                @error('numero_final')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
-            </label>
-
-            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Capacidade (opcional)
-                <input type="number" name="capacidade" min="1" max="999" value="{{ old('capacidade') }}"
-                       class="mt-1 w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 @error('capacidade') border-rose-500 @enderror"
-                       placeholder="Ex.: 4">
-                @error('capacidade')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
-            </label>
-
-            <div class="flex flex-col justify-end sm:col-span-2 lg:col-span-2">
-                <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">
-                    Ex.: inicial <strong>1</strong> e final <strong>20</strong> cria as {{ $tipo }}s 1…20 desta unidade/empresa.
-                </p>
-                <x-button type="submit" class="w-full sm:w-auto">
-                    Gerar faixa de {{ $tipo }}s
-                </x-button>
-            </div>
-        </form>
-    </x-card>
-    @endcan
 </div>
 @endsection

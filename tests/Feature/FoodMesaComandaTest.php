@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Food\AtendimentoService;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
@@ -147,7 +148,7 @@ class FoodMesaComandaTest extends TestCase
                 'numero_final' => 5,
                 'capacidade' => 4,
             ])
-            ->assertRedirect(route('food.index', ['unidade_id' => $unidade->id, 'tipo' => 'mesa']));
+            ->assertRedirect(route('empresa.edit', ['unidade_id' => $unidade->id, 'tipo' => 'mesa']));
 
         $this->assertSame(5, PontoAtendimento::where('empresa_id', $empresa->id)
             ->where('unidade_id', $unidade->id)
@@ -179,7 +180,7 @@ class FoodMesaComandaTest extends TestCase
                 'numero_inicial' => 10,
                 'numero_final' => 12,
             ])
-            ->assertRedirect(route('food.index', ['unidade_id' => $unidade->id, 'tipo' => 'comanda']));
+            ->assertRedirect(route('empresa.edit', ['unidade_id' => $unidade->id, 'tipo' => 'comanda']));
 
         $this->assertSame(3, PontoAtendimento::where([
             'empresa_id' => $empresa->id,
@@ -194,7 +195,7 @@ class FoodMesaComandaTest extends TestCase
         $this->criarPonto($empresa, $unidade, 'mesa', 3);
 
         $this->actingAs($operador)
-            ->from(route('food.index', ['unidade_id' => $unidade->id, 'tipo' => 'mesa']))
+            ->from(route('empresa.edit', ['unidade_id' => $unidade->id, 'tipo' => 'mesa']))
             ->post(route('food.pontos.store'), [
                 'unidade_id' => $unidade->id,
                 'tipo' => 'mesa',
@@ -234,6 +235,8 @@ class FoodMesaComandaTest extends TestCase
             Permission::findOrCreate($nome, 'web');
         }
         $operador->givePermissionTo(['food.visualizar', 'food.operar', 'food.fechar', 'food.configurar']);
+        // Rede de segurança: se Spatie/cache mexer na conexão, não bloqueia o teste.
+        Gate::before(fn () => true);
 
         return [$empresa, $unidade, $operador];
     }

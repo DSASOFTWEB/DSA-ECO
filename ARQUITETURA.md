@@ -325,6 +325,10 @@ Arquivos de entrada: `FoodController`, `AtendimentoService`, models
 `PontoAtendimento`/`Atendimento`/`AtendimentoItem`, views `resources/views/food` e
 rotas nomeadas `food.*` em `routes/web.php`.
 
+Cadastro em faixa de mesas/comandas fica em **Minha Empresa** (`/empresa`), não no
+mapa. O mapa (`food/mapa`) é só operação. A tela de lançamento (`food/atendimento`)
+usa layout touch (categorias + grade + painel do pedido), referência ZeusFOOD.
+
 ## 15. Próximos passos sugeridos
 
 1. Validar o schema real: `docker compose up -d --build` (ver README.md, seção "Subir

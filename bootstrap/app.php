@@ -47,11 +47,20 @@ return Application::configure(basePath: dirname(__DIR__))
             return array_values(array_unique($hosts));
         });
 
-        // Proxies: rede Docker + Cloudflare (ver config/parque.php).
-        // Sem isso, atrás do CF o Laravel não vê HTTPS (X-Forwarded-Proto)
-        // e cookies/URLs/CSRF ficam inconsistentes.
-        $trusted = config('parque.trusted_proxies', []);
-        $trustAll = $trusted === ['*'] || (count($trusted) === 1 && ($trusted[0] ?? '') === '*');
+        // Proxies: rede Docker + Cloudflare.
+        // IMPORTANTE: não usar config() aqui — o withMiddleware roda antes do
+        // repositório de config estar no container (fatal: Class "config").
+        // TRUSTED_PROXIES=* só se a origem não for pública.
+        $trustedRaw = (string) env(
+            'TRUSTED_PROXIES',
+            '10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,'.
+            '173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,'.
+            '141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,'.
+            '197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,'.
+            '104.24.0.0/14,172.64.0.0/13,131.0.72.0/22'
+        );
+        $trusted = array_values(array_filter(array_map('trim', explode(',', $trustedRaw))));
+        $trustAll = $trusted === ['*'];
         $middleware->trustProxies(
             at: $trustAll ? '*' : $trusted,
             headers: Request::HEADER_X_FORWARDED_FOR

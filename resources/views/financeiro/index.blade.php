@@ -26,6 +26,70 @@
             </div>
         </div>
 
+        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="overflow-hidden rounded-2xl border border-cyan-300 bg-cyan-100 p-5 shadow-sm dark:border-cyan-700 dark:bg-cyan-500/[0.15]">
+                <div class="-mx-5 -mt-5 mb-4 h-1.5 bg-cyan-500"></div>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Total em caixa (agora)</p>
+                <p class="mt-2 text-2xl font-bold text-cyan-700 dark:text-cyan-400">R$ {{ number_format($saldoCaixas['saldo_geral'], 2, ',', '.') }}</p>
+                <p class="mt-1 text-xs text-slate-500">{{ $saldoCaixas['caixas']->count() }} caixa(s) aberto(s)</p>
+            </div>
+            <div class="overflow-hidden rounded-2xl border border-emerald-300 bg-emerald-100 p-5 shadow-sm dark:border-emerald-700 dark:bg-emerald-500/[0.15]">
+                <div class="-mx-5 -mt-5 mb-4 h-1.5 bg-emerald-500"></div>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Total de entradas (caixas abertos)</p>
+                <p class="mt-2 text-2xl font-bold text-emerald-700 dark:text-emerald-400">R$ {{ number_format($saldoCaixas['total_entradas'], 2, ',', '.') }}</p>
+            </div>
+            <div class="overflow-hidden rounded-2xl border border-rose-300 bg-rose-100 p-5 shadow-sm dark:border-rose-700 dark:bg-rose-500/[0.15]">
+                <div class="-mx-5 -mt-5 mb-4 h-1.5 bg-rose-500"></div>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Total de saídas (caixas abertos)</p>
+                <p class="mt-2 text-2xl font-bold text-rose-700 dark:text-rose-400">R$ {{ number_format($saldoCaixas['total_saidas'], 2, ',', '.') }}</p>
+            </div>
+            <div class="overflow-hidden rounded-2xl border border-indigo-300 bg-indigo-100 p-5 shadow-sm dark:border-indigo-700 dark:bg-indigo-500/[0.15]">
+                <div class="-mx-5 -mt-5 mb-4 h-1.5 bg-indigo-500"></div>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Saldo geral consolidado</p>
+                <p class="mt-2 text-2xl font-bold text-indigo-700 dark:text-indigo-400">R$ {{ number_format($saldoCaixas['saldo_geral'], 2, ',', '.') }}</p>
+                <p class="mt-1 text-xs text-slate-500">Soma de todos os caixas abertos</p>
+            </div>
+        </div>
+
+        @if ($saldoCaixas['caixas']->isNotEmpty())
+            <div class="mt-6">
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Saldo por caixa/terminal</h2>
+                    <div class="flex gap-3 text-xs">
+                        @can('viewAny', App\Models\CaixaMovimentacao::class)
+                            <a href="{{ route('movimentacoes.index') }}" class="font-medium text-sky-600 hover:underline">Ver movimentações →</a>
+                        @endcan
+                        @can('create', App\Models\TransferenciaCaixa::class)
+                            <a href="{{ route('transferencias.index') }}" class="font-medium text-sky-600 hover:underline">Transferir entre caixas →</a>
+                        @endcan
+                        @can('auditoria.visualizar')
+                            <a href="{{ route('relatorios.movimentacoes') }}" class="font-medium text-sky-600 hover:underline">Relatórios de movimentações →</a>
+                        @endcan
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    @foreach ($saldoCaixas['caixas'] as $resumoCaixa)
+                        <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                            <p class="text-sm font-semibold text-slate-800 dark:text-white/90">{{ $resumoCaixa['caixa']->terminal->nome ?? $resumoCaixa['caixa']->unidade->nome }}</p>
+                            <p class="text-xs text-slate-400">{{ $resumoCaixa['caixa']->unidade->nome }}</p>
+                            <dl class="mt-3 space-y-1.5 text-sm">
+                                <div class="flex justify-between"><dt class="text-slate-400">Entradas</dt><dd class="font-medium text-emerald-600">+ R$ {{ number_format($resumoCaixa['entradas'], 2, ',', '.') }}</dd></div>
+                                <div class="flex justify-between"><dt class="text-slate-400">Saídas</dt><dd class="font-medium text-rose-600">- R$ {{ number_format($resumoCaixa['saidas'], 2, ',', '.') }}</dd></div>
+                                <div class="flex justify-between border-t border-gray-100 pt-1.5 dark:border-gray-800"><dt class="font-medium text-slate-600 dark:text-slate-300">Saldo atual</dt><dd class="font-bold text-slate-800 dark:text-white/90">R$ {{ number_format($resumoCaixa['saldo_atual'], 2, ',', '.') }}</dd></div>
+                            </dl>
+                            @if (! empty($resumoCaixa['por_forma_pagamento']))
+                                <div class="mt-3 border-t border-gray-100 pt-2 text-xs text-slate-500 dark:border-gray-800">
+                                    @foreach ($resumoCaixa['por_forma_pagamento'] as $forma => $valor)
+                                        <div class="flex justify-between"><span>{{ \App\Support\Financeiro::labelFormaPagamento($forma) }}</span><span>R$ {{ number_format($valor, 2, ',', '.') }}</span></div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         <div class="mt-6 flex gap-2 border-b border-gray-200 dark:border-gray-800">
             <button type="button" @click="aba = 'pagar'" :class="aba === 'pagar' ? 'border-rose-500 text-rose-700 dark:text-rose-400' : 'border-transparent text-slate-500 hover:text-slate-700'" class="border-b-2 px-4 py-2.5 text-sm font-medium transition">Contas a pagar</button>
             <button type="button" @click="aba = 'receber'" :class="aba === 'receber' ? 'border-emerald-500 text-emerald-700 dark:text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-700'" class="border-b-2 px-4 py-2.5 text-sm font-medium transition">Contas a receber</button>
@@ -83,15 +147,21 @@
                                 <td class="px-4 py-3">
                                     @if (in_array($conta->status, ['pendente', 'atrasado']))
                                         @can('update', $conta)
-                                            <form method="POST" action="{{ route('contas-pagar.pagar', $conta) }}" class="flex items-center gap-2" onsubmit="return confirm('Confirmar pagamento desta conta?')">
+                                            <form method="POST" action="{{ route('contas-pagar.pagar', $conta) }}" class="flex flex-wrap items-center gap-2" onsubmit="return confirm('Confirmar pagamento desta conta?')">
                                                 @csrf
                                                 <select name="forma_pagamento" required class="rounded-lg border border-slate-300 px-2 py-1.5 text-xs dark:border-gray-700">
-                                                    <option value="dinheiro">Dinheiro</option>
-                                                    <option value="pix">Pix</option>
-                                                    <option value="cartao">Cartão</option>
-                                                    <option value="transferencia">Transferência</option>
-                                                    <option value="boleto">Boleto</option>
+                                                    @foreach ($formasPagamento as $chave => $forma)
+                                                        <option value="{{ $chave }}">{{ $forma['label'] }}</option>
+                                                    @endforeach
                                                 </select>
+                                                @if ($caixasAbertos->count() > 1)
+                                                    <select name="caixa_id" required class="rounded-lg border border-slate-300 px-2 py-1.5 text-xs dark:border-gray-700">
+                                                        <option value="">Caixa...</option>
+                                                        @foreach ($caixasAbertos as $caixaAberto)
+                                                            <option value="{{ $caixaAberto->id }}">{{ $caixaAberto->terminal->nome ?? $caixaAberto->unidade->nome }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                @endif
                                                 <button class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Dar baixa</button>
                                             </form>
                                         @endcan
@@ -165,15 +235,21 @@
                                 <td class="px-4 py-3">
                                     @if (in_array($conta->status, ['pendente', 'atrasado']))
                                         @can('update', $conta)
-                                            <form method="POST" action="{{ route('contas-receber.receber', $conta) }}" class="flex items-center gap-2" onsubmit="return confirm('Confirmar recebimento desta conta?')">
+                                            <form method="POST" action="{{ route('contas-receber.receber', $conta) }}" class="flex flex-wrap items-center gap-2" onsubmit="return confirm('Confirmar recebimento desta conta?')">
                                                 @csrf
                                                 <select name="forma_pagamento" required class="rounded-lg border border-slate-300 px-2 py-1.5 text-xs dark:border-gray-700">
-                                                    <option value="dinheiro">Dinheiro</option>
-                                                    <option value="pix">Pix</option>
-                                                    <option value="cartao">Cartão</option>
-                                                    <option value="transferencia">Transferência</option>
-                                                    <option value="boleto">Boleto</option>
+                                                    @foreach ($formasPagamento as $chave => $forma)
+                                                        <option value="{{ $chave }}">{{ $forma['label'] }}</option>
+                                                    @endforeach
                                                 </select>
+                                                @if ($caixasAbertos->count() > 1)
+                                                    <select name="caixa_id" required class="rounded-lg border border-slate-300 px-2 py-1.5 text-xs dark:border-gray-700">
+                                                        <option value="">Caixa...</option>
+                                                        @foreach ($caixasAbertos as $caixaAberto)
+                                                            <option value="{{ $caixaAberto->id }}">{{ $caixaAberto->terminal->nome ?? $caixaAberto->unidade->nome }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                @endif
                                                 <button class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Dar baixa</button>
                                             </form>
                                         @endcan

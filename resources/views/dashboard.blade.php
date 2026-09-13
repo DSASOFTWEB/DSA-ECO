@@ -69,6 +69,26 @@
         </div>
     </div>
 
+    @if ($entradasPorTipoEntrada->isNotEmpty())
+        <hr class="my-6 border-gray-200 dark:border-gray-800">
+        <div>
+            <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Entrada por tipo de ingresso no parque</h2>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 md:gap-6">
+                @foreach ($entradasPorTipoEntrada as $i => $entradaTipo)
+                    @php
+                        $cor = $kpiCards[$i % count($kpiCards)];
+                    @endphp
+                    <div class="overflow-hidden rounded-2xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:p-6 {{ $cor['card'] }}">
+                        <div class="-mx-5 -mt-5 mb-4 h-1.5 md:-mx-6 md:-mt-6 {{ $cor['accent'] }}"></div>
+                        <p class="truncate text-xs font-medium uppercase tracking-wide text-slate-400" title="{{ $entradaTipo['nome'] }}">{{ $entradaTipo['nome'] }}</p>
+                        <p class="mt-2 text-3xl font-bold tracking-tight {{ $cor['valor'] }}">{{ $entradaTipo['quantidade'] }}</p>
+                        <p class="mt-1 text-xs text-slate-400">Entradas hoje</p>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <div class="mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
         <div class="mb-4 flex items-center justify-between">
             <h2 class="text-sm font-semibold text-slate-700">Saldo do caixa — últimos 14 dias</h2>

@@ -14,12 +14,13 @@ class Quarto extends Model
     use BelongsToTenant, HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'empresa_id', 'unidade_id', 'numero', 'capacidade_maxima', 'valor_diaria', 'status', 'observacoes',
+        'empresa_id', 'unidade_id', 'numero', 'capacidade_maxima', 'valor_diaria', 'status', 'precisa_limpeza', 'observacoes',
     ];
 
     protected $casts = [
         'capacidade_maxima' => 'integer',
         'valor_diaria' => 'decimal:2',
+        'precisa_limpeza' => 'boolean',
     ];
 
     public function unidade(): BelongsTo
@@ -30,6 +31,11 @@ class Quarto extends Model
     public function hospedagens(): HasMany
     {
         return $this->hasMany(Hospedagem::class);
+    }
+
+    public function itensComodato(): HasMany
+    {
+        return $this->hasMany(QuartoItem::class);
     }
 
     public function scopeAtivos($query)

@@ -27,7 +27,7 @@ class HospedagemService
     ) {}
 
     /**
-     * @param  array{quarto_id:int, cliente_id:int, quantidade_hospedes?:int, data_checkin_prevista:string, data_checkout_prevista:string, observacoes?:string}  $dados
+     * @param  array{quarto_id:int, cliente_id:int, quantidade_adultos?:int, quantidade_criancas?:int, quantidade_isentos?:int, data_checkin_prevista:string, data_checkout_prevista:string, observacoes?:string}  $dados
      */
     public function reservar(array $dados, User $operador): Hospedagem
     {
@@ -38,7 +38,11 @@ class HospedagemService
             throw new NegocioException('A data de check-out precisa ser depois da data de check-in.');
         }
 
-        return DB::transaction(function () use ($dados, $operador, $checkin, $checkout) {
+        $adultos = (int) ($dados['quantidade_adultos'] ?? 1);
+        $criancas = (int) ($dados['quantidade_criancas'] ?? 0);
+        $isentos = (int) ($dados['quantidade_isentos'] ?? 0);
+
+        return DB::transaction(function () use ($dados, $operador, $checkin, $checkout, $adultos, $criancas, $isentos) {
             // Trava a linha do quarto durante a checagem de disponibilidade
             // — mesmo padrão de CaixaService::abrir() — pra duas reservas
             // simultâneas no mesmo quarto/período não passarem juntas.
@@ -52,7 +56,13 @@ class HospedagemService
                 'unidade_id' => $quarto->unidade_id,
                 'quarto_id' => $quarto->id,
                 'cliente_id' => $cliente->id,
-                'quantidade_hospedes' => $dados['quantidade_hospedes'] ?? 1,
+                // quantidade_hospedes fica derivado (soma) pra continuar
+                // servindo quem já lê esse campo (ex: capacidade do quarto),
+                // sem precisar duplicar a soma em toda tela.
+                'quantidade_hospedes' => $adultos + $criancas + $isentos,
+                'quantidade_adultos' => $adultos,
+                'quantidade_criancas' => $criancas,
+                'quantidade_isentos' => $isentos,
                 'valor_diaria' => $quarto->valor_diaria,
                 'data_checkin_prevista' => $checkin->toDateString(),
                 'data_checkout_prevista' => $checkout->toDateString(),
@@ -172,8 +182,18 @@ class HospedagemService
                 'caixa_id' => $caixa->id,
             ]);
 
+            // O quarto fica "sujo" até alguém marcar a limpeza como
+            // concluída (ver marcarQuartoLimpo()) — não libera pra nova
+            // reserva sozinho no mapa de quartos.
+            $hospedagem->quarto->update(['precisa_limpeza' => true]);
+
             return $hospedagem->fresh(['quarto', 'cliente', 'consumos']);
         });
+    }
+
+    public function marcarQuartoLimpo(Quarto $quarto): void
+    {
+        $quarto->update(['precisa_limpeza' => false]);
     }
 
     public function cancelar(Hospedagem $hospedagem): Hospedagem
@@ -253,6 +273,140 @@ class HospedagemService
             'total_faturado' => $totalFaturado,
             'ticket_medio' => $totalEstadias > 0 ? round($totalFaturado / $totalEstadias, 2) : 0.0,
             'por_quarto' => $porQuarto,
+        ];
+    }
+
+    /**
+     * Status visual de cada quarto pro Mapa de Quartos: bloqueado (quarto
+     * inativo/em manutenção) > ocupado (tem hospedagem em andamento) >
+     * em_limpeza (check-out feito, ninguém marcou limpo ainda) > reservado
+     * (tem reserva futura, ainda sem check-in) > disponível. Junto com o
+     * status, traz a hospedagem relevante (a hospedada, ou a próxima
+     * reserva) pra mostrar hóspede/datas no card.
+     *
+     * @return \Illuminate\Support\Collection<int, array{quarto: Quarto, status: string, hospedagem: ?Hospedagem}>
+     */
+    public function mapaQuartos(): \Illuminate\Support\Collection
+    {
+        $quartos = Quarto::with(['unidade', 'hospedagens' => function ($q) {
+            $q->whereIn('status', ['reservado', 'hospedado'])
+                ->with('cliente')
+                ->orderBy('data_checkin_prevista');
+        }])->orderBy('numero')->get();
+
+        return $quartos->map(function (Quarto $quarto) {
+            $hospedada = $quarto->hospedagens->firstWhere('status', 'hospedado');
+            $reservada = $quarto->hospedagens->firstWhere('status', 'reservado');
+
+            $status = match (true) {
+                $quarto->status !== 'ativo' => 'bloqueado',
+                $hospedada !== null => 'ocupado',
+                $quarto->precisa_limpeza => 'em_limpeza',
+                $reservada !== null => 'reservado',
+                default => 'disponivel',
+            };
+
+            return [
+                'quarto' => $quarto,
+                'status' => $status,
+                'hospedagem' => $hospedada ?? $reservada,
+            ];
+        });
+    }
+
+    /**
+     * Indicadores da pousada no período: taxa de ocupação, RevPAR e diária
+     * média (ADR) calculados sobre estadias FINALIZADAS com check-out no
+     * período (mesma base de relatorioPeriodo(), pra bater com o relatório
+     * já existente). "Quartos-noite disponíveis" = quartos ativos × dias do
+     * período — é o denominador padrão de ocupação/RevPAR em hotelaria.
+     *
+     * @return array{taxa_ocupacao:float, revpar:float, diaria_media:float, receita:float, novas_reservas:int, numero_hospedes:int, reservas_canceladas:int}
+     */
+    public function indicadores(Carbon $inicio, Carbon $fim): array
+    {
+        $quartosAtivos = Quarto::ativos()->count();
+        $dias = max(1, $inicio->copy()->startOfDay()->diffInDays($fim->copy()->startOfDay()) + 1);
+        $quartosNoiteDisponiveis = $quartosAtivos * $dias;
+
+        $finalizadas = Hospedagem::where('status', 'finalizado')
+            ->whereBetween('data_checkout_real', [$inicio->copy()->startOfDay(), $fim->copy()->endOfDay()])
+            ->get();
+
+        $receita = round((float) $finalizadas->sum('valor_total'), 2);
+        $noitesVendidas = $finalizadas->sum(fn (Hospedagem $h) => max(1, $h->data_checkin_real?->diffInDays($h->data_checkout_real) ?? 1));
+
+        return [
+            'taxa_ocupacao' => $quartosNoiteDisponiveis > 0 ? round($noitesVendidas / $quartosNoiteDisponiveis * 100, 1) : 0.0,
+            'revpar' => $quartosNoiteDisponiveis > 0 ? round($receita / $quartosNoiteDisponiveis, 2) : 0.0,
+            'diaria_media' => $noitesVendidas > 0 ? round($receita / $noitesVendidas, 2) : 0.0,
+            'receita' => $receita,
+            'novas_reservas' => Hospedagem::whereBetween('created_at', [$inicio, $fim])->count(),
+            'numero_hospedes' => (int) $finalizadas->sum('quantidade_hospedes'),
+            'reservas_canceladas' => Hospedagem::where('status', 'cancelado')->whereBetween('updated_at', [$inicio, $fim])->count(),
+        ];
+    }
+
+    /**
+     * Novas reservas x canceladas por dia, pro gráfico da tela de
+     * indicadores — mesmo padrão de iteração dia-a-dia de
+     * RelatorioService::fluxoDeCaixaPeriodo().
+     *
+     * @return \Illuminate\Support\Collection<int, array{data: Carbon, novas: int, canceladas: int}>
+     */
+    public function indicadoresPorDia(Carbon $inicio, Carbon $fim): \Illuminate\Support\Collection
+    {
+        $novasPorDia = Hospedagem::whereBetween('created_at', [$inicio, $fim])
+            ->selectRaw('DATE(created_at) as dia, COUNT(*) as total')
+            ->groupBy('dia')
+            ->pluck('total', 'dia');
+
+        $canceladasPorDia = Hospedagem::where('status', 'cancelado')
+            ->whereBetween('updated_at', [$inicio, $fim])
+            ->selectRaw('DATE(updated_at) as dia, COUNT(*) as total')
+            ->groupBy('dia')
+            ->pluck('total', 'dia');
+
+        $dias = collect();
+        $cursor = $inicio->copy()->startOfDay();
+        $fimDia = $fim->copy()->startOfDay();
+
+        while ($cursor->lte($fimDia)) {
+            $chave = $cursor->toDateString();
+
+            $dias->push([
+                'data' => $cursor->copy(),
+                'novas' => (int) ($novasPorDia[$chave] ?? 0),
+                'canceladas' => (int) ($canceladasPorDia[$chave] ?? 0),
+            ]);
+
+            $cursor->addDay();
+        }
+
+        return $dias;
+    }
+
+    /**
+     * Hóspedes hospedados (check-in já feito) cobrindo a data escolhida —
+     * usado pela lista de café da manhã da copa/cozinha.
+     *
+     * @return array{hospedagens: \Illuminate\Support\Collection, adultos: int, criancas: int, isentos: int, total: int}
+     */
+    public function listaCafeDaManha(Carbon $data): array
+    {
+        $hospedagens = Hospedagem::where('status', 'hospedado')
+            ->whereDate('data_checkin_real', '<=', $data)
+            ->where(fn ($q) => $q->whereNull('data_checkout_prevista')->orWhereDate('data_checkout_prevista', '>=', $data))
+            ->with(['quarto', 'cliente'])
+            ->get()
+            ->sortBy(fn (Hospedagem $h) => $h->quarto->numero);
+
+        return [
+            'hospedagens' => $hospedagens,
+            'adultos' => (int) $hospedagens->sum('quantidade_adultos'),
+            'criancas' => (int) $hospedagens->sum('quantidade_criancas'),
+            'isentos' => (int) $hospedagens->sum('quantidade_isentos'),
+            'total' => (int) $hospedagens->sum(fn (Hospedagem $h) => $h->quantidade_adultos + $h->quantidade_criancas + $h->quantidade_isentos),
         ];
     }
 

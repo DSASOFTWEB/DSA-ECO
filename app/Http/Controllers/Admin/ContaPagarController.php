@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Exceptions\NegocioException;
 use App\Http\Controllers\Controller;
 use App\Models\ContaPagar;
+use App\Models\User;
 use App\Services\CaixaService;
 use App\Services\FinanceiroGestaoService;
+use App\Support\Financeiro;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ContaPagarController extends Controller
 {
@@ -64,10 +67,15 @@ class ContaPagarController extends Controller
         $this->authorize('update', $contaPagar);
 
         $dados = $request->validate([
-            'forma_pagamento' => ['required', 'string', 'max:30'],
+            'forma_pagamento' => ['required', Rule::in(array_keys(Financeiro::FORMAS_PAGAMENTO))],
+            'caixa_id' => ['nullable', 'integer'],
         ]);
 
-        $caixa = $this->caixaService->caixaAbertoDaUnidade($contaPagar->unidade);
+        [$caixa, $caixasDisponiveis] = $this->resolverCaixaDaConta($contaPagar->unidade_id, $request->user(), $dados['caixa_id'] ?? null);
+
+        if ($caixasDisponiveis->count() > 1 && ! $caixa) {
+            return back()->with('erro', 'Selecione em qual caixa esta saída deve ser lançada — há mais de um caixa aberto.');
+        }
 
         try {
             $this->financeiroGestaoService->marcarContaPagarPaga($contaPagar, $request->user(), $dados['forma_pagamento'], $caixa);
@@ -75,9 +83,33 @@ class ContaPagarController extends Controller
             return back()->with('erro', $e->getMessage());
         }
 
-        $mensagem = 'Conta marcada como paga.'.($caixa ? ' Lançada no caixa aberto da unidade.' : ' Não havia caixa aberto na unidade — apenas a baixa foi registrada.');
+        $mensagem = 'Conta marcada como paga.'.($caixa ? " Lançada no caixa {$caixa->terminal?->nome}." : ' Não havia caixa aberto — apenas a baixa foi registrada.');
 
         return back()->with('sucesso', $mensagem);
+    }
+
+    /**
+     * Caixas abertos candidatos pra lançar a baixa: prioriza a unidade da
+     * PRÓPRIA conta (quando ela tem uma definida — comportamento já
+     * existente), senão usa a unidade do operador logado (ou a empresa
+     * toda, se ele não tiver unidade fixa) — mesma ideia de
+     * VendaController::resolverCaixaOperador.
+     */
+    protected function resolverCaixaDaConta(?int $unidadeIdDaConta, User $user, null|string|int $caixaIdEscolhido): array
+    {
+        $unidadeId = $unidadeIdDaConta ?? $user->unidade_id;
+
+        $caixasDisponiveis = $unidadeId
+            ? $this->caixaService->caixasAbertosDaUnidade($unidadeId)
+            : $this->caixaService->caixasAbertosDaEmpresa($user->empresa_id);
+
+        if ($caixasDisponiveis->count() <= 1) {
+            return [$caixasDisponiveis->first(), $caixasDisponiveis];
+        }
+
+        $caixaEscolhido = $caixaIdEscolhido ? $caixasDisponiveis->firstWhere('id', (int) $caixaIdEscolhido) : null;
+
+        return [$caixaEscolhido, $caixasDisponiveis];
     }
 
     public function destroy(ContaPagar $contaPagar): RedirectResponse

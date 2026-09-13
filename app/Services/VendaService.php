@@ -272,6 +272,7 @@ class VendaService
                 'cliente_id' => $clienteId,
                 'venda_id' => $venda->id,
                 'venda_item_id' => $vendaItem->id,
+                'tipo_entrada_id' => $vendaItem->tipo_entrada_id,
                 'unidade_id' => $venda->unidade_id,
                 'tipo' => 'entrada',
                 'origem' => $origem,

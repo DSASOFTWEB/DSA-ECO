@@ -26,4 +26,14 @@ class QuartoPolicy
     {
         return $user->can('pousada.gerenciar') && $user->empresa_id === $quarto->empresa_id;
     }
+
+    public function limpar(User $user, Quarto $quarto): bool
+    {
+        return $user->can('pousada.limpeza') && $user->empresa_id === $quarto->empresa_id;
+    }
+
+    public function comodato(User $user, Quarto $quarto): bool
+    {
+        return $user->can('pousada.comodato') && $user->empresa_id === $quarto->empresa_id;
+    }
 }

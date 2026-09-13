@@ -21,6 +21,7 @@ class Hospedagem extends Model
 
     protected $fillable = [
         'empresa_id', 'unidade_id', 'quarto_id', 'cliente_id', 'quantidade_hospedes',
+        'quantidade_adultos', 'quantidade_criancas', 'quantidade_isentos',
         'valor_diaria', 'data_checkin_prevista', 'data_checkout_prevista',
         'data_checkin_real', 'data_checkout_real', 'valor_total', 'desconto',
         'forma_pagamento', 'status', 'observacoes', 'caixa_id', 'registrado_por_id',
@@ -28,6 +29,9 @@ class Hospedagem extends Model
 
     protected $casts = [
         'quantidade_hospedes' => 'integer',
+        'quantidade_adultos' => 'integer',
+        'quantidade_criancas' => 'integer',
+        'quantidade_isentos' => 'integer',
         'valor_diaria' => 'decimal:2',
         'valor_total' => 'decimal:2',
         'desconto' => 'decimal:2',
@@ -39,7 +43,7 @@ class Hospedagem extends Model
 
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logOnlyDirty()->dontSubmitEmptyLogs();
+        return LogOptions::defaults()->logFillable()->logOnlyDirty()->dontSubmitEmptyLogs();
     }
 
     public function quarto(): BelongsTo

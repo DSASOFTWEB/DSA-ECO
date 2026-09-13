@@ -181,7 +181,7 @@
                 </div>
                 <div class="pdv-header__acoes">
                     @if ($caixasDisponiveis->count() > 1)
-                        <a href="{{ route('vendas.create') }}" class="pdv-header__btn">Trocar terminal</a>
+                        <a href="{{ route('vendas.create', ['trocar_terminal' => 1]) }}" class="pdv-header__btn">Trocar terminal</a>
                     @endif
                     <a href="{{ route('caixas.show', $caixaAberto) }}" class="pdv-header__btn">Caixa</a>
                     <a href="{{ route('vendas.index') }}" class="pdv-header__btn pdv-header__btn--close" title="Sair do PDV">✕</a>

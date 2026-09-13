@@ -27,6 +27,10 @@
         'link' => 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
         'bed' => 'M2 20v-6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v6 M2 20h20 M4 12V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3 M12 9V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v5',
         'door' => 'M5 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17 M3 21h18 M14 12h.01',
+        'list' => 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+        'swap' => 'M7 8h13l-4-4m4 4-4 4M17 16H4l4-4m-4 4 4 4',
+        'grid' => 'M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z',
+        'coffee' => 'M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Zm13 2h1.5a2.5 2.5 0 0 1 0 5H17M8 2v2m3-2v2m3-2v2',
     ];
 @endphp
 <svg {{ $attributes }} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="{{ $paths[$name] ?? $paths['home'] }}" /></svg>

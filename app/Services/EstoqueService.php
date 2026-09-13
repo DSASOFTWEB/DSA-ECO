@@ -40,6 +40,31 @@ class EstoqueService
         return $this->movimentar($produto, 'venda', $quantidade, 'Baixa por venda', $usuarioId, saida: true, referencia: $referencia);
     }
 
+    /**
+     * Sai do estoque geral pra ficar emprestado (comodato) num quarto —
+     * mesma regra de estoque insuficiente de saidaPorVenda(), mas sem
+     * vender/faturar nada. Quem mantém "quanto está emprestado em cada
+     * quarto agora" é o QuartoEstoqueService (tabela `quarto_itens`); aqui
+     * só entra no histórico de movimentações do produto.
+     */
+    public function saidaPorComodato(Produto $produto, int $quantidade, Model $referencia, int $usuarioId): MovimentacaoEstoque
+    {
+        if ($produto->controla_estoque && $produto->estoque_atual < $quantidade) {
+            throw new NegocioException("Estoque insuficiente para o produto \"{$produto->nome}\" (disponível: {$produto->estoque_atual}, solicitado: {$quantidade}).");
+        }
+
+        return $this->movimentar($produto, 'comodato', $quantidade, 'Emprestado em comodato', $usuarioId, saida: true, referencia: $referencia);
+    }
+
+    /**
+     * Devolução de um item que estava emprestado em comodato — volta pro
+     * estoque geral.
+     */
+    public function entradaPorDevolucaoComodato(Produto $produto, int $quantidade, Model $referencia, int $usuarioId): MovimentacaoEstoque
+    {
+        return $this->movimentar($produto, 'devolucao_comodato', $quantidade, 'Devolução de comodato', $usuarioId, referencia: $referencia);
+    }
+
     protected function movimentar(
         Produto $produto,
         string $tipo,

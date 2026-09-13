@@ -73,9 +73,20 @@
                 </div>
             </div>
 
-            <div>
-                <label class="block text-sm font-medium text-slate-700">Quantidade de hóspedes</label>
-                <input type="number" name="quantidade_hospedes" min="1" max="50" value="{{ old('quantidade_hospedes', 1) }}" class="mt-1 w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Adultos</label>
+                    <input type="number" name="quantidade_adultos" min="1" max="50" value="{{ old('quantidade_adultos', 1) }}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                    @error('quantidade_adultos')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Crianças</label>
+                    <input type="number" name="quantidade_criancas" min="0" max="50" value="{{ old('quantidade_criancas', 0) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Isentos</label>
+                    <input type="number" name="quantidade_isentos" min="0" max="50" value="{{ old('quantidade_isentos', 0) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                </div>
             </div>
 
             <div>

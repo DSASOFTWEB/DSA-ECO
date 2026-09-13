@@ -3,6 +3,10 @@
 @section('titulo', 'Hospedagem — Quarto '.$hospedagem->quarto->numero)
 
 @section('conteudo')
+    <div class="mb-4">
+        <a href="{{ url()->previous(route('hospedagens.index')) }}" class="text-sm text-brand-600 hover:underline">&larr; Voltar</a>
+    </div>
+
     <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
             <h2 class="text-2xl font-bold tracking-tight text-gray-800 dark:text-white/90">Quarto {{ $hospedagem->quarto->numero }} — {{ $hospedagem->cliente->nome }}</h2>
@@ -10,6 +14,7 @@
         </div>
 
         <div class="flex flex-wrap gap-2">
+            <a href="{{ route('hospedagens.ficha', $hospedagem) }}" target="_blank" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5">🖨 Imprimir ficha</a>
             @if ($hospedagem->estaReservado())
                 @can('checkin', $hospedagem)
                     <form method="POST" action="{{ route('hospedagens.checkin', $hospedagem) }}" onsubmit="return confirm('Confirmar check-in agora?')">
@@ -35,7 +40,7 @@
         <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
             <h3 class="mb-3 text-sm font-semibold text-slate-700">Dados da estadia</h3>
             <dl class="space-y-2 text-sm">
-                <div class="flex justify-between"><dt class="text-slate-400">Hóspedes</dt><dd>{{ $hospedagem->quantidade_hospedes }}</dd></div>
+                <div class="flex justify-between"><dt class="text-slate-400">Hóspedes</dt><dd>{{ $hospedagem->quantidade_hospedes }} ({{ $hospedagem->quantidade_adultos }} adulto(s), {{ $hospedagem->quantidade_criancas }} criança(s), {{ $hospedagem->quantidade_isentos }} isento(s))</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">Diária</dt><dd>R$ {{ number_format($hospedagem->valor_diaria, 2, ',', '.') }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">Check-in previsto</dt><dd>{{ $hospedagem->data_checkin_prevista->format('d/m/Y') }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">Check-out previsto</dt><dd>{{ $hospedagem->data_checkout_prevista->format('d/m/Y') }}</dd></div>

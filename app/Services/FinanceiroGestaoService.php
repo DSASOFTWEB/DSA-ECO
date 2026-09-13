@@ -53,7 +53,7 @@ class FinanceiroGestaoService
             if ($caixa && $caixa->estaAberto()) {
                 $movimentacaoId = $caixa->movimentacoes()->create([
                     'tipo' => 'saida',
-                    'categoria' => 'despesa',
+                    'categoria' => 'conta_a_pagar',
                     'descricao' => "Pagamento: {$conta->descricao} ({$conta->fornecedor})",
                     'valor' => $conta->valor,
                     'forma_pagamento' => $formaPagamento,
@@ -90,7 +90,7 @@ class FinanceiroGestaoService
             if ($caixa && $caixa->estaAberto()) {
                 $movimentacaoId = $caixa->movimentacoes()->create([
                     'tipo' => 'entrada',
-                    'categoria' => 'outro',
+                    'categoria' => 'conta_a_receber',
                     'descricao' => "Recebimento: {$conta->descricao} ({$conta->nomePagador()})",
                     'valor' => $conta->valor,
                     'forma_pagamento' => $formaPagamento,

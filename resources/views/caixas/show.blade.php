@@ -33,14 +33,35 @@
 
     @if ($caixa->estaAberto())
         @can('registrarMovimentacao', $caixa)
-            <form method="POST" action="{{ route('caixas.movimentar', $caixa) }}" class="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <form method="POST" action="{{ route('caixas.movimentar', $caixa) }}" x-data="{ tipo: 'entrada' }" class="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 @csrf
-                <select name="tipo" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <select name="tipo" x-model="tipo" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
                     <option value="entrada">Entrada</option>
                     <option value="saida">Saída</option>
                 </select>
-                <input type="text" name="categoria" placeholder="Categoria (ex: sangria, suprimento)" required class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <select name="categoria" required class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <template x-if="tipo === 'entrada'">
+                        <optgroup label="Entrada">
+                            @foreach (\App\Support\Financeiro::CATEGORIAS_ENTRADA as $chave => $label)
+                                <option value="{{ $chave }}">{{ $label }}</option>
+                            @endforeach
+                        </optgroup>
+                    </template>
+                    <template x-if="tipo === 'saida'">
+                        <optgroup label="Saída">
+                            @foreach (\App\Support\Financeiro::CATEGORIAS_SAIDA as $chave => $label)
+                                <option value="{{ $chave }}">{{ $label }}</option>
+                            @endforeach
+                        </optgroup>
+                    </template>
+                </select>
                 <input type="text" name="descricao" placeholder="Descrição" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <select name="forma_pagamento" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Forma de pagamento</option>
+                    @foreach (\App\Support\Financeiro::FORMAS_PAGAMENTO as $chave => $forma)
+                        <option value="{{ $chave }}">{{ $forma['label'] }}</option>
+                    @endforeach
+                </select>
                 <input type="number" step="0.01" name="valor" placeholder="Valor" required class="w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm">
                 <button class="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">Registrar</button>
             </form>
@@ -61,20 +82,37 @@
         </div>
 
         <div class="overflow-x-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 lg:col-span-2">
-            <h3 class="mb-3 text-sm font-semibold text-slate-700">Movimentações</h3>
+            <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-slate-700">Movimentações</h3>
+                @can('viewAny', App\Models\CaixaMovimentacao::class)
+                    <a href="{{ route('movimentacoes.index', ['caixa_id' => $caixa->id]) }}" class="text-xs font-medium text-sky-600 hover:underline">Ver na tela de movimentações →</a>
+                @endcan
+            </div>
             <table class="min-w-full text-sm">
                 <tbody class="divide-y divide-slate-50">
                     @forelse ($caixa->movimentacoes as $mov)
                         <tr>
-                            <td class="py-2">{{ $mov->categoria }}</td>
+                            <td class="py-2">{{ \App\Support\Financeiro::labelCategoria($mov->tipo, $mov->categoria) }}</td>
                             <td class="py-2 text-slate-500">{{ $mov->descricao }}</td>
                             <td class="py-2 text-slate-500">{{ $mov->usuario->name }}</td>
                             <td class="py-2 text-right font-medium {{ $mov->tipo === 'saida' ? 'text-rose-600' : 'text-emerald-600' }}">
                                 {{ $mov->tipo === 'saida' ? '-' : '+' }} R$ {{ number_format($mov->valor, 2, ',', '.') }}
                             </td>
+                            <td class="py-2 pl-3 text-right">
+                                @if ($mov->estaEstornada())
+                                    <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">Estornada</span>
+                                @elseif ($mov->podeEstornar())
+                                    @can('estornar', $mov)
+                                        <form method="POST" action="{{ route('movimentacoes.estornar', $mov) }}" onsubmit="return confirm('Estornar este lançamento?')">
+                                            @csrf
+                                            <button class="text-xs text-rose-600 hover:underline">Estornar</button>
+                                        </form>
+                                    @endcan
+                                @endif
+                            </td>
                         </tr>
                     @empty
-                        <tr><td class="py-6 text-center text-slate-400">Nenhuma movimentação ainda.</td></tr>
+                        <tr><td colspan="5" class="py-6 text-center text-slate-400">Nenhuma movimentação ainda.</td></tr>
                     @endforelse
                 </tbody>
             </table>

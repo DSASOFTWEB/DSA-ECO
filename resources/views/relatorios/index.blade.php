@@ -11,6 +11,7 @@
         <button class="h-11 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">Aplicar</button>
         <a href="{{ route('relatorios.financeiro.pdf', ['mes' => $mes->format('Y-m')]) }}" class="inline-flex h-11 items-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300">⬇ PDF</a>
         <a href="{{ route('relatorios.financeiro.excel', ['mes' => $mes->format('Y-m')]) }}" class="inline-flex h-11 items-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300">⬇ Excel</a>
+        <a href="{{ route('relatorios.movimentacoes') }}" class="ml-auto inline-flex h-11 items-center rounded-lg bg-slate-700 px-4 text-sm font-medium text-white hover:bg-slate-800">Relatório de Movimentações →</a>
     </form>
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">

@@ -6,6 +6,22 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>App Validador · {{ $empresaAtual->nome ?? config('app.name', 'Parque Aquático') }}</title>
 
+    <script>
+        // Captura o evento de instalação o MAIS CEDO possível, antes de
+        // qualquer outro script (inclusive o Alpine.js carregado logo
+        // abaixo). O Chrome pode disparar "beforeinstallprompt" assim que
+        // valida o manifest/service worker — se só começarmos a escutar
+        // depois que o Alpine carrega e inicializa, essa corrida às vezes
+        // é perdida: o Chrome já mostra a opção escondida no menu (⋮ >
+        // Instalar aplicativo), mas o aviso do PRÓPRIO app nunca aparece,
+        // porque o evento passou batido antes de alguém escutar.
+        window.__pwaEventoInstalacao = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            window.__pwaEventoInstalacao = e;
+        });
+    </script>
+
     {{-- PWA: instalável na tela inicial do porteiro, em tela cheia (sem barra do navegador). --}}
     <link rel="manifest" href="{{ route('app-validador.manifest') }}">
     <meta name="theme-color" content="#0284c7">
@@ -25,8 +41,17 @@
             promptEvento: null,
             iosDica: false,
             init() {
+                // O evento já pode ter sido capturado antes mesmo do Alpine
+                // inicializar (ver script no <head>) — usa ele se já
+                // existir, e continua escutando também, caso dispare só
+                // agora (a ordem entre os dois pode variar).
+                if (window.__pwaEventoInstalacao) {
+                    this.promptEvento = window.__pwaEventoInstalacao;
+                    this.podeInstalar = true;
+                }
                 window.addEventListener('beforeinstallprompt', (e) => {
                     e.preventDefault();
+                    window.__pwaEventoInstalacao = e;
                     this.promptEvento = e;
                     this.podeInstalar = true;
                 });
@@ -34,7 +59,8 @@
                 const ehIOS = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
                 if (ehIOS && !ehStandalone) { this.podeInstalar = true; this.iosDica = true; }
                 if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.register('{{ asset('validador-sw.js') }}', { scope: '{{ route('app-validador.index') }}' }).catch(() => {});
+                    navigator.serviceWorker.register('{{ asset('validador-sw.js') }}', { scope: '{{ route('app-validador.index') }}' })
+                        .catch((erro) => console.error('Falha ao registrar o service worker do App Validador:', erro));
                 }
             },
             async instalar() {

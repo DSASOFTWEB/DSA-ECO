@@ -20,7 +20,9 @@ class StoreHospedagemRequest extends FormRequest
         return [
             'quarto_id' => ['required', Rule::exists('quartos', 'id')->where('empresa_id', $empresaId)],
             'cliente_id' => ['required', Rule::exists('clientes', 'id')->where('empresa_id', $empresaId)],
-            'quantidade_hospedes' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'quantidade_adultos' => ['required', 'integer', 'min:1', 'max:50'],
+            'quantidade_criancas' => ['nullable', 'integer', 'min:0', 'max:50'],
+            'quantidade_isentos' => ['nullable', 'integer', 'min:0', 'max:50'],
             'data_checkin_prevista' => ['required', 'date'],
             'data_checkout_prevista' => ['required', 'date', 'after:data_checkin_prevista'],
             'observacoes' => ['nullable', 'string', 'max:1000'],

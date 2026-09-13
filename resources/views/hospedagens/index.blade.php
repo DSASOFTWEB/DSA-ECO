@@ -32,14 +32,19 @@
 
     <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <form method="GET" class="flex flex-wrap items-end gap-3">
-            <select name="status" onchange="this.form.submit()" class="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                <option value="">Todos os status</option>
+            <input type="text" name="busca" value="{{ request('busca') }}" placeholder="Buscar por hóspede ou número do quarto" class="h-11 w-64 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+            <select name="status" onchange="this.form.submit()" class="h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                <option value="">Todos os status ({{ $porStatus->sum() }})</option>
                 @foreach (['reservado', 'hospedado', 'finalizado', 'cancelado'] as $opcao)
-                    <option value="{{ $opcao }}" @selected(request('status') === $opcao)>{{ ucfirst($opcao) }}</option>
+                    <option value="{{ $opcao }}" @selected(request('status') === $opcao)>{{ ucfirst($opcao) }} ({{ $porStatus[$opcao] ?? 0 }})</option>
                 @endforeach
             </select>
+            <button class="h-11 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">Buscar</button>
         </form>
-        <div class="flex shrink-0 gap-2">
+        <div class="flex shrink-0 flex-wrap gap-2">
+            <a href="{{ route('hospedagens.mapa') }}" class="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5">Mapa de Quartos</a>
+            <a href="{{ route('hospedagens.indicadores') }}" class="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5">Indicadores</a>
+            <a href="{{ route('hospedagens.cafe') }}" class="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5">Café da manhã</a>
             <a href="{{ route('hospedagens.relatorio') }}" class="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5">Relatório por período</a>
             @can('create', \App\Models\Hospedagem::class)
                 <a href="{{ route('hospedagens.create') }}" class="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-theme-xs transition hover:bg-brand-600">+ Nova reserva</a>

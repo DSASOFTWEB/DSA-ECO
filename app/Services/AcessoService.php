@@ -43,6 +43,7 @@ class AcessoService
 
         $acesso = Acesso::create([
             'carteirinha_id' => $carteirinha?->id,
+            'plano_id' => $carteirinha ? $this->contratoAtivoDoTitular($carteirinha)?->plano_id : null,
             'unidade_id' => $unidadeId,
             'tipo' => $tipo,
             'origem' => 'catraca',
@@ -239,9 +240,12 @@ class AcessoService
             // barras no comprovante impresso (ver ORIGENS_QUE_EXIGEM_VALIDACAO
             // no Acesso: isso só controla se a portaria PRECISA escanear pra
             // liberar, não se o código existe).
+            $planoId = $situacao['contrato']?->plano_id;
+
             $acesso = Acesso::create([
                 'carteirinha_id' => $cliente->carteirinha?->id,
                 'cliente_id' => $cliente->id,
+                'plano_id' => $planoId,
                 'unidade_id' => $unidadeId,
                 'tipo' => 'entrada',
                 'origem' => $origem,
@@ -263,6 +267,7 @@ class AcessoService
                     $acessos->push(Acesso::create([
                         'carteirinha_id' => $dependente->carteirinha?->id,
                         'dependente_id' => $dependente->id,
+                        'plano_id' => $planoId,
                         'unidade_id' => $unidadeId,
                         'tipo' => 'entrada',
                         'origem' => $origem,

@@ -32,15 +32,55 @@ class HospedagemController extends Controller
     {
         $this->authorize('viewAny', Hospedagem::class);
 
+        $busca = trim((string) request('busca'));
+
         $hospedagens = Hospedagem::with(['quarto', 'cliente'])
             ->when(request('status'), fn ($q, $v) => $q->where('status', $v))
+            ->when($busca !== '', fn ($q) => $q->where(function ($qq) use ($busca) {
+                $qq->whereHas('cliente', fn ($c) => $c->where('nome', 'like', "%{$busca}%"))
+                    ->orWhereHas('quarto', fn ($qu) => $qu->where('numero', 'like', "%{$busca}%"));
+            }))
             ->latest('data_checkin_prevista')
             ->paginate(20)
             ->withQueryString();
 
         $resumo = $this->hospedagemService->resumo();
+        $porStatus = Hospedagem::selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status');
 
-        return view('hospedagens.index', compact('hospedagens', 'resumo'));
+        return view('hospedagens.index', compact('hospedagens', 'resumo', 'porStatus'));
+    }
+
+    public function mapa(): View
+    {
+        $this->authorize('viewAny', Hospedagem::class);
+
+        $mapa = $this->hospedagemService->mapaQuartos();
+
+        return view('hospedagens.mapa', compact('mapa'));
+    }
+
+    public function indicadores(): View
+    {
+        $this->authorize('viewAny', Hospedagem::class);
+
+        $inicio = request('data_inicio') ? Carbon::parse(request('data_inicio'))->startOfDay() : now()->startOfDay();
+        $fim = request('data_fim') ? Carbon::parse(request('data_fim'))->endOfDay() : now()->endOfDay();
+
+        $indicadores = $this->hospedagemService->indicadores($inicio, $fim);
+        $porDia = $this->hospedagemService->indicadoresPorDia($inicio, $fim);
+
+        return view('hospedagens.indicadores', compact('indicadores', 'porDia', 'inicio', 'fim'));
+    }
+
+    public function cafeDaManha(): View
+    {
+        $this->authorize('viewAny', Hospedagem::class);
+
+        $data = request('data') ? Carbon::parse(request('data'))->startOfDay() : now()->startOfDay();
+
+        $cafe = $this->hospedagemService->listaCafeDaManha($data);
+
+        return view('hospedagens.cafe', compact('cafe', 'data'));
     }
 
     public function relatorio(): View
@@ -103,6 +143,28 @@ class HospedagemController extends Controller
         $produtos = Produto::ativos()->orderBy('nome')->get();
 
         return view('hospedagens.show', compact('hospedagem', 'produtos'));
+    }
+
+    public function ficha(Hospedagem $hospedagem): View
+    {
+        $this->authorize('view', $hospedagem);
+
+        $hospedagem->load(['quarto.unidade', 'cliente', 'consumos.produto', 'registradoPor']);
+
+        $totalConsumos = (float) $hospedagem->consumos->sum('subtotal');
+        $noites = $this->hospedagemService->noites($hospedagem);
+        // Estadia ainda em andamento: mostra o total ESTIMADO até agora (não
+        // fechado); já finalizada, mostra o valor real cobrado no check-out.
+        $total = $hospedagem->estaFinalizado() ? (float) $hospedagem->valor_total : $this->hospedagemService->calcularTotal($hospedagem);
+
+        return view('hospedagens.ficha', [
+            'hospedagem' => $hospedagem,
+            'empresa' => \App\Models\Empresa::find($hospedagem->empresa_id),
+            'noites' => $noites,
+            'totalConsumos' => $totalConsumos,
+            'total' => $total,
+            'geradoEm' => now(),
+        ]);
     }
 
     public function checkin(Hospedagem $hospedagem): RedirectResponse

@@ -17,13 +17,16 @@ use App\Http\Controllers\Admin\FoodController;
 use App\Http\Controllers\Admin\DependenteController;
 use App\Http\Controllers\Admin\EmpresaController;
 use App\Http\Controllers\Admin\MensalidadeController;
+use App\Http\Controllers\Admin\MovimentacaoController;
 use App\Http\Controllers\Admin\PlanoController;
 use App\Http\Controllers\Admin\HospedagemController;
 use App\Http\Controllers\Admin\ProdutoController;
 use App\Http\Controllers\Admin\QuartoController;
 use App\Http\Controllers\Admin\RelatorioController;
+use App\Http\Controllers\Admin\RelatorioMovimentacaoController;
 use App\Http\Controllers\Admin\TerminalController;
 use App\Http\Controllers\Admin\TipoEntradaController;
+use App\Http\Controllers\Admin\TransferenciaCaixaController;
 use App\Http\Controllers\Admin\UnidadeController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\ValidacaoVoucherController;
@@ -136,6 +139,14 @@ Route::middleware('auth')->group(function () {
     Route::post('caixas/{caixa}/movimentar', [CaixaController::class, 'movimentar'])->name('caixas.movimentar');
     Route::post('caixas/{caixa}/fechar', [CaixaController::class, 'fechar'])->name('caixas.fechar');
 
+    Route::get('financeiro/movimentacoes', [MovimentacaoController::class, 'index'])->name('movimentacoes.index');
+    Route::get('financeiro/movimentacoes/imprimir', [MovimentacaoController::class, 'imprimir'])->name('movimentacoes.imprimir');
+    Route::put('financeiro/movimentacoes/{movimentacao}', [MovimentacaoController::class, 'update'])->name('movimentacoes.update');
+    Route::post('financeiro/movimentacoes/{movimentacao}/estornar', [MovimentacaoController::class, 'estornar'])->name('movimentacoes.estornar');
+
+    Route::get('financeiro/transferencias', [TransferenciaCaixaController::class, 'index'])->name('transferencias.index');
+    Route::post('financeiro/transferencias', [TransferenciaCaixaController::class, 'store'])->name('transferencias.store');
+
     Route::resource('produtos', ProdutoController::class);
     Route::post('produtos/{produto}/ajustar-estoque', [ProdutoController::class, 'ajustarEstoque'])->name('produtos.ajustar-estoque');
 
@@ -158,13 +169,21 @@ Route::middleware('auth')->group(function () {
     Route::get('food/atendimentos/{atendimento}/conta', [FoodController::class, 'conta'])->name('food.atendimentos.conta');
     Route::get('food/atendimentos/{atendimento}/conta.escpos', [FoodController::class, 'contaEscpos'])->name('food.atendimentos.conta.escpos');
 
+    Route::get('quartos/estoque', [QuartoController::class, 'estoqueGeral'])->name('quartos.estoque-geral');
     Route::resource('quartos', QuartoController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+    Route::post('quartos/{quarto}/limpar', [QuartoController::class, 'limpar'])->name('quartos.limpar');
+    Route::get('quartos/{quarto}/estoque', [QuartoController::class, 'estoque'])->name('quartos.estoque');
+    Route::post('quartos/{quarto}/estoque', [QuartoController::class, 'emprestar'])->name('quartos.estoque.emprestar');
+    Route::post('quartos/{quarto}/estoque/{produto}/devolver', [QuartoController::class, 'devolver'])->name('quartos.estoque.devolver');
 
-    // Precisa vir ANTES do Route::resource abaixo: "hospedagens/{hospedagem}"
-    // (show) casaria com "hospedagens/relatorio" primeiro, já que as rotas
-    // são resolvidas na ordem de registro.
+    // Precisam vir ANTES do Route::resource abaixo: "hospedagens/{hospedagem}"
+    // (show) casaria com essas rotas fixas primeiro, já que são resolvidas
+    // na ordem de registro.
     Route::get('hospedagens/relatorio', [HospedagemController::class, 'relatorio'])->name('hospedagens.relatorio');
     Route::get('hospedagens/relatorio/pdf', [HospedagemController::class, 'relatorioPdf'])->name('hospedagens.relatorio.pdf');
+    Route::get('hospedagens/mapa', [HospedagemController::class, 'mapa'])->name('hospedagens.mapa');
+    Route::get('hospedagens/indicadores', [HospedagemController::class, 'indicadores'])->name('hospedagens.indicadores');
+    Route::get('hospedagens/cafe-da-manha', [HospedagemController::class, 'cafeDaManha'])->name('hospedagens.cafe');
 
     // "parameters" explícito: o singular automático de "hospedagens" dá
     // "hospedagen" (inflector do Laravel não conhece plural em português),
@@ -173,6 +192,7 @@ Route::middleware('auth')->group(function () {
     // UserController/TerminalController.
     Route::resource('hospedagens', HospedagemController::class, ['parameters' => ['hospedagens' => 'hospedagem']])
         ->only(['index', 'create', 'store', 'show']);
+    Route::get('hospedagens/{hospedagem}/ficha', [HospedagemController::class, 'ficha'])->name('hospedagens.ficha');
     Route::post('hospedagens/{hospedagem}/checkin', [HospedagemController::class, 'checkin'])->name('hospedagens.checkin');
     Route::post('hospedagens/{hospedagem}/consumos', [HospedagemController::class, 'consumos'])->name('hospedagens.consumos');
     Route::get('hospedagens/{hospedagem}/checkout', [HospedagemController::class, 'checkoutForm'])->name('hospedagens.checkout');
@@ -234,4 +254,6 @@ Route::middleware('auth')->group(function () {
     Route::get('relatorios', [RelatorioController::class, 'index'])->name('relatorios.index');
     Route::get('relatorios/financeiro.pdf', [RelatorioController::class, 'financeiroPdf'])->name('relatorios.financeiro.pdf');
     Route::get('relatorios/financeiro.xlsx', [RelatorioController::class, 'financeiroExcel'])->name('relatorios.financeiro.excel');
+    Route::get('relatorios/movimentacoes', [RelatorioMovimentacaoController::class, 'index'])->name('relatorios.movimentacoes');
+    Route::get('relatorios/movimentacoes/pdf', [RelatorioMovimentacaoController::class, 'pdf'])->name('relatorios.movimentacoes.pdf');
 });

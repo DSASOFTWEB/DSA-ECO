@@ -24,7 +24,7 @@ class Acesso extends Model
     public const ORIGENS_QUE_EXIGEM_VALIDACAO = ['online', 'checkin_online', 'cortesia'];
 
     protected $fillable = [
-        'carteirinha_id', 'cliente_id', 'dependente_id', 'venda_id', 'venda_item_id', 'tipo_entrada_id', 'unidade_id', 'tipo', 'origem',
+        'carteirinha_id', 'cliente_id', 'dependente_id', 'venda_id', 'venda_item_id', 'tipo_entrada_id', 'plano_id', 'unidade_id', 'tipo', 'origem',
         'codigo_validacao', 'dispositivo', 'autorizado', 'motivo_negado', 'observacao', 'validade_ate', 'validado_em', 'validado_por_id',
         'registrado_por_id', 'registrado_em',
     ];
@@ -64,6 +64,11 @@ class Acesso extends Model
     public function tipoEntrada(): BelongsTo
     {
         return $this->belongsTo(TipoEntrada::class);
+    }
+
+    public function plano(): BelongsTo
+    {
+        return $this->belongsTo(Plano::class);
     }
 
     public function unidade(): BelongsTo

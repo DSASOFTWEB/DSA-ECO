@@ -45,6 +45,11 @@ class VendaController extends Controller
         $this->authorize('create', Venda::class);
 
         $user = request()->user();
+
+        if (request()->boolean('trocar_terminal')) {
+            session()->forget('pdv_caixa_id');
+        }
+
         [$caixaAberto, $caixasDisponiveis] = $this->resolverCaixaOperador($user, request()->query('caixa_id'));
 
         $produtos = Produto::ativos()->orderBy('nome')->get();
@@ -246,6 +251,14 @@ class VendaController extends Controller
      * mais de um, precisa do $caixaIdEscolhido (a tela pede pra ele
      * escolher em qual terminal está vendendo).
      *
+     * Uma vez escolhido, o terminal fica lembrado na sessão do operador
+     * (`pdv_caixa_id`) — sem isso, toda vez que "Nova venda" volta pro PDV
+     * (depois de cada venda) a pergunta apareceria de novo, o que na
+     * prática travaria o fluxo do caixa. Só pergunta de novo se: o
+     * operador clicar em "Trocar terminal" (limpa a sessão), ou o caixa
+     * escolhido tiver fechado nesse meio tempo (deixa de existir entre os
+     * $caixasDisponiveis, então a busca abaixo já retorna null sozinha).
+     *
      * @return array{0: ?Caixa, 1: Collection<int, Caixa>}
      */
     protected function resolverCaixaOperador(User $user, null|string|int $caixaIdEscolhido): array
@@ -258,7 +271,13 @@ class VendaController extends Controller
             return [$caixasDisponiveis->first(), $caixasDisponiveis];
         }
 
+        $caixaIdEscolhido ??= session('pdv_caixa_id');
+
         $caixaEscolhido = $caixaIdEscolhido ? $caixasDisponiveis->firstWhere('id', (int) $caixaIdEscolhido) : null;
+
+        if ($caixaEscolhido) {
+            session(['pdv_caixa_id' => $caixaEscolhido->id]);
+        }
 
         return [$caixaEscolhido, $caixasDisponiveis];
     }

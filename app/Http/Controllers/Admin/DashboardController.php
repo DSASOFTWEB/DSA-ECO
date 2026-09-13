@@ -15,7 +15,8 @@ class DashboardController extends Controller
         $inadimplenciaPorUnidade = $relatorioService->inadimplenciaPorUnidade();
         $entradasPorHora = $relatorioService->entradasPorHoraHoje();
         $velasCaixa = $relatorioService->velasCaixa();
+        $entradasPorTipoEntrada = $relatorioService->entradasHojePorTipoEntrada();
 
-        return view('dashboard', compact('kpis', 'resumoFinanceiro', 'inadimplenciaPorUnidade', 'entradasPorHora', 'velasCaixa'));
+        return view('dashboard', compact('kpis', 'resumoFinanceiro', 'inadimplenciaPorUnidade', 'entradasPorHora', 'velasCaixa', 'entradasPorTipoEntrada'));
     }
 }

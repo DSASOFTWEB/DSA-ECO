@@ -72,7 +72,7 @@
                             <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{{ $hospedagem->quarto->numero }}</td>
                             <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ $hospedagem->cliente->nome }}</td>
                             <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ $hospedagem->data_checkout_real->format('d/m/Y H:i') }}</td>
-                            <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ max(1, $hospedagem->data_checkin_real->diffInDays($hospedagem->data_checkout_real)) }}</td>
+                            <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ \App\Models\Hospedagem::contarNoites($hospedagem->data_checkin_real, $hospedagem->data_checkout_real) }}</td>
                             <td class="px-4 py-3 text-right font-medium">R$ {{ number_format($hospedagem->valor_total, 2, ',', '.') }}</td>
                         </tr>
                     @empty

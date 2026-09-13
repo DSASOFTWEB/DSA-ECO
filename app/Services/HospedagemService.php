@@ -148,7 +148,7 @@ class HospedagemService
     {
         $inicio = $hospedagem->data_checkin_real ?? $hospedagem->data_checkin_prevista;
 
-        return max(1, $inicio->diffInDays(now()));
+        return Hospedagem::contarNoites($inicio, now());
     }
 
     public function checkout(Hospedagem $hospedagem, Caixa $caixa, User $operador, string $formaPagamento, float $desconto = 0): Hospedagem
@@ -334,7 +334,9 @@ class HospedagemService
             ->get();
 
         $receita = round((float) $finalizadas->sum('valor_total'), 2);
-        $noitesVendidas = $finalizadas->sum(fn (Hospedagem $h) => max(1, $h->data_checkin_real?->diffInDays($h->data_checkout_real) ?? 1));
+        $noitesVendidas = $finalizadas->sum(fn (Hospedagem $h) => $h->data_checkin_real && $h->data_checkout_real
+            ? Hospedagem::contarNoites($h->data_checkin_real, $h->data_checkout_real)
+            : 1);
 
         return [
             'taxa_ocupacao' => $quartosNoiteDisponiveis > 0 ? round($noitesVendidas / $quartosNoiteDisponiveis * 100, 1) : 0.0,

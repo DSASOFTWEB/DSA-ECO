@@ -71,6 +71,20 @@ class Hospedagem extends Model
         return $this->hasMany(HospedagemConsumo::class);
     }
 
+    /**
+     * Conta noites como uma pousada conta: pela diferença de DATA (dia
+     * civil) entre entrada e saída, ignorando a hora — check-in dia 11 às
+     * 15h e check-out dia 13 às 00h11 são 2 noites (passou a noite de
+     * 11→12 e a de 12→13), não "1,38 dia" (o cálculo ingênuo de horas
+     * decorridas ÷ 24, que é o que `diffInDays` entre dois horários
+     * diferentes devolve nesta versão do Carbon — sem o `startOfDay()` em
+     * ambos os lados, cobrança e indicadores saíam errados).
+     */
+    public static function contarNoites(\Illuminate\Support\Carbon $checkin, \Illuminate\Support\Carbon $checkout): int
+    {
+        return max(1, $checkin->copy()->startOfDay()->diffInDays($checkout->copy()->startOfDay()));
+    }
+
     public function estaReservado(): bool
     {
         return $this->status === 'reservado';

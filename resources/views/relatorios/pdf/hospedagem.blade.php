@@ -61,7 +61,7 @@
                     <td>{{ $hospedagem->quarto->numero }}</td>
                     <td>{{ $hospedagem->cliente->nome }}</td>
                     <td>{{ $hospedagem->data_checkout_real->format('d/m/Y H:i') }}</td>
-                    <td>{{ max(1, $hospedagem->data_checkin_real->diffInDays($hospedagem->data_checkout_real)) }}</td>
+                    <td>{{ \App\Models\Hospedagem::contarNoites($hospedagem->data_checkin_real, $hospedagem->data_checkout_real) }}</td>
                     <td class="valor">R$ {{ number_format($hospedagem->valor_total, 2, ',', '.') }}</td>
                 </tr>
             @empty

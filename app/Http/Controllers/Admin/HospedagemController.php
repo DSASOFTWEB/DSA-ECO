@@ -11,12 +11,14 @@ use App\Http\Requests\Hospedagem\StoreHospedagemRequest;
 use App\Models\Caixa;
 use App\Models\CategoriaProduto;
 use App\Models\Cliente;
+use App\Models\DocumentoFiscal;
 use App\Models\Hospedagem;
 use App\Models\Produto;
 use App\Models\Quarto;
 use App\Models\Unidade;
 use App\Models\User;
 use App\Services\CaixaService;
+use App\Services\Fiscal\FiscalXmlStorageService;
 use App\Services\Fiscal\HospedagemFiscalService;
 use App\Services\HospedagemService;
 use App\Services\Relatorios\HospedagemPdfExport;
@@ -26,6 +28,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HospedagemController extends Controller
 {
@@ -207,6 +210,38 @@ class HospedagemController extends Controller
         }
 
         return back()->with('sucesso', 'NFS-e autorizada nº '.$doc->numero.($doc->chave ? ' · chave '.$doc->chave : ''));
+    }
+
+    public function downloadXmlFiscal(
+        Hospedagem $hospedagem,
+        DocumentoFiscal $documento,
+        FiscalXmlStorageService $xmlStorage,
+    ): StreamedResponse|Response {
+        $this->authorize('view', $hospedagem);
+
+        if ((int) $documento->hospedagem_id !== (int) $hospedagem->id
+            || (int) $documento->empresa_id !== (int) $hospedagem->empresa_id) {
+            abort(404);
+        }
+
+        $tipo = request()->query('tipo', 'autorizado');
+        $conteudo = null;
+        $nome = ($documento->chave ?: $documento->modelo.'-'.$documento->numero).'-'.$tipo.'.xml';
+
+        if ($tipo === 'envio') {
+            $conteudo = $xmlStorage->ler($documento->xml_envio_path) ?: $documento->xml;
+        } else {
+            $conteudo = $xmlStorage->ler($documento->xml_path) ?: $documento->xml_protocolado ?: $documento->xml;
+        }
+
+        if (! filled($conteudo)) {
+            return back()->with('erro', 'XML deste documento fiscal não está disponível.');
+        }
+
+        return response($conteudo, 200, [
+            'Content-Type' => 'application/xml; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$nome.'"',
+        ]);
     }
 
     public function ficha(Hospedagem $hospedagem): View

@@ -1,3 +1,6 @@
+# Herda OIDs, políticas e padrões de CSR/certificado da distribuição.
+.include /etc/ssl/openssl.cnf
+
 # OpenSSL 3 desabilita algoritmos antigos por padrão. Alguns certificados A1
 # ICP-Brasil ainda usam RC2/3DES no PKCS#12, por isso carregamos os providers
 # default e legacy desde o início do processo PHP/Apache.

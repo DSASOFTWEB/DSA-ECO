@@ -9,6 +9,7 @@ use App\Models\Empresa;
 use App\Models\PontoAtendimento;
 use App\Models\Unidade;
 use App\Services\EmpresaService;
+use App\Services\Fiscal\CertificadoA1Service;
 use App\Services\Integrations\CnpjConsultaService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -26,7 +27,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class EmpresaController extends Controller
 {
-    public function __construct(protected EmpresaService $empresaService) {}
+    public function __construct(
+        protected EmpresaService $empresaService,
+        protected CertificadoA1Service $certificadoA1,
+    ) {}
 
     public function edit(): View
     {
@@ -87,7 +91,7 @@ class EmpresaController extends Controller
         $empresa = Empresa::findOrFail(request()->user()->empresa_id);
         abort_unless($empresa->temCertificadoDigital(), 404, 'Certificado digital não cadastrado.');
 
-        $conteudo = $empresa->getRawOriginal('certificado_arquivo');
+        $conteudo = $this->certificadoA1->carregar($empresa)['pfx'];
         $cnpj = preg_replace('/\D+/', '', (string) $empresa->cnpj) ?: 'empresa';
 
         return response()->streamDownload(
@@ -97,5 +101,15 @@ class EmpresaController extends Controller
             "certificado-{$cnpj}.pfx",
             ['Content-Type' => 'application/x-pkcs12']
         );
+    }
+
+    public function destroyCertificado(): RedirectResponse
+    {
+        Gate::authorize('empresa.gerenciar');
+
+        $empresa = Empresa::findOrFail(request()->user()->empresa_id);
+        $this->empresaService->removerCertificado($empresa);
+
+        return redirect()->route('empresa.edit')->with('sucesso', 'Certificado digital removido com sucesso.');
     }
 }

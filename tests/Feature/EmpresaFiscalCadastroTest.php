@@ -134,6 +134,28 @@ class EmpresaFiscalCadastroTest extends TestCase
         $this->assertTrue($empresa->fresh()->temCertificadoDigital());
     }
 
+    public function test_gestor_remove_certificado_do_banco_e_do_storage(): void
+    {
+        Storage::fake('local');
+        [$empresa, , $user] = $this->criarGestor();
+        $pfx = $this->criarPfx('senha-remocao');
+        $empresa->update([
+            'certificado_arquivo' => $pfx,
+            'certificado_senha' => 'senha-remocao',
+        ]);
+        Storage::disk('local')->put($empresa->certificadoCaminho(), $pfx);
+
+        $this->actingAs($user)
+            ->delete(route('empresa.certificado.destroy'))
+            ->assertRedirect(route('empresa.edit'))
+            ->assertSessionHas('sucesso');
+
+        $empresa->refresh();
+        $this->assertNull($empresa->getRawOriginal('certificado_arquivo'));
+        $this->assertNull($empresa->certificado_senha);
+        Storage::disk('local')->assertMissing($empresa->certificadoCaminho());
+    }
+
     public function test_cosmos_prioriza_token_da_empresa_sobre_env(): void
     {
         config(['parque.cosmos_token' => 'token-env']);

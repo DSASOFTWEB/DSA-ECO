@@ -287,16 +287,53 @@
             @if ($hospedagem->documentosFiscais->isNotEmpty())
                 <div class="mt-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
                     <h3 class="mb-3 text-sm font-semibold text-slate-700">Documentos fiscais</h3>
-                    <ul class="divide-y divide-slate-100 text-sm dark:divide-gray-800">
-                        @foreach ($hospedagem->documentosFiscais as $doc)
-                            <li class="flex flex-wrap items-center justify-between gap-2 py-2">
-                                <span class="font-medium uppercase">{{ $doc->modelo }}</span>
-                                <span class="text-slate-500">nº {{ $doc->numero ?? '—' }} · série {{ $doc->serie ?? '—' }}</span>
-                                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase text-slate-600">{{ $doc->status }}</span>
-                                <span class="text-slate-700">R$ {{ number_format($doc->valor_total, 2, ',', '.') }}</span>
-                            </li>
-                        @endforeach
-                    </ul>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-slate-100 text-sm">
+                            <thead class="text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                <tr>
+                                    <th class="py-2 pr-3">Modelo</th>
+                                    <th class="py-2 pr-3">Nº / Série</th>
+                                    <th class="py-2 pr-3">Status</th>
+                                    <th class="py-2 pr-3">Chave</th>
+                                    <th class="py-2 pr-3">Protocolo</th>
+                                    <th class="py-2 pr-3">Recibo</th>
+                                    <th class="py-2 pr-3">Valor</th>
+                                    <th class="py-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 dark:divide-gray-800">
+                                @foreach ($hospedagem->documentosFiscais as $doc)
+                                    <tr>
+                                        <td class="py-2 pr-3 font-medium uppercase">{{ $doc->modelo }}</td>
+                                        <td class="py-2 pr-3 text-slate-600">{{ $doc->numero ?? '—' }} / {{ $doc->serie ?? '—' }}</td>
+                                        <td class="py-2 pr-3">
+                                            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase text-slate-600 dark:bg-white/10 dark:text-gray-300">{{ $doc->status }}</span>
+                                        </td>
+                                        <td class="py-2 pr-3 font-mono text-xs text-slate-600">{{ $doc->chave ?: '—' }}</td>
+                                        <td class="py-2 pr-3 font-mono text-xs text-slate-600">{{ $doc->protocolo ?: '—' }}</td>
+                                        <td class="py-2 pr-3 font-mono text-xs text-slate-600">{{ $doc->recibo ?: '—' }}</td>
+                                        <td class="py-2 pr-3 text-slate-700">R$ {{ number_format($doc->valor_total, 2, ',', '.') }}</td>
+                                        <td class="py-2 text-right">
+                                            @if ($doc->temXmlArquivo())
+                                                <a href="{{ route('hospedagens.documentos-fiscais.xml', [$hospedagem, $doc]) }}" class="text-xs font-semibold text-brand-600 hover:underline">XML</a>
+                                                @if ($doc->xml || $doc->xml_envio_path)
+                                                    <a href="{{ route('hospedagens.documentos-fiscais.xml', [$hospedagem, $doc, 'tipo' => 'envio']) }}" class="ml-2 text-xs font-medium text-slate-500 hover:underline">envio</a>
+                                                @endif
+                                            @endif
+                                            @if ($doc->link)
+                                                <a href="{{ $doc->link }}" target="_blank" rel="noopener" class="ml-2 text-xs font-medium text-slate-500 hover:underline">link</a>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                    @if ($doc->mensagem_erro)
+                                        <tr>
+                                            <td colspan="8" class="pb-2 text-xs text-rose-600">{{ $doc->mensagem_erro }}</td>
+                                        </tr>
+                                    @endif
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             @endif
         </div>

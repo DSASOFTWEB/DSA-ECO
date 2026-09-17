@@ -144,6 +144,21 @@ class EmpresaService
         return $empresa->fresh();
     }
 
+    public function removerCertificado(Empresa $empresa): Empresa
+    {
+        DB::transaction(function () use ($empresa): void {
+            $empresa->update([
+                'certificado_arquivo' => null,
+                'certificado_senha' => null,
+                'certificado_validade' => null,
+            ]);
+
+            Storage::disk('local')->delete($empresa->certificadoCaminho());
+        });
+
+        return $empresa->fresh();
+    }
+
     /**
      * Campo enviado em branco no formulário = mantém o valor já salvo (não
      * apaga a credencial sem querer só porque o operador deixou o campo de

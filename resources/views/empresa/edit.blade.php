@@ -303,6 +303,11 @@
                 @if ($empresa->temCertificadoDigital())
                     <span class="text-emerald-600">Certificado já cadastrado{{ $empresa->certificado_validade ? ' · validade '.$empresa->certificado_validade->format('d/m/Y') : '' }}.</span>
                     <a href="{{ route('empresa.certificado.download') }}" class="ml-2 text-sky-600 hover:underline">Baixar .pfx</a>
+                    <form method="POST" action="{{ route('empresa.certificado.destroy') }}" class="ml-2 inline" onsubmit="return confirm('Remover o certificado digital e a senha cadastrada?')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="text-rose-600 hover:underline">Remover certificado</button>
+                    </form>
                 @else
                     <span class="text-amber-600">Nenhum certificado enviado ainda.</span>
                 @endif

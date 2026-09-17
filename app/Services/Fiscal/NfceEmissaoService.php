@@ -19,7 +19,10 @@ use stdClass;
  */
 class NfceEmissaoService
 {
-    public function __construct(protected CertificadoA1Service $certificadoA1) {}
+    public function __construct(
+        protected CertificadoA1Service $certificadoA1,
+        protected FiscalXmlStorageService $xmlStorage,
+    ) {}
 
     /**
      * @param  list<array{descricao:string, quantidade:float|int, valor_unitario:float, ncm?:?string, cfop?:?string, cst_icms?:?string, csosn?:?string, origem?:?int, unidade?:string, ean?:?string}>  $itens
@@ -49,12 +52,14 @@ class NfceEmissaoService
 
         $xml = $this->montarXml($empresa, $unidade, $hospedagem, $itens, $serie, $numero, (string) $cMun);
         $assinado = $tools->signNFe($xml);
+        $xmlEnvioPath = $this->xmlStorage->salvarEnvio($documento, $assinado);
 
         $documento->update([
             'status' => DocumentoFiscal::STATUS_PROCESSANDO,
             'serie' => $serie,
             'numero' => $numero,
             'xml' => $assinado,
+            'xml_envio_path' => $xmlEnvioPath,
             'itens' => $itens,
             'valor_total' => collect($itens)->sum(fn ($i) => round(((float) $i['quantidade']) * ((float) $i['valor_unitario']), 2)),
         ]);
@@ -66,12 +71,14 @@ class NfceEmissaoService
 
             $cStat = (string) ($std->cStat ?? $std->protNFe->infProt->cStat ?? '');
             $protocolo = (string) ($std->protNFe->infProt->nProt ?? $std->nProt ?? '');
-            $chave = (string) ($std->protNFe->infProt->chNFe ?? '');
+            $recibo = (string) ($std->infRec->nRec ?? $std->nRec ?? '');
+            $chave = preg_replace('/\D+/', '', (string) ($std->protNFe->infProt->chNFe ?? '')) ?: null;
 
             if (! in_array($cStat, ['100', '150'], true)) {
                 $motivo = (string) ($std->xMotivo ?? $std->protNFe->infProt->xMotivo ?? 'Rejeição SEFAZ');
                 $documento->update([
                     'status' => DocumentoFiscal::STATUS_REJEITADO,
+                    'recibo' => $recibo !== '' ? $recibo : null,
                     'mensagem_erro' => "cStat {$cStat}: {$motivo}",
                     'retorno' => json_decode(json_encode($std), true),
                 ]);
@@ -85,11 +92,15 @@ class NfceEmissaoService
                 $xmlProt = $assinado;
             }
 
+            $xmlPath = $this->xmlStorage->salvarAutorizado($documento, $xmlProt, $chave);
+
             $documento->update([
                 'status' => DocumentoFiscal::STATUS_AUTORIZADO,
-                'chave' => $chave !== '' ? $chave : $documento->chave,
-                'protocolo' => $protocolo,
+                'chave' => $chave !== null && $chave !== '' ? $chave : $documento->chave,
+                'protocolo' => $protocolo !== '' ? $protocolo : null,
+                'recibo' => $recibo !== '' ? $recibo : null,
                 'xml_protocolado' => $xmlProt,
+                'xml_path' => $xmlPath,
                 'autorizado_em' => now(),
                 'mensagem_erro' => null,
                 'retorno' => json_decode(json_encode($std), true),

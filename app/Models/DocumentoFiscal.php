@@ -32,9 +32,9 @@ class DocumentoFiscal extends Model
 
     protected $fillable = [
         'empresa_id', 'unidade_id', 'hospedagem_id', 'cliente_id', 'emitido_por_id',
-        'modelo', 'origem', 'ambiente', 'status', 'serie', 'numero', 'chave', 'protocolo',
-        'valor_total', 'forma_pagamento', 'xml', 'xml_protocolado', 'itens', 'retorno',
-        'mensagem_erro', 'autorizado_em',
+        'modelo', 'origem', 'ambiente', 'status', 'serie', 'numero', 'chave', 'protocolo', 'recibo',
+        'valor_total', 'forma_pagamento', 'xml', 'xml_protocolado', 'xml_path', 'xml_envio_path', 'link',
+        'itens', 'retorno', 'mensagem_erro', 'autorizado_em',
     ];
 
     protected $casts = [
@@ -65,5 +65,10 @@ class DocumentoFiscal extends Model
     public function estaAutorizado(): bool
     {
         return $this->status === self::STATUS_AUTORIZADO;
+    }
+
+    public function temXmlArquivo(): bool
+    {
+        return filled($this->xml_path) || filled($this->xml_protocolado) || filled($this->xml);
     }
 }

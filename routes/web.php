@@ -206,6 +206,7 @@ Route::middleware('auth')->group(function () {
     Route::post('hospedagens/{hospedagem}/checkout', [HospedagemController::class, 'checkout'])->name('hospedagens.checkout.store');
     Route::post('hospedagens/{hospedagem}/emitir-nfce', [HospedagemController::class, 'emitirNfce'])->name('hospedagens.emitir-nfce');
     Route::post('hospedagens/{hospedagem}/emitir-nfse', [HospedagemController::class, 'emitirNfse'])->name('hospedagens.emitir-nfse');
+    Route::get('hospedagens/{hospedagem}/documentos-fiscais/{documento}/xml', [HospedagemController::class, 'downloadXmlFiscal'])->name('hospedagens.documentos-fiscais.xml');
     Route::post('hospedagens/{hospedagem}/cancelar', [HospedagemController::class, 'cancelar'])->name('hospedagens.cancelar');
 
     Route::get('tipos-entrada', [TipoEntradaController::class, 'index'])->name('tipos-entrada.index');
@@ -252,6 +253,7 @@ Route::middleware('auth')->group(function () {
     Route::put('empresa', [EmpresaController::class, 'update'])->name('empresa.update');
     Route::get('empresa/consultar-cnpj', [EmpresaController::class, 'consultarCnpj'])->name('empresa.consultar-cnpj');
     Route::get('empresa/certificado', [EmpresaController::class, 'downloadCertificado'])->name('empresa.certificado.download');
+    Route::delete('empresa/certificado', [EmpresaController::class, 'destroyCertificado'])->name('empresa.certificado.destroy');
 
     Route::get('cidades', [CidadeController::class, 'index'])->name('cidades.index');
     Route::post('cidades/sincronizar', [CidadeController::class, 'sincronizar'])->name('cidades.sincronizar');

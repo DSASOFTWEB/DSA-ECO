@@ -12,8 +12,8 @@ use Illuminate\Support\Facades\Http;
 use NFePHP\Common\Signer;
 
 /**
- * Emite NFS-e Nacional (DPS) para diárias/serviços da hospedagem.
- * Fluxo alinhado ao Evora (SEFIN Nacional + mTLS do A1).
+ * Emite NFS-e Nacional (DPS) para diárias/serviços da hospedagem
+ * via SEFIN Nacional com mTLS do certificado A1.
  */
 class NfseEmissaoService
 {

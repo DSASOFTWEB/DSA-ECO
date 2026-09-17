@@ -8,8 +8,10 @@ use App\Http\Requests\Produto\StoreProdutoRequest;
 use App\Http\Requests\Produto\UpdateProdutoRequest;
 use App\Models\CategoriaProduto;
 use App\Models\Empresa;
+use App\Models\Ncm;
 use App\Models\Produto;
 use App\Services\EstoqueService;
+use App\Services\Fiscal\NcmSiscomexService;
 use App\Services\Integrations\CosmosProdutoService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -36,8 +38,9 @@ class ProdutoController extends Controller
 
         $categorias = CategoriaProduto::orderBy('nome')->get();
         $empresa = Empresa::find(auth()->user()->empresa_id);
+        $totalNcms = Ncm::count();
 
-        return view('produtos.index', compact('produtos', 'categorias', 'empresa'));
+        return view('produtos.index', compact('produtos', 'categorias', 'empresa', 'totalNcms'));
     }
 
     public function create(): View
@@ -102,6 +105,57 @@ class ProdutoController extends Controller
         } catch (IntegrationException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
+    }
+
+    public function sincronizarNcm(NcmSiscomexService $service): RedirectResponse
+    {
+        $this->authorize('create', Produto::class);
+
+        try {
+            $resultado = $service->sincronizarApi(apenasNovos: true);
+            $msg = sprintf(
+                'NCM atualizado. API: %s | Inseridos: %s | Já existentes: %s',
+                number_format($resultado['total_api'], 0, ',', '.'),
+                number_format($resultado['inseridos'], 0, ',', '.'),
+                number_format($resultado['ignorados'], 0, ',', '.')
+            );
+
+            return redirect()->route('produtos.index')->with('sucesso', $msg);
+        } catch (IntegrationException $e) {
+            return redirect()->route('produtos.index')->with('erro', $e->getMessage());
+        }
+    }
+
+    public function autocompleteNcm(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Produto::class);
+
+        $busca = trim((string) $request->query('busca', ''));
+        if (mb_strlen($busca) < 2) {
+            return response()->json([]);
+        }
+
+        $digits = preg_replace('/\D/', '', $busca) ?: '';
+
+        $query = Ncm::query()
+            ->whereRaw('CHAR_LENGTH(ncm) = 8')
+            ->orderBy('ncm')
+            ->limit(25);
+
+        $query->where(function ($q) use ($busca, $digits) {
+            if ($digits !== '') {
+                $q->where('ncm', 'like', $digits.'%');
+            }
+            $q->orWhere('descricao', 'like', '%'.$busca.'%');
+        });
+
+        return response()->json(
+            $query->get(['ncm', 'descricao'])->map(fn (Ncm $row) => [
+                'ncm' => $row->ncm,
+                'descricao' => $row->descricao,
+                'text' => $row->ncm.' — '.$row->descricao,
+            ])->values()
+        );
     }
 
     public function ajustarEstoque(Request $request, Produto $produto): RedirectResponse

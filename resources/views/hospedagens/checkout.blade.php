@@ -59,6 +59,29 @@
                         </select>
                     </div>
 
+                    <fieldset class="rounded-xl border border-slate-200 p-4 dark:border-gray-700">
+                        <legend class="px-1 text-sm font-semibold text-slate-700 dark:text-slate-200">Documentos fiscais</legend>
+                        <p class="mb-3 text-xs text-slate-500">Selecione as notas que devem ser emitidas logo após o fechamento da conta.</p>
+
+                        <div class="space-y-3">
+                            <label class="flex items-start gap-3 {{ $quantidadeItensNfce === 0 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer' }}">
+                                <input type="checkbox" name="emitir_nfce" value="1" @checked(old('emitir_nfce')) @disabled($quantidadeItensNfce === 0) class="mt-0.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                                <span>
+                                    <span class="block text-sm font-medium text-slate-700 dark:text-slate-200">Emitir NFC-e (produtos)</span>
+                                    <span class="block text-xs text-slate-500">{{ $quantidadeItensNfce }} item(ns) de produto</span>
+                                </span>
+                            </label>
+
+                            <label class="flex items-start gap-3 {{ $quantidadeItensNfse === 0 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer' }}">
+                                <input type="checkbox" name="emitir_nfse" value="1" @checked(old('emitir_nfse')) @disabled($quantidadeItensNfse === 0) class="mt-0.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                                <span>
+                                    <span class="block text-sm font-medium text-slate-700 dark:text-slate-200">Emitir NFS-e (hospedagem)</span>
+                                    <span class="block text-xs text-slate-500">{{ $quantidadeItensNfse }} item(ns) de diária/serviço</span>
+                                </span>
+                            </label>
+                        </div>
+                    </fieldset>
+
                     <div class="flex items-center justify-between rounded-2xl bg-gray-900 p-5 text-white">
                         <span class="text-sm text-gray-300">Total a cobrar</span>
                         <span class="text-2xl font-bold" x-text="formatar(total)"></span>

@@ -134,6 +134,30 @@ class HospedagemFiscalEmissaoTest extends TestCase
             ->assertSessionHas('erro');
     }
 
+    public function test_mapa_exibe_modal_de_reserva_e_acoes_da_hospedagem(): void
+    {
+        [$empresa, $unidade, $user] = $this->criarOperador();
+        $this->criarHospedagem($empresa, $unidade, $user);
+
+        Quarto::create([
+            'empresa_id' => $empresa->id,
+            'unidade_id' => $unidade->id,
+            'numero' => '102',
+            'capacidade_maxima' => 4,
+            'valor_diaria' => 220,
+            'status' => 'ativo',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('hospedagens.mapa'))
+            ->assertOk()
+            ->assertSee('Reservar')
+            ->assertSee('Confirmar reserva')
+            ->assertSee('Ver')
+            ->assertSee('Imprimir ficha')
+            ->assertSee('Fechar conta');
+    }
+
     protected function criarHospedagem(Empresa $empresa, Unidade $unidade, User $user, float $valorDiaria = 150): Hospedagem
     {
         $cliente = Cliente::factory()->create(['empresa_id' => $empresa->id, 'unidade_id' => $unidade->id]);

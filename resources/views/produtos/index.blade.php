@@ -15,13 +15,36 @@
         </form>
 
         @can('create', \App\Models\Produto::class)
-            <button
-                type="button"
-                @click="$dispatch('open-modal', 'incluir-produto')"
-                class="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-theme-xs transition hover:bg-brand-600"
-            >
-                + Incluir
-            </button>
+            <div class="flex flex-wrap items-center gap-2">
+                <form
+                    method="POST"
+                    action="{{ route('produtos.sincronizar-ncm') }}"
+                    x-data="{ loading: false }"
+                    @submit="loading = true"
+                    class="inline"
+                >
+                    @csrf
+                    <button
+                        type="submit"
+                        :disabled="loading"
+                        class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-theme-xs transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                        title="Baixa a tabela NCM oficial do Portal Único Siscomex"
+                    >
+                        <span x-show="!loading">Baixar NCM</span>
+                        <span x-cloak x-show="loading">Baixando NCM…</span>
+                    </button>
+                </form>
+                @if (($totalNcms ?? 0) > 0)
+                    <span class="text-xs text-slate-400">{{ number_format($totalNcms, 0, ',', '.') }} códigos</span>
+                @endif
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal', 'incluir-produto')"
+                    class="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-theme-xs transition hover:bg-brand-600"
+                >
+                    + Incluir
+                </button>
+            </div>
         @endcan
     </div>
 

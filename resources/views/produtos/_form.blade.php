@@ -13,6 +13,7 @@
         imagemUrl: @js(old('imagem_url', $p?->imagem_url)),
         unidade: @js(old('unidade_comercial', $p?->unidade_comercial ?? 'UN')),
         cosmosUrl: @js(route('produtos.consultar-ean')),
+        ncmAutocompleteUrl: @js(route('produtos.ncm-autocomplete')),
     })"
 >
     {{-- Identificação --}}
@@ -144,9 +145,38 @@
             </p>
         </div>
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
-            <div>
+            <div class="relative">
                 <label class="block text-sm font-medium text-slate-700">NCM</label>
-                <input type="text" name="ncm" x-model="ncm" maxlength="8" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <input
+                    type="text"
+                    name="ncm"
+                    x-model="ncm"
+                    @input.debounce.300ms="buscarNcm()"
+                    @focus="buscarNcm()"
+                    @keydown.escape="ncmSugestoes = []"
+                    maxlength="8"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="8 dígitos ou descrição"
+                    class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                <p class="mt-1 truncate text-xs text-slate-400" x-show="ncmDescricao" x-text="ncmDescricao"></p>
+                <div
+                    x-show="ncmSugestoes.length > 0"
+                    x-cloak
+                    class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                >
+                    <template x-for="item in ncmSugestoes" :key="item.ncm">
+                        <button
+                            type="button"
+                            class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-white/5"
+                            @click="selecionarNcm(item)"
+                        >
+                            <span class="font-medium" x-text="item.ncm"></span>
+                            <span class="text-slate-500" x-text="' — ' + item.descricao"></span>
+                        </button>
+                    </template>
+                </div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700">CEST</label>
@@ -262,16 +292,6 @@
                 <label class="block text-sm font-medium text-slate-700">Cód. benefício fiscal</label>
                 <input type="text" name="cod_beneficio" value="{{ old('cod_beneficio', $p?->cod_beneficio) }}" maxlength="10" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
             </div>
-            <div class="sm:col-span-3">
-                <label class="block text-sm font-medium text-slate-700">Forma de pagamento padrão (tPag)</label>
-                <select name="forma_pagamento_fiscal" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                    <option value="">— usar a do PDV/caixa —</option>
-                    @foreach (\App\Support\FiscalTabelas::formasPagamento() as $cod => $label)
-                        <option value="{{ $cod }}" @selected(old('forma_pagamento_fiscal', $p?->forma_pagamento_fiscal) == $cod)>{{ $label }}</option>
-                    @endforeach
-                </select>
-                <p class="mt-1 text-xs text-slate-400">Códigos oficiais do Manual de Orientação do Contribuinte (NF-e/NFC-e).</p>
-            </div>
         </div>
     </section>
 
@@ -317,11 +337,36 @@ function produtoFiscalForm(cfg) {
         ean: cfg.ean || '',
         nome: cfg.nome || '',
         ncm: cfg.ncm || '',
+        ncmDescricao: '',
+        ncmSugestoes: [],
         imagemUrl: cfg.imagemUrl || '',
         unidade: cfg.unidade || 'UN',
         cosmosUrl: cfg.cosmosUrl,
+        ncmAutocompleteUrl: cfg.ncmAutocompleteUrl,
         consultando: false,
         cosmosMsg: '',
+        async buscarNcm() {
+            const busca = String(this.ncm || '').trim();
+            this.ncmSugestoes = [];
+            if (busca.length < 2 || !this.ncmAutocompleteUrl) {
+                return;
+            }
+            try {
+                const res = await fetch(`${this.ncmAutocompleteUrl}?busca=${encodeURIComponent(busca)}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) return;
+                this.ncmSugestoes = await res.json();
+            } catch (e) {
+                this.ncmSugestoes = [];
+            }
+        },
+        selecionarNcm(item) {
+            this.ncm = item.ncm;
+            this.ncmDescricao = item.descricao || '';
+            this.ncmSugestoes = [];
+        },
         async consultarCosmos() {
             this.cosmosMsg = '';
             const ean = String(this.ean || '').replace(/\D+/g, '');

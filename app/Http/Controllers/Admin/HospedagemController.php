@@ -9,6 +9,7 @@ use App\Http\Requests\Hospedagem\CheckoutHospedagemRequest;
 use App\Http\Requests\Hospedagem\StoreConsumoRequest;
 use App\Http\Requests\Hospedagem\StoreHospedagemRequest;
 use App\Models\Caixa;
+use App\Models\Cliente;
 use App\Models\Hospedagem;
 use App\Models\Produto;
 use App\Models\Quarto;
@@ -58,8 +59,12 @@ class HospedagemController extends Controller
         $this->authorize('viewAny', Hospedagem::class);
 
         $mapa = $this->hospedagemService->mapaQuartos();
+        $quartoAnterior = old('quarto_id')
+            ? data_get($mapa->first(fn (array $item) => $item['quarto']->id === (int) old('quarto_id')), 'quarto')
+            : null;
+        $clienteAnterior = old('cliente_id') ? Cliente::find(old('cliente_id')) : null;
 
-        return view('hospedagens.mapa', compact('mapa'));
+        return view('hospedagens.mapa', compact('mapa', 'quartoAnterior', 'clienteAnterior'));
     }
 
     public function indicadores(): View
@@ -233,14 +238,24 @@ class HospedagemController extends Controller
             return redirect()->route('hospedagens.show', $hospedagem)->with('erro', 'Esta hospedagem não está com check-in em andamento.');
         }
 
-        $hospedagem->load(['quarto', 'cliente', 'consumos']);
+        $hospedagem->load(['quarto', 'cliente', 'consumos.produto']);
 
         [$caixaAberto, $caixasDisponiveis] = $this->resolverCaixaOperador(request()->user(), null);
 
         $noites = $this->hospedagemService->noites($hospedagem);
         $totalEstimado = $this->hospedagemService->calcularTotal($hospedagem);
+        $quantidadeItensNfce = count($this->hospedagemFiscalService->itensProdutos($hospedagem));
+        $quantidadeItensNfse = count($this->hospedagemFiscalService->itensServicos($hospedagem));
 
-        return view('hospedagens.checkout', compact('hospedagem', 'caixaAberto', 'caixasDisponiveis', 'noites', 'totalEstimado'));
+        return view('hospedagens.checkout', compact(
+            'hospedagem',
+            'caixaAberto',
+            'caixasDisponiveis',
+            'noites',
+            'totalEstimado',
+            'quantidadeItensNfce',
+            'quantidadeItensNfse',
+        ));
     }
 
     public function checkout(CheckoutHospedagemRequest $request, Hospedagem $hospedagem): RedirectResponse
@@ -252,7 +267,7 @@ class HospedagemController extends Controller
         }
 
         try {
-            $this->hospedagemService->checkout(
+            $hospedagem = $this->hospedagemService->checkout(
                 $hospedagem,
                 $caixa,
                 $request->user(),
@@ -263,7 +278,35 @@ class HospedagemController extends Controller
             return back()->with('erro', $e->getMessage());
         }
 
-        return redirect()->route('hospedagens.show', $hospedagem)->with('sucesso', 'Check-out realizado com sucesso.');
+        $documentosEmitidos = [];
+        $falhasFiscais = [];
+
+        if ($request->boolean('emitir_nfce')) {
+            try {
+                $documentosEmitidos[] = 'NFC-e nº '.$this->hospedagemFiscalService
+                    ->emitirNfceConsumos($hospedagem, $request->user())->numero;
+            } catch (NegocioException|IntegrationException $e) {
+                $falhasFiscais[] = 'NFC-e: '.$e->getMessage();
+            }
+        }
+
+        if ($request->boolean('emitir_nfse')) {
+            try {
+                $documentosEmitidos[] = 'NFS-e nº '.$this->hospedagemFiscalService
+                    ->emitirNfseServicos($hospedagem, $request->user())->numero;
+            } catch (NegocioException|IntegrationException $e) {
+                $falhasFiscais[] = 'NFS-e: '.$e->getMessage();
+            }
+        }
+
+        $redirect = redirect()->route('hospedagens.show', $hospedagem)
+            ->with('sucesso', 'Check-out realizado com sucesso.'.($documentosEmitidos ? ' '.implode(' e ', $documentosEmitidos).' emitida(s).' : ''));
+
+        if ($falhasFiscais) {
+            $redirect->with('erro', 'A conta foi fechada, mas houve falha fiscal: '.implode(' | ', $falhasFiscais));
+        }
+
+        return $redirect;
     }
 
     public function cancelar(Hospedagem $hospedagem): RedirectResponse

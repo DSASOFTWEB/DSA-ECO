@@ -15,7 +15,6 @@ trait ProdutoFiscalRules
     {
         $cstSaida = array_keys(FiscalTabelas::cstPisCofinsSaida());
         $cstEntrada = array_keys(FiscalTabelas::cstPisCofinsEntrada());
-        $tPag = array_keys(FiscalTabelas::formasPagamento());
 
         return [
             'tipo_item' => ['required', Rule::in(['produto', 'servico'])],
@@ -46,7 +45,6 @@ trait ProdutoFiscalRules
             'cst_ipi' => ['nullable', 'string', 'max:2'],
             'aliq_ipi' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'cod_beneficio' => ['nullable', 'string', 'max:10'],
-            'forma_pagamento_fiscal' => ['nullable', 'string', Rule::in($tPag)],
 
             'codigo_servico_lc116' => ['nullable', 'string', 'max:10'],
             'codigo_tributacao_municipal' => ['nullable', 'string', 'max:20'],
@@ -88,7 +86,6 @@ trait ProdutoFiscalRules
             'cst_cofins' => $emptyToNull($this->input('cst_cofins')),
             'cst_pis_entrada' => $emptyToNull($this->input('cst_pis_entrada')),
             'cst_cofins_entrada' => $emptyToNull($this->input('cst_cofins_entrada')),
-            'forma_pagamento_fiscal' => $emptyToNull($this->input('forma_pagamento_fiscal')),
             'cst_ipi' => $emptyToNull($this->input('cst_ipi')),
             'cod_beneficio' => $emptyToNull($this->input('cod_beneficio')),
             'codigo_servico_lc116' => $emptyToNull($this->input('codigo_servico_lc116')),

@@ -148,6 +148,8 @@ Route::middleware('auth')->group(function () {
     Route::post('financeiro/transferencias', [TransferenciaCaixaController::class, 'store'])->name('transferencias.store');
 
     Route::get('produtos/consultar-ean', [ProdutoController::class, 'consultarEan'])->name('produtos.consultar-ean');
+    Route::get('produtos/ncm-autocomplete', [ProdutoController::class, 'autocompleteNcm'])->name('produtos.ncm-autocomplete');
+    Route::post('produtos/sincronizar-ncm', [ProdutoController::class, 'sincronizarNcm'])->name('produtos.sincronizar-ncm');
     Route::resource('produtos', ProdutoController::class);
     Route::post('produtos/{produto}/ajustar-estoque', [ProdutoController::class, 'ajustarEstoque'])->name('produtos.ajustar-estoque');
 

@@ -4,8 +4,7 @@ namespace App\Support;
 
 /**
  * Tabelas fiscais oficiais usadas no cadastro de produto e na emissão
- * (CST/CSOSN ICMS, CST PIS/COFINS entrada×saída, tPag NFC-e/NF-e).
- * Espelha a documentação fiscal / padrão Evora.
+ * (CST/CSOSN ICMS, CST PIS/COFINS entrada×saída, formas de pagamento NF-e/NFC-e).
  */
 class FiscalTabelas
 {

@@ -14,9 +14,6 @@ return new class extends Migration
             $table->decimal('aliq_pis_entrada', 7, 4)->nullable()->after('cst_pis_entrada');
             $table->string('cst_cofins_entrada', 2)->nullable()->after('aliq_pis_entrada');
             $table->decimal('aliq_cofins_entrada', 7, 4)->nullable()->after('cst_cofins_entrada');
-
-            // Forma de pagamento padrão (código tPag da NF-e/NFC-e)
-            $table->string('forma_pagamento_fiscal', 2)->nullable()->after('aliq_cofins_entrada');
         });
     }
 
@@ -26,7 +23,6 @@ return new class extends Migration
             $table->dropColumn([
                 'cst_pis_entrada', 'aliq_pis_entrada',
                 'cst_cofins_entrada', 'aliq_cofins_entrada',
-                'forma_pagamento_fiscal',
             ]);
         });
     }

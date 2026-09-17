@@ -4,6 +4,8 @@ namespace App\Services\Fiscal;
 
 use App\Exceptions\NegocioException;
 use App\Models\Empresa;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use NFePHP\Common\Certificate;
 
 class CertificadoA1Service
@@ -17,7 +19,13 @@ class CertificadoA1Service
         try {
             return Certificate::readPfx($pfx, $senha);
         } catch (\Throwable $e) {
-            throw new NegocioException('Certificado ou senha inválidos. Envie um arquivo .pfx ou .p12 válido.');
+            Log::warning('Falha ao validar certificado A1.', [
+                'erro' => $e->getMessage(),
+                'openssl' => OPENSSL_VERSION_TEXT,
+                'bytes' => strlen($pfx),
+            ]);
+
+            throw new NegocioException('Certificado ou senha inválidos. Envie um arquivo .pfx, .p12 ou .bin válido.');
         }
     }
 
@@ -30,6 +38,12 @@ class CertificadoA1Service
         if (is_resource($pfx)) {
             $pfx = stream_get_contents($pfx) ?: '';
         }
+
+        $disco = Storage::disk('local');
+        $caminho = $empresa->certificadoCaminho();
+        if ((! is_string($pfx) || $pfx === '') && $disco->exists($caminho)) {
+            $pfx = $disco->get($caminho);
+        }
         $senha = (string) ($empresa->certificado_senha ?? '');
 
         if (! is_string($pfx) || $pfx === '' || $senha === '') {
@@ -37,6 +51,12 @@ class CertificadoA1Service
         }
 
         $certificate = $this->validar($pfx, $senha);
+
+        // Mantém as duas cópias sincronizadas. O disco local é privado e,
+        // no Docker, storage/app está em volume persistente entre deploys.
+        if (! $disco->exists($caminho)) {
+            $disco->put($caminho, $pfx);
+        }
 
         return [
             'pfx' => $pfx,

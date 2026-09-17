@@ -17,6 +17,8 @@ RUN npm ci
 COPY . .
 RUN npm run build
 FROM php:8.3-apache AS app
+COPY docker/openssl-legacy.cnf /etc/ssl/openssl-legacy.cnf
+ENV OPENSSL_CONF=/etc/ssl/openssl-legacy.cnf
 # Extensões de sistema necessárias pelas extensões PHP abaixo e pelos pacotes
 # do projeto (endroid/qr-code usa gd, maatwebsite/excel usa zip/mbstring/xml,
 # barryvdh/laravel-dompdf usa gd/mbstring).

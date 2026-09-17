@@ -299,7 +299,7 @@
         <div class="border-t border-gray-100 pt-6 dark:border-gray-800">
             <h2 class="text-sm font-semibold text-slate-700">Certificado digital A1</h2>
             <p class="mt-1 text-xs text-slate-400">
-                Arquivo <strong>.pfx / .p12</strong> armazenado no banco (como no Evora). Senha gravada criptografada.
+                Arquivo <strong>.pfx / .p12 / .bin</strong> armazenado no banco e no storage privado persistente. Senha gravada criptografada.
                 @if ($empresa->temCertificadoDigital())
                     <span class="text-emerald-600">Certificado já cadastrado{{ $empresa->certificado_validade ? ' · validade '.$empresa->certificado_validade->format('d/m/Y') : '' }}.</span>
                     <a href="{{ route('empresa.certificado.download') }}" class="ml-2 text-sky-600 hover:underline">Baixar .pfx</a>
@@ -310,7 +310,7 @@
             <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Arquivo do certificado</label>
-                    <input type="file" name="certificado" accept=".pfx,.p12" class="mt-1 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-500 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white">
+                    <input type="file" name="certificado" accept=".pfx,.p12,.bin,application/x-pkcs12" class="mt-1 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-500 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white">
                     @error('certificado')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                 </div>
                 <div>

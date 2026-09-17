@@ -11,6 +11,8 @@ COPY . .
 RUN npm run build
 
 FROM php:8.3-apache AS app
+COPY docker/openssl-legacy.cnf /etc/ssl/openssl-legacy.cnf
+ENV OPENSSL_CONF=/etc/ssl/openssl-legacy.cnf
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libzip-dev \
         libpng-dev \

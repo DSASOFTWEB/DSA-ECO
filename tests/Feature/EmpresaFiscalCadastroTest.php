@@ -5,11 +5,13 @@ namespace Tests\Feature;
 use App\Models\Empresa;
 use App\Models\Unidade;
 use App\Models\User;
+use App\Services\Fiscal\CertificadoA1Service;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
@@ -61,6 +63,7 @@ class EmpresaFiscalCadastroTest extends TestCase
 
     public function test_upload_certificado_a1_grava_blob_e_senha(): void
     {
+        Storage::fake('local');
         [$empresa, , $user] = $this->criarGestor();
         $pfx = UploadedFile::fake()->createWithContent(
             'certificado.pfx',
@@ -81,16 +84,19 @@ class EmpresaFiscalCadastroTest extends TestCase
         $this->assertTrue($empresa->temCertificadoDigital());
         $this->assertSame('senha-secreta', $empresa->certificado_senha);
         $this->assertNotEmpty($empresa->getRawOriginal('certificado_arquivo'));
+        Storage::disk('local')->assertExists($empresa->certificadoCaminho());
     }
 
     public function test_certificado_invalido_nao_substitui_o_arquivo_ja_salvo(): void
     {
+        Storage::fake('local');
         [$empresa, , $user] = $this->criarGestor();
         $original = $this->criarPfx('senha-original');
         $empresa->update([
             'certificado_arquivo' => $original,
             'certificado_senha' => 'senha-original',
         ]);
+        Storage::disk('local')->put($empresa->certificadoCaminho(), $original);
 
         $invalido = UploadedFile::fake()->createWithContent('certificado.pfx', 'arquivo-invalido');
 
@@ -108,6 +114,24 @@ class EmpresaFiscalCadastroTest extends TestCase
         $empresa->refresh();
         $this->assertSame($original, $empresa->getRawOriginal('certificado_arquivo'));
         $this->assertSame('senha-original', $empresa->certificado_senha);
+        $this->assertSame($original, Storage::disk('local')->get($empresa->certificadoCaminho()));
+    }
+
+    public function test_leitura_recupera_certificado_da_copia_persistente(): void
+    {
+        Storage::fake('local');
+        [$empresa] = $this->criarGestor();
+        $pfx = $this->criarPfx('senha-storage');
+        $empresa->update([
+            'certificado_arquivo' => null,
+            'certificado_senha' => 'senha-storage',
+        ]);
+        Storage::disk('local')->put($empresa->certificadoCaminho(), $pfx);
+
+        $carregado = app(CertificadoA1Service::class)->carregar($empresa->fresh());
+
+        $this->assertSame($pfx, $carregado['pfx']);
+        $this->assertTrue($empresa->fresh()->temCertificadoDigital());
     }
 
     public function test_cosmos_prioriza_token_da_empresa_sobre_env(): void

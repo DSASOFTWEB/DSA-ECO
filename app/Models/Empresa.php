@@ -90,12 +90,17 @@ class Empresa extends Model
     public function temCertificadoDigital(): bool
     {
         $conteudo = $this->attributes['certificado_arquivo'] ?? null;
+        $temNoBanco = is_resource($conteudo)
+            ? (int) ((fstat($conteudo)['size'] ?? 0)) > 0
+            : is_string($conteudo) && strlen($conteudo) > 0;
 
-        if (is_resource($conteudo)) {
-            return fstat($conteudo)['size'] > 0;
-        }
+        return $temNoBanco
+            || Storage::disk('local')->exists($this->certificadoCaminho());
+    }
 
-        return is_string($conteudo) && strlen($conteudo) > 0;
+    public function certificadoCaminho(): string
+    {
+        return "certificados/empresa-{$this->getKey()}.pfx";
     }
 
     /**

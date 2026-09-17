@@ -7,6 +7,7 @@ use App\Models\Empresa;
 use App\Services\Fiscal\CertificadoA1Service;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class EmpresaService
@@ -123,7 +124,22 @@ class EmpresaService
         $dados['configuracoes'] = $configuracoes;
         $dados = array_merge($dados, $fiscais);
 
-        $empresa->update($dados);
+        DB::transaction(function () use ($empresa, $dados): void {
+            $empresa->update($dados);
+
+            if (isset($dados['certificado_arquivo'])) {
+                $gravado = Storage::disk('local')->put(
+                    $empresa->certificadoCaminho(),
+                    $dados['certificado_arquivo']
+                );
+
+                if (! $gravado) {
+                    throw ValidationException::withMessages([
+                        'certificado' => 'Não foi possível guardar a cópia persistente do certificado. Tente novamente.',
+                    ]);
+                }
+            }
+        });
 
         return $empresa->fresh();
     }

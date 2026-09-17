@@ -1,0 +1,3 @@
+[submodule "nfse-nacional"]
+	path = nfse-nacional
+	url = https://github.com/Rainzart/nfse-nacional.git

@@ -24,6 +24,8 @@ class UpdateEmpresaRequest extends FormRequest
             'cnae' => ['nullable', 'string', 'max:7', 'regex:/^[0-9]{0,7}$/'],
             'regime_tributario' => ['required', Rule::in(array_keys(Empresa::regimesTributarios()))],
             'aut_xml' => ['nullable', 'string', 'max:18'],
+            'codigo_municipio_ibge' => ['nullable', 'string', 'size:7', 'regex:/^[0-9]{7}$/'],
+            'codigo_servico_hospedagem_lc116' => ['nullable', 'string', 'max:10'],
             'email' => ['nullable', 'email', 'max:255'],
             'telefone' => ['nullable', 'string', 'max:20'],
             'endereco' => ['nullable', 'string', 'max:500'],
@@ -80,6 +82,7 @@ class UpdateEmpresaRequest extends FormRequest
             'nfse_nacional_habilitado' => $this->boolean('nfse_nacional_habilitado'),
             'cnae' => preg_replace('/\D+/', '', (string) $this->input('cnae', '')) ?: null,
             'aut_xml' => preg_replace('/\D+/', '', (string) $this->input('aut_xml', '')) ?: null,
+            'codigo_municipio_ibge' => preg_replace('/\D+/', '', (string) $this->input('codigo_municipio_ibge', '')) ?: null,
         ]);
     }
 }

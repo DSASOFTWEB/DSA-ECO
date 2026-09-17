@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Produto;
 
+use App\Support\FiscalTabelas;
 use Illuminate\Validation\Rule;
 
 trait ProdutoFiscalRules
@@ -12,6 +13,10 @@ trait ProdutoFiscalRules
      */
     protected function regrasFiscaisProduto(): array
     {
+        $cstSaida = array_keys(FiscalTabelas::cstPisCofinsSaida());
+        $cstEntrada = array_keys(FiscalTabelas::cstPisCofinsEntrada());
+        $tPag = array_keys(FiscalTabelas::formasPagamento());
+
         return [
             'tipo_item' => ['required', Rule::in(['produto', 'servico'])],
             'ean' => ['nullable', 'string', 'max:14', 'regex:/^[0-9]{8,14}$/'],
@@ -22,16 +27,26 @@ trait ProdutoFiscalRules
             'cest' => ['nullable', 'string', 'max:7', 'regex:/^[0-9]{7}$/'],
             'cfop' => ['nullable', 'string', 'size:4', 'regex:/^[0-9]{4}$/'],
             'origem' => ['nullable', 'integer', 'min:0', 'max:8'],
-            'cst_icms' => ['nullable', 'string', 'max:3'],
-            'csosn' => ['nullable', 'string', 'max:4'],
+            'cst_icms' => ['nullable', 'string', Rule::in(array_keys(FiscalTabelas::cstIcms()))],
+            'csosn' => ['nullable', 'string', Rule::in(array_keys(FiscalTabelas::csosn()))],
             'aliq_icms' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'cst_pis' => ['nullable', 'string', 'max:2'],
+
+            // PIS/COFINS saída (venda)
+            'cst_pis' => ['nullable', 'string', Rule::in($cstSaida)],
             'aliq_pis' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'cst_cofins' => ['nullable', 'string', 'max:2'],
+            'cst_cofins' => ['nullable', 'string', Rule::in($cstSaida)],
             'aliq_cofins' => ['nullable', 'numeric', 'min:0', 'max:100'],
+
+            // PIS/COFINS entrada (compra)
+            'cst_pis_entrada' => ['nullable', 'string', Rule::in($cstEntrada)],
+            'aliq_pis_entrada' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'cst_cofins_entrada' => ['nullable', 'string', Rule::in($cstEntrada)],
+            'aliq_cofins_entrada' => ['nullable', 'numeric', 'min:0', 'max:100'],
+
             'cst_ipi' => ['nullable', 'string', 'max:2'],
             'aliq_ipi' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'cod_beneficio' => ['nullable', 'string', 'max:10'],
+            'forma_pagamento_fiscal' => ['nullable', 'string', Rule::in($tPag)],
 
             'codigo_servico_lc116' => ['nullable', 'string', 'max:10'],
             'codigo_tributacao_municipal' => ['nullable', 'string', 'max:20'],
@@ -51,6 +66,7 @@ trait ProdutoFiscalRules
         };
 
         $imagemUrl = trim((string) $this->input('imagem_url', ''));
+        $emptyToNull = static fn (mixed $v): ?string => ($v === null || $v === '') ? null : (string) $v;
 
         $this->merge([
             'iss_retido' => $this->boolean('iss_retido'),
@@ -65,6 +81,18 @@ trait ProdutoFiscalRules
             'cnae_servico' => $digits($this->input('cnae_servico')),
             'nbs' => $digits($this->input('nbs')),
             'imagem_url' => $imagemUrl !== '' ? $imagemUrl : null,
+            'origem' => $this->filled('origem') ? (int) $this->input('origem') : null,
+            'cst_icms' => $emptyToNull($this->input('cst_icms')),
+            'csosn' => $emptyToNull($this->input('csosn')),
+            'cst_pis' => $emptyToNull($this->input('cst_pis')),
+            'cst_cofins' => $emptyToNull($this->input('cst_cofins')),
+            'cst_pis_entrada' => $emptyToNull($this->input('cst_pis_entrada')),
+            'cst_cofins_entrada' => $emptyToNull($this->input('cst_cofins_entrada')),
+            'forma_pagamento_fiscal' => $emptyToNull($this->input('forma_pagamento_fiscal')),
+            'cst_ipi' => $emptyToNull($this->input('cst_ipi')),
+            'cod_beneficio' => $emptyToNull($this->input('cod_beneficio')),
+            'codigo_servico_lc116' => $emptyToNull($this->input('codigo_servico_lc116')),
+            'codigo_tributacao_municipal' => $emptyToNull($this->input('codigo_tributacao_municipal')),
         ]);
     }
 }

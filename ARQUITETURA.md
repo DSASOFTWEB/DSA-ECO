@@ -295,7 +295,7 @@ funcionalidades acessórias — o quadro abaixo é explícito sobre a diferença
 | Unidades | Completo | index/create/store/edit/update (sem exclusão, por segurança — unidade com histórico não deve ser removida) | CRUD | **Completo** |
 | Auditoria | Completo (Activitylog) | 1 rota | 1 view | **Completo** para visualização; sem filtro avançado (por usuário/período) na tela ainda |
 | API mobile | Parcial | Auth, Cliente, Acesso | — (API, sem view) | **Esqueleto**: autenticação e os dois endpoints mais críticos (consulta de cliente, validação de acesso) prontos; os demais módulos ainda não têm endpoint de API — hoje são web-only |
-| Integrações fiscais (NF-e/NFC-e / NFS-e Nacional) | Catálogo + emitente | Produto/serviço com campos fiscais; empresa com certificado A1, CSC, séries, NFS-e, Cosmos (fallback .env) | Emissão ainda não ligada às libs `nfephp-org` / `nfse-nacional` | Próximo passo: Service de emissão + Tools NFePHP |
+| Integrações fiscais (NF-e/NFC-e / NFS-e Nacional) | Emissão hospedagem | Emitente na empresa; NFC-e consumos + NFS-e diárias/serviços na tela da hospedagem (`nfephp-org/sped-nfe`) | Ajustes de schema SEFAZ/RTC e DANFSe PDF | Homologar com certificado real |
 
 ## 13. Testes
 

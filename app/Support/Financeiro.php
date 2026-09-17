@@ -36,19 +36,38 @@ class Financeiro
     ];
 
     /**
-     * 'tipo_saldo' classifica onde o valor efetivamente cai (seção 16/17 do
-     * pedido do cliente: caixa físico vs banco vs maquininha) — hoje é só
-     * metadado usado pra agrupar/exibir (ex: resumo por forma de pagamento
-     * no card de saldo do caixa), não roteia dinheiro de verdade.
+     * Formas de pagamento do caixa/PDV, com código fiscal tPag (NF-e/NFC-e).
+     * 'tipo_saldo' classifica onde o valor cai (caixa físico / banco / maquininha).
+     * Chave interna estável; codigo_fiscal segue a tabela oficial do MOC.
      */
     public const FORMAS_PAGAMENTO = [
-        'dinheiro' => ['label' => 'Dinheiro', 'tipo_saldo' => 'caixa_fisico'],
-        'pix' => ['label' => 'Pix', 'tipo_saldo' => 'banco'],
-        'cartao' => ['label' => 'Cartão', 'tipo_saldo' => 'maquininha'],
-        'transferencia' => ['label' => 'Transferência', 'tipo_saldo' => 'banco'],
-        'boleto' => ['label' => 'Boleto', 'tipo_saldo' => 'banco'],
-        'outro' => ['label' => 'Outro', 'tipo_saldo' => 'outro'],
+        'dinheiro' => ['label' => 'Dinheiro', 'tipo_saldo' => 'caixa_fisico', 'codigo_fiscal' => '01'],
+        'pix' => ['label' => 'Pix', 'tipo_saldo' => 'banco', 'codigo_fiscal' => '17'],
+        'cartao' => ['label' => 'Cartão', 'tipo_saldo' => 'maquininha', 'codigo_fiscal' => '03'],
+        'cartao_credito' => ['label' => 'Cartão de crédito', 'tipo_saldo' => 'maquininha', 'codigo_fiscal' => '03'],
+        'cartao_debito' => ['label' => 'Cartão de débito', 'tipo_saldo' => 'maquininha', 'codigo_fiscal' => '04'],
+        'transferencia' => ['label' => 'Transferência', 'tipo_saldo' => 'banco', 'codigo_fiscal' => '18'],
+        'boleto' => ['label' => 'Boleto', 'tipo_saldo' => 'banco', 'codigo_fiscal' => '15'],
+        'outro' => ['label' => 'Outro', 'tipo_saldo' => 'outro', 'codigo_fiscal' => '99'],
     ];
+
+    public static function codigoFiscalFormaPagamento(?string $chave): string
+    {
+        if ($chave === null || $chave === '') {
+            return '99';
+        }
+
+        if (isset(self::FORMAS_PAGAMENTO[$chave]['codigo_fiscal'])) {
+            return self::FORMAS_PAGAMENTO[$chave]['codigo_fiscal'];
+        }
+
+        // Já veio como tPag (01, 17…)
+        if (isset(FiscalTabelas::formasPagamento()[$chave])) {
+            return $chave;
+        }
+
+        return '99';
+    }
 
     public static function categorias(string $tipo): array
     {

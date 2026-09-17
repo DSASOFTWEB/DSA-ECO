@@ -46,6 +46,16 @@ class Hospedagem extends Model
         return LogOptions::defaults()->logFillable()->logOnlyDirty()->dontSubmitEmptyLogs();
     }
 
+    public function unidade(): BelongsTo
+    {
+        return $this->belongsTo(Unidade::class);
+    }
+
+    public function documentosFiscais(): HasMany
+    {
+        return $this->hasMany(DocumentoFiscal::class);
+    }
+
     public function quarto(): BelongsTo
     {
         return $this->belongsTo(Quarto::class);

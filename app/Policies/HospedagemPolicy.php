@@ -37,6 +37,11 @@ class HospedagemPolicy
         return $user->can('pousada.checkout') && $user->empresa_id === $hospedagem->empresa_id;
     }
 
+    public function emitirFiscal(User $user, Hospedagem $hospedagem): bool
+    {
+        return $user->can('pousada.checkout') && $user->empresa_id === $hospedagem->empresa_id;
+    }
+
     public function cancelar(User $user, Hospedagem $hospedagem): bool
     {
         return $user->can('pousada.reservar') && $user->empresa_id === $hospedagem->empresa_id;

@@ -33,6 +33,23 @@
                     <a href="{{ route('hospedagens.checkout', $hospedagem) }}" class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700">Fazer check-out</a>
                 @endcan
             @endif
+
+            @if ($hospedagem->estaHospedado() || $hospedagem->estaFinalizado())
+                @can('emitirFiscal', $hospedagem)
+                    <form method="POST" action="{{ route('hospedagens.emitir-nfce', $hospedagem) }}" onsubmit="return confirm('Emitir NFC-e dos consumos de produto?')">
+                        @csrf
+                        <button type="submit" @disabled(count($itensNfce) === 0) class="rounded-lg border border-amber-400 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50">
+                            Emitir NFC-e (produtos)
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ route('hospedagens.emitir-nfse', $hospedagem) }}" onsubmit="return confirm('Emitir NFS-e das diárias e serviços?')">
+                        @csrf
+                        <button type="submit" @disabled(count($itensNfse) === 0) class="rounded-lg border border-violet-400 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50">
+                            Emitir NFS-e (hospedagem)
+                        </button>
+                    </form>
+                @endcan
+            @endif
         </div>
     </div>
 
@@ -132,4 +149,31 @@
             @endif
         </div>
     </div>
+
+    @if ($hospedagem->documentosFiscais->isNotEmpty())
+        <div class="mt-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
+            <h3 class="mb-3 text-sm font-semibold text-slate-700">Documentos fiscais</h3>
+            <ul class="divide-y divide-slate-100 text-sm">
+                @foreach ($hospedagem->documentosFiscais as $doc)
+                    <li class="flex flex-wrap items-center justify-between gap-2 py-2">
+                        <span class="font-medium uppercase">{{ $doc->modelo }}</span>
+                        <span class="text-slate-500">nº {{ $doc->numero ?? '—' }} · série {{ $doc->serie ?? '—' }}</span>
+                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase text-slate-600">{{ $doc->status }}</span>
+                        <span class="text-slate-700">R$ {{ number_format($doc->valor_total, 2, ',', '.') }}</span>
+                        @if ($doc->mensagem_erro)
+                            <span class="w-full text-xs text-rose-600">{{ $doc->mensagem_erro }}</span>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
+            <p class="mt-2 text-xs text-slate-400">
+                NFC-e: {{ count($itensNfce) }} item(ns) de produto · NFS-e: {{ count($itensNfse) }} item(ns) de diária/serviço
+            </p>
+        </div>
+    @elseif ($hospedagem->estaHospedado() || $hospedagem->estaFinalizado())
+        <p class="mt-4 text-xs text-slate-400">
+            Pronto para emissão — NFC-e: {{ count($itensNfce) }} produto(s) · NFS-e: {{ count($itensNfse) }} serviço(s)/diária(s).
+            Configure certificado, CSC e código IBGE em Dados da empresa.
+        </p>
+    @endif
 @endsection

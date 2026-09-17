@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\IntegrationException;
 use App\Exceptions\NegocioException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hospedagem\CheckoutHospedagemRequest;
@@ -13,6 +14,7 @@ use App\Models\Produto;
 use App\Models\Quarto;
 use App\Models\User;
 use App\Services\CaixaService;
+use App\Services\Fiscal\HospedagemFiscalService;
 use App\Services\HospedagemService;
 use App\Services\Relatorios\HospedagemPdfExport;
 use Illuminate\Contracts\View\View;
@@ -26,6 +28,7 @@ class HospedagemController extends Controller
     public function __construct(
         protected HospedagemService $hospedagemService,
         protected CaixaService $caixaService,
+        protected HospedagemFiscalService $hospedagemFiscalService,
     ) {}
 
     public function index(): View
@@ -138,11 +141,42 @@ class HospedagemController extends Controller
     {
         $this->authorize('view', $hospedagem);
 
-        $hospedagem->load(['quarto', 'cliente', 'consumos.produto', 'consumos.registradoPor', 'registradoPor']);
+        $hospedagem->load([
+            'quarto', 'cliente', 'consumos.produto', 'consumos.registradoPor', 'registradoPor',
+            'documentosFiscais' => fn ($q) => $q->latest('id'),
+        ]);
 
         $produtos = Produto::ativos()->orderBy('nome')->get();
+        $itensNfce = $this->hospedagemFiscalService->itensProdutos($hospedagem);
+        $itensNfse = $this->hospedagemFiscalService->itensServicos($hospedagem);
 
-        return view('hospedagens.show', compact('hospedagem', 'produtos'));
+        return view('hospedagens.show', compact('hospedagem', 'produtos', 'itensNfce', 'itensNfse'));
+    }
+
+    public function emitirNfce(Hospedagem $hospedagem): RedirectResponse
+    {
+        $this->authorize('emitirFiscal', $hospedagem);
+
+        try {
+            $doc = $this->hospedagemFiscalService->emitirNfceConsumos($hospedagem, request()->user());
+        } catch (NegocioException|IntegrationException $e) {
+            return back()->with('erro', $e->getMessage());
+        }
+
+        return back()->with('sucesso', 'NFC-e autorizada nº '.$doc->numero.($doc->chave ? ' · chave '.$doc->chave : ''));
+    }
+
+    public function emitirNfse(Hospedagem $hospedagem): RedirectResponse
+    {
+        $this->authorize('emitirFiscal', $hospedagem);
+
+        try {
+            $doc = $this->hospedagemFiscalService->emitirNfseServicos($hospedagem, request()->user());
+        } catch (NegocioException|IntegrationException $e) {
+            return back()->with('erro', $e->getMessage());
+        }
+
+        return back()->with('sucesso', 'NFS-e autorizada nº '.$doc->numero.($doc->chave ? ' · chave '.$doc->chave : ''));
     }
 
     public function ficha(Hospedagem $hospedagem): View

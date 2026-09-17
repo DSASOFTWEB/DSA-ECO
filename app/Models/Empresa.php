@@ -25,7 +25,7 @@ class Empresa extends Model
     public const AMBIENTE_HOMOLOGACAO = 2;
 
     protected $fillable = [
-        'nome', 'razao_social', 'cnpj', 'ie', 'im', 'cnae', 'regime_tributario', 'aut_xml',
+        'nome', 'razao_social', 'cnpj',         'ie', 'im', 'cnae', 'regime_tributario', 'aut_xml', 'codigo_municipio_ibge', 'codigo_servico_hospedagem_lc116',
         'logo_path', 'email', 'telefone',
         'plano_saas', 'status', 'trial_termina_em', 'configuracoes',
         'ambiente_nfe', 'csc', 'csc_id',

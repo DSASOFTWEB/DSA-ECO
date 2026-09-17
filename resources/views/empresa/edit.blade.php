@@ -148,8 +148,20 @@
             </p>
 
             <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-3 [&_input]:min-h-11 [&_input]:border-gray-300 [&_input]:bg-transparent [&_input]:text-gray-800 [&_input]:outline-none [&_input]:transition [&_input]:focus:border-brand-500 [&_input]:focus:ring-3 [&_input]:focus:ring-brand-500/10 dark:[&_input]:border-gray-700 dark:[&_input]:text-white/90 [&_select]:min-h-11 [&_select]:border-gray-300 [&_select]:bg-transparent">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Ambiente SEFAZ</label>
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Cód. município IBGE</label>
+                <input type="text" name="codigo_municipio_ibge" value="{{ old('codigo_municipio_ibge', $empresa->codigo_municipio_ibge) }}" maxlength="7" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="3550308">
+                <p class="mt-1 text-xs text-slate-400">Obrigatório para emitir NFC-e / NFS-e.</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700">LC 116 hospedagem</label>
+                <input type="text" name="codigo_servico_hospedagem_lc116" value="{{ old('codigo_servico_hospedagem_lc116', $empresa->codigo_servico_hospedagem_lc116) }}" maxlength="10" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="9.01">
+                <p class="mt-1 text-xs text-slate-400">Código do serviço de diária na NFS-e Nacional.</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Ambiente SEFAZ</label>
                     <select name="ambiente_nfe" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                         <option value="2" @selected((int) old('ambiente_nfe', $empresa->ambiente_nfe ?? 2) === 2)>Homologação</option>
                         <option value="1" @selected((int) old('ambiente_nfe', $empresa->ambiente_nfe ?? 2) === 1)>Produção</option>

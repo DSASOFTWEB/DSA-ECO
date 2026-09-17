@@ -27,6 +27,8 @@ class Produto extends Model
         // NFC-e
         'ncm', 'cest', 'cfop', 'origem', 'cst_icms', 'csosn', 'aliq_icms',
         'cst_pis', 'aliq_pis', 'cst_cofins', 'aliq_cofins', 'cst_ipi', 'aliq_ipi', 'cod_beneficio',
+        'cst_pis_entrada', 'aliq_pis_entrada', 'cst_cofins_entrada', 'aliq_cofins_entrada',
+        'forma_pagamento_fiscal',
         // NFS-e Nacional
         'codigo_servico_lc116', 'codigo_tributacao_municipal', 'cnae_servico', 'nbs', 'aliq_iss', 'iss_retido',
     ];
@@ -43,6 +45,8 @@ class Produto extends Model
         'aliq_cofins' => 'decimal:4',
         'aliq_ipi' => 'decimal:4',
         'aliq_iss' => 'decimal:4',
+        'aliq_pis_entrada' => 'decimal:4',
+        'aliq_cofins_entrada' => 'decimal:4',
     ];
 
     public function getActivitylogOptions(): LogOptions

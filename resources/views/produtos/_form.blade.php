@@ -127,8 +127,22 @@
     </section>
 
     {{-- NFC-e --}}
+    @php
+        $empresaFiscal = $empresa ?? auth()->user()?->empresa;
+        $classificacaoIcms = $classificacaoIcms ?? \App\Support\FiscalTabelas::classificacaoIcmsParaRegime($empresaFiscal?->regime_tributario);
+        $campoIcms = $classificacaoIcms['campo'];
+        $opcoesIcms = $classificacaoIcms['opcoes'];
+        $rotuloIcms = $classificacaoIcms['rotulo'];
+        $rotuloRegime = \App\Models\Empresa::regimesTributarios()[$empresaFiscal?->regime_tributario ?? \App\Models\Empresa::REGIME_SIMPLES] ?? 'Simples Nacional';
+    @endphp
     <section class="space-y-4" x-show="tipo === 'produto'" x-cloak>
-        <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Fiscal NFC-e (mercadoria)</h3>
+        <div class="flex flex-wrap items-end justify-between gap-2">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Fiscal NFC-e (mercadoria)</h3>
+            <p class="text-xs text-slate-400">
+                Classificação pré-definida para
+                <strong>{{ $rotuloRegime }}</strong>
+            </p>
+        </div>
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
             <div>
                 <label class="block text-sm font-medium text-slate-700">NCM</label>
@@ -143,52 +157,99 @@
                 <input type="text" name="cfop" value="{{ old('cfop', $p?->cfop) }}" maxlength="4" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="5102">
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700">Origem ICMS</label>
+                <label class="block text-sm font-medium text-slate-700">Origem da mercadoria</label>
                 <select name="origem" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                     <option value="">—</option>
-                    @foreach ([
-                        0 => '0 — Nacional',
-                        1 => '1 — Estrangeira (importação direta)',
-                        2 => '2 — Estrangeira (mercado interno)',
-                        3 => '3 — Nacional c/ conteúdo importação >40%',
-                        4 => '4 — Nacional produção conforme PPB',
-                        5 => '5 — Nacional c/ conteúdo importação ≤40%',
-                        6 => '6 — Estrangeira (importação direta sem similar)',
-                        7 => '7 — Estrangeira (mercado interno sem similar)',
-                        8 => '8 — Nacional c/ conteúdo importação >70%',
-                    ] as $origemValor => $origemLabel)
-                        <option value="{{ $origemValor }}" @selected(old('origem', $p?->origem) === $origemValor || old('origem', $p?->origem) === (string) $origemValor)>{{ $origemLabel }}</option>
+                    @foreach (\App\Support\FiscalTabelas::origemMercadoria() as $origemValor => $origemLabel)
+                        <option value="{{ $origemValor }}" @selected((string) old('origem', $p?->origem) === (string) $origemValor)>{{ $origemLabel }}</option>
                     @endforeach
                 </select>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700">CST ICMS</label>
-                <input type="text" name="cst_icms" value="{{ old('cst_icms', $p?->cst_icms) }}" maxlength="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="000">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700">CSOSN (Simples)</label>
-                <input type="text" name="csosn" value="{{ old('csosn', $p?->csosn) }}" maxlength="4" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="102">
+            <div class="sm:col-span-2">
+                <label class="block text-sm font-medium text-slate-700">{{ $rotuloIcms }}</label>
+                <select name="{{ $campoIcms }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">—</option>
+                    @foreach ($opcoesIcms as $cod => $label)
+                        <option value="{{ $cod }}" @selected(old($campoIcms, $p?->{$campoIcms}) == $cod)>{{ $label }}</option>
+                    @endforeach
+                </select>
+                @if ($campoIcms === 'csosn')
+                    <input type="hidden" name="cst_icms" value="">
+                @else
+                    <input type="hidden" name="csosn" value="">
+                @endif
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700">Alíq. ICMS (%)</label>
                 <input type="number" step="0.0001" min="0" max="100" name="aliq_icms" value="{{ old('aliq_icms', $p?->aliq_icms) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
             </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700">CST PIS</label>
-                <input type="text" name="cst_pis" value="{{ old('cst_pis', $p?->cst_pis) }}" maxlength="2" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+
+            <div class="sm:col-span-3 border-t border-slate-100 pt-4">
+                <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">PIS / COFINS — saída (venda)</p>
+                <div class="grid grid-cols-1 gap-5 sm:grid-cols-4">
+                    <div class="sm:col-span-2">
+                        <label class="block text-sm font-medium text-slate-700">CST PIS saída</label>
+                        <select name="cst_pis" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            <option value="">—</option>
+                            @foreach (\App\Support\FiscalTabelas::cstPisCofinsSaida() as $cod => $label)
+                                <option value="{{ $cod }}" @selected(old('cst_pis', $p?->cst_pis) == $cod)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Alíq. PIS saída (%)</label>
+                        <input type="number" step="0.0001" min="0" max="100" name="aliq_pis" value="{{ old('aliq_pis', $p?->aliq_pis) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                    <div></div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-sm font-medium text-slate-700">CST COFINS saída</label>
+                        <select name="cst_cofins" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            <option value="">—</option>
+                            @foreach (\App\Support\FiscalTabelas::cstPisCofinsSaida() as $cod => $label)
+                                <option value="{{ $cod }}" @selected(old('cst_cofins', $p?->cst_cofins) == $cod)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Alíq. COFINS saída (%)</label>
+                        <input type="number" step="0.0001" min="0" max="100" name="aliq_cofins" value="{{ old('aliq_cofins', $p?->aliq_cofins) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700">Alíq. PIS (%)</label>
-                <input type="number" step="0.0001" min="0" max="100" name="aliq_pis" value="{{ old('aliq_pis', $p?->aliq_pis) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+
+            <div class="sm:col-span-3 border-t border-slate-100 pt-4">
+                <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">PIS / COFINS — entrada (compra)</p>
+                <div class="grid grid-cols-1 gap-5 sm:grid-cols-4">
+                    <div class="sm:col-span-2">
+                        <label class="block text-sm font-medium text-slate-700">CST PIS entrada</label>
+                        <select name="cst_pis_entrada" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            <option value="">—</option>
+                            @foreach (\App\Support\FiscalTabelas::cstPisCofinsEntrada() as $cod => $label)
+                                <option value="{{ $cod }}" @selected(old('cst_pis_entrada', $p?->cst_pis_entrada) == $cod)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Alíq. PIS entrada (%)</label>
+                        <input type="number" step="0.0001" min="0" max="100" name="aliq_pis_entrada" value="{{ old('aliq_pis_entrada', $p?->aliq_pis_entrada) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                    <div></div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-sm font-medium text-slate-700">CST COFINS entrada</label>
+                        <select name="cst_cofins_entrada" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            <option value="">—</option>
+                            @foreach (\App\Support\FiscalTabelas::cstPisCofinsEntrada() as $cod => $label)
+                                <option value="{{ $cod }}" @selected(old('cst_cofins_entrada', $p?->cst_cofins_entrada) == $cod)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Alíq. COFINS entrada (%)</label>
+                        <input type="number" step="0.0001" min="0" max="100" name="aliq_cofins_entrada" value="{{ old('aliq_cofins_entrada', $p?->aliq_cofins_entrada) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700">CST COFINS</label>
-                <input type="text" name="cst_cofins" value="{{ old('cst_cofins', $p?->cst_cofins) }}" maxlength="2" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700">Alíq. COFINS (%)</label>
-                <input type="number" step="0.0001" min="0" max="100" name="aliq_cofins" value="{{ old('aliq_cofins', $p?->aliq_cofins) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-            </div>
+
             <div>
                 <label class="block text-sm font-medium text-slate-700">CST IPI</label>
                 <input type="text" name="cst_ipi" value="{{ old('cst_ipi', $p?->cst_ipi) }}" maxlength="2" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
@@ -200,6 +261,16 @@
             <div>
                 <label class="block text-sm font-medium text-slate-700">Cód. benefício fiscal</label>
                 <input type="text" name="cod_beneficio" value="{{ old('cod_beneficio', $p?->cod_beneficio) }}" maxlength="10" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            </div>
+            <div class="sm:col-span-3">
+                <label class="block text-sm font-medium text-slate-700">Forma de pagamento padrão (tPag)</label>
+                <select name="forma_pagamento_fiscal" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">— usar a do PDV/caixa —</option>
+                    @foreach (\App\Support\FiscalTabelas::formasPagamento() as $cod => $label)
+                        <option value="{{ $cod }}" @selected(old('forma_pagamento_fiscal', $p?->forma_pagamento_fiscal) == $cod)>{{ $label }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-slate-400">Códigos oficiais do Manual de Orientação do Contribuinte (NF-e/NFC-e).</p>
             </div>
         </div>
     </section>

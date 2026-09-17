@@ -198,6 +198,8 @@ Route::middleware('auth')->group(function () {
     Route::post('hospedagens/{hospedagem}/consumos', [HospedagemController::class, 'consumos'])->name('hospedagens.consumos');
     Route::get('hospedagens/{hospedagem}/checkout', [HospedagemController::class, 'checkoutForm'])->name('hospedagens.checkout');
     Route::post('hospedagens/{hospedagem}/checkout', [HospedagemController::class, 'checkout'])->name('hospedagens.checkout.store');
+    Route::post('hospedagens/{hospedagem}/emitir-nfce', [HospedagemController::class, 'emitirNfce'])->name('hospedagens.emitir-nfce');
+    Route::post('hospedagens/{hospedagem}/emitir-nfse', [HospedagemController::class, 'emitirNfse'])->name('hospedagens.emitir-nfse');
     Route::post('hospedagens/{hospedagem}/cancelar', [HospedagemController::class, 'cancelar'])->name('hospedagens.cancelar');
 
     Route::get('tipos-entrada', [TipoEntradaController::class, 'index'])->name('tipos-entrada.index');

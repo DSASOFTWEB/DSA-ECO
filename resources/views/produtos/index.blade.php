@@ -15,9 +15,26 @@
         </form>
 
         @can('create', \App\Models\Produto::class)
-            <a href="{{ route('produtos.create') }}" class="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-theme-xs transition hover:bg-brand-600">+ Novo produto</a>
+            <button
+                type="button"
+                @click="$dispatch('open-modal', 'incluir-produto')"
+                class="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-theme-xs transition hover:bg-brand-600"
+            >
+                + Incluir
+            </button>
         @endcan
     </div>
+
+    @if ($errors->any())
+        <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-300">
+            <p class="font-semibold">Não foi possível salvar o produto:</p>
+            <ul class="mt-1 list-disc pl-5">
+                @foreach ($errors->all() as $erro)
+                    <li>{{ $erro }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
     <div class="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <table class="min-w-full divide-y divide-slate-100 text-sm">
@@ -60,4 +77,28 @@
     </div>
 
     <div class="mt-4">{{ $produtos->links() }}</div>
+
+    @can('create', \App\Models\Produto::class)
+        <x-modal name="incluir-produto" title="Incluir produto" maxWidth="5xl">
+            <form method="POST" action="{{ route('produtos.store') }}" class="max-h-[75vh] space-y-2 overflow-y-auto pr-1">
+                @csrf
+                <input type="hidden" name="return_to" value="index">
+                @include('produtos._form', ['produto' => null, 'categorias' => $categorias, 'empresa' => $empresa])
+                <div class="sticky bottom-0 flex justify-end gap-2 border-t border-slate-100 bg-white pt-4 dark:border-gray-800 dark:bg-gray-900">
+                    <button type="button" @click="$dispatch('close-modal', 'incluir-produto')" class="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 dark:hover:bg-white/5">Cancelar</button>
+                    <button class="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-theme-xs transition hover:bg-brand-600">Salvar produto</button>
+                </div>
+            </form>
+        </x-modal>
+    @endcan
 @endsection
+
+@if ($errors->any() && old('return_to') === 'index')
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                window.dispatchEvent(new CustomEvent('open-modal', { detail: 'incluir-produto' }));
+            });
+        </script>
+    @endpush
+@endif

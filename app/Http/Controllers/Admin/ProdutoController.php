@@ -34,7 +34,10 @@ class ProdutoController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return view('produtos.index', compact('produtos'));
+        $categorias = CategoriaProduto::orderBy('nome')->get();
+        $empresa = Empresa::find(auth()->user()->empresa_id);
+
+        return view('produtos.index', compact('produtos', 'categorias', 'empresa'));
     }
 
     public function create(): View
@@ -42,13 +45,18 @@ class ProdutoController extends Controller
         $this->authorize('create', Produto::class);
 
         $categorias = CategoriaProduto::orderBy('nome')->get();
+        $empresa = Empresa::find(auth()->user()->empresa_id);
 
-        return view('produtos.create', compact('categorias'));
+        return view('produtos.create', compact('categorias', 'empresa'));
     }
 
     public function store(StoreProdutoRequest $request): RedirectResponse
     {
         $produto = Produto::create($request->validated());
+
+        if ($request->input('return_to') === 'index') {
+            return redirect()->route('produtos.index')->with('sucesso', 'Produto cadastrado com sucesso.');
+        }
 
         return redirect()->route('produtos.show', $produto)->with('sucesso', 'Produto cadastrado com sucesso.');
     }
@@ -67,8 +75,9 @@ class ProdutoController extends Controller
         $this->authorize('update', $produto);
 
         $categorias = CategoriaProduto::orderBy('nome')->get();
+        $empresa = Empresa::find(auth()->user()->empresa_id);
 
-        return view('produtos.edit', compact('produto', 'categorias'));
+        return view('produtos.edit', compact('produto', 'categorias', 'empresa'));
     }
 
     public function update(UpdateProdutoRequest $request, Produto $produto): RedirectResponse

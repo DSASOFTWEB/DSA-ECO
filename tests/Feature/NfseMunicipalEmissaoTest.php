@@ -134,6 +134,34 @@ class NfseMunicipalEmissaoTest extends TestCase
         $this->assertStringContainsString('processamento', mb_strtolower((string) $doc->mensagem_erro));
     }
 
+    public function test_maceio_com_flag_nacional_ainda_usa_giss_nao_sefin(): void
+    {
+        // E0039: município não parametrizado nos emissores públicos nacionais.
+        [$empresa, $unidade, $user, $hospedagem] = $this->cenario(ibge: '2704302', nacional: true);
+        $this->anexarCertificado($empresa);
+
+        $envioXml = '<?xml version="1.0"?>'
+            .'<EnviarLoteRpsResposta><Protocolo>PROT-AUTO</Protocolo></EnviarLoteRpsResposta>';
+        $consultaXml = '<?xml version="1.0"?>'
+            .'<ConsultarLoteRpsResposta><ListaNfse><CompNfse><Nfse><InfNfse>'
+            .'<Numero>55</Numero><CodigoVerificacao>XYZ</CodigoVerificacao>'
+            .'</InfNfse></Nfse></CompNfse></ListaNfse></ConsultarLoteRpsResposta>';
+
+        Http::fake([
+            'ws-homologacao-rtc.giss.com.br/*' => Http::sequence()
+                ->push($this->soapEnvelope($envioXml), 200)
+                ->push($this->soapEnvelope($consultaXml), 200),
+            'sefin.*' => Http::response(['erros' => [['Codigo' => 'E0039', 'Descricao' => 'nao']]], 400),
+        ]);
+
+        $doc = app(HospedagemFiscalService::class)->emitirNfseServicos($hospedagem->fresh(['quarto', 'cliente']), $user);
+
+        $this->assertSame(DocumentoFiscal::STATUS_AUTORIZADO, $doc->status);
+        $this->assertSame(55, (int) $doc->numero);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'giss.com.br'));
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'sefin'));
+    }
+
     /**
      * @return array{0:Empresa,1:Unidade,2:User,3:Hospedagem}
      */

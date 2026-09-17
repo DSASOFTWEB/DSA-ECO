@@ -77,17 +77,7 @@ class AbrasfV2RpsBuilder
 
         $valores = '<Valores>'
             .'<ValorServicos>'.$this->money($valor).'</ValorServicos>'
-            .'<ValorDeducoes>0.00</ValorDeducoes>'
-            .'<ValorPis>0.00</ValorPis>'
-            .'<ValorCofins>0.00</ValorCofins>'
-            .'<ValorInss>0.00</ValorInss>'
-            .'<ValorIr>0.00</ValorIr>'
-            .'<ValorCsll>0.00</ValorCsll>'
-            .'<OutrasRetencoes>0.00</OutrasRetencoes>'
-            .'<ValorIss>0.00</ValorIss>'
-            .'<Aliquota>'.$this->money($aliqXml, 4).'</Aliquota>'
-            .'<DescontoIncondicionado>0.00</DescontoIncondicionado>'
-            .'<DescontoCondicionado>0.00</DescontoCondicionado>'
+            .($aliqXml > 0 ? '<Aliquota>'.$this->money($aliqXml, 4).'</Aliquota>' : '')
             .'</Valores>';
 
         $servico = '<Servico>'
@@ -106,7 +96,7 @@ class AbrasfV2RpsBuilder
             .($im !== '' ? '<InscricaoMunicipal>'.$im.'</InscricaoMunicipal>' : '')
             .'</Prestador>';
 
-        $tomador = $this->montarTomador($hospedagem);
+        $tomador = $this->montarTomador($hospedagem, $empresa, $unidade, $cMun);
 
         $inf = '<InfDeclaracaoPrestacaoServico Id="'.$idInf.'" xmlns="'.self::NS_TIPOS.'">'
             .'<Rps>'
@@ -186,7 +176,7 @@ class AbrasfV2RpsBuilder
         return $rpsAssinado;
     }
 
-    protected function montarTomador(Hospedagem $hospedagem): string
+    protected function montarTomador(Hospedagem $hospedagem, Empresa $empresa, Unidade $unidade, string $cMunEmpresa): string
     {
         $cliente = $hospedagem->cliente;
         if (! $cliente) {
@@ -202,16 +192,35 @@ class AbrasfV2RpsBuilder
             return '';
         }
 
+        // tcEndereco GISS exige: Endereco, Numero, Bairro, CodigoMunicipio, Uf, Cep.
+        // Sem todos os campos, omite o endereço (opcional em tcDadosTomador).
         $end = '';
+        $logradouro = trim((string) ($cliente->endereco ?? ''));
+        $numero = trim((string) ($cliente->numero ?: 'S/N'));
+        $bairro = trim((string) ($cliente->bairro ?? ''));
         $cep = preg_replace('/\D+/', '', (string) ($cliente->cep ?? ''));
+        $uf = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', (string) ($cliente->uf ?? $unidade->uf ?? '')), 0, 2));
         $cMun = preg_replace('/\D+/', '', (string) ($cliente->codigo_municipio_ibge ?? ''));
-        if (filled($cliente->endereco)) {
+        if (strlen((string) $cMun) !== 7) {
+            $cMun = $cMunEmpresa;
+        }
+
+        if (
+            $logradouro !== ''
+            && $numero !== ''
+            && $bairro !== ''
+            && strlen((string) $cep) === 8
+            && strlen((string) $cMun) === 7
+            && strlen($uf) === 2
+        ) {
             $end = '<Endereco>'
-                .'<Endereco>'.$this->esc(mb_substr((string) $cliente->endereco, 0, 125, 'UTF-8')).'</Endereco>'
-                .'<Numero>'.$this->esc(mb_substr((string) ($cliente->numero ?: 'S/N'), 0, 10, 'UTF-8')).'</Numero>'
-                .(filled($cliente->bairro) ? '<Bairro>'.$this->esc(mb_substr((string) $cliente->bairro, 0, 60, 'UTF-8')).'</Bairro>' : '')
-                .(strlen((string) $cMun) === 7 ? '<CodigoMunicipio>'.$cMun.'</CodigoMunicipio>' : '')
-                .(strlen((string) $cep) === 8 ? '<Cep>'.$cep.'</Cep>' : '')
+                .'<Endereco>'.$this->esc(mb_substr($logradouro, 0, 125, 'UTF-8')).'</Endereco>'
+                .'<Numero>'.$this->esc(mb_substr($numero, 0, 10, 'UTF-8')).'</Numero>'
+                .(filled($cliente->complemento) ? '<Complemento>'.$this->esc(mb_substr((string) $cliente->complemento, 0, 60, 'UTF-8')).'</Complemento>' : '')
+                .'<Bairro>'.$this->esc(mb_substr($bairro, 0, 60, 'UTF-8')).'</Bairro>'
+                .'<CodigoMunicipio>'.$cMun.'</CodigoMunicipio>'
+                .'<Uf>'.$uf.'</Uf>'
+                .'<Cep>'.$cep.'</Cep>'
                 .'</Endereco>';
         }
 

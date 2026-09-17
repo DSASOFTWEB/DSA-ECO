@@ -8,13 +8,14 @@ use App\Models\DocumentoFiscal;
 use App\Models\Empresa;
 use App\Models\Hospedagem;
 use App\Models\Unidade;
+use App\Services\Fiscal\NfseMunicipal\MunicipioNfseCatalog;
 use App\Services\Fiscal\NfseMunicipal\NfseMunicipalEmissor;
 use Illuminate\Support\Facades\Http;
 use NFePHP\Common\Signer;
 
 /**
- * Emite NFS-e: Nacional (DPS/SEFIN) quando habilitada; senão municipal
- * (ACBr: IBGE → provedor, v1 = GISS ABRASF 2.04).
+ * Emite NFS-e: Nacional (DPS/SEFIN) quando habilitada e o município
+ * estiver no Padrão Nacional; senão municipal (ACBr/GISS).
  */
 class NfseEmissaoService
 {
@@ -26,6 +27,7 @@ class NfseEmissaoService
         protected CertificadoA1Service $certificadoA1,
         protected FiscalXmlStorageService $xmlStorage,
         protected NfseMunicipalEmissor $municipal,
+        protected MunicipioNfseCatalog $municipios,
     ) {}
 
     /**
@@ -42,8 +44,7 @@ class NfseEmissaoService
             throw new NegocioException('Informe o código IBGE do município (7 dígitos) em Dados da empresa.');
         }
 
-        // Nacional desabilitada → prefeitura (catálogo ACBr / GISS).
-        if (! $empresa->nfse_nacional_habilitado) {
+        if ($this->deveUsarMunicipal($empresa, $cMun)) {
             return $this->municipal->emitir($empresa, $unidade, $hospedagem, $documento, $itens);
         }
 
@@ -142,6 +143,12 @@ class NfseEmissaoService
             }
 
             $motivo = $this->extrairMensagemErro($json, $response->body());
+            if ($this->ehErroMunicipioSemNacional($motivo)) {
+                $motivo .= ' Este município não está no NFS-e Nacional (emissor público). '
+                    .'Desmarque “Habilitar emissão NFS-e Nacional” em Dados da empresa '
+                    .'para emitir via prefeitura (ex.: Maceió → GISS), ou o sistema passará a '
+                    .'rotear automaticamente pelo catálogo ACBr.';
+            }
             $documento->update([
                 'status' => DocumentoFiscal::STATUS_REJEITADO,
                 'mensagem_erro' => "HTTP {$statusHttp}: ".substr($motivo, 0, 800),
@@ -165,6 +172,42 @@ class NfseEmissaoService
     public function consultarLoteMunicipal(Empresa $empresa, Unidade $unidade, DocumentoFiscal $documento): DocumentoFiscal
     {
         return $this->municipal->consultarLoteDocumento($empresa, $unidade, $documento);
+    }
+
+    /**
+     * Municipal quando: flag nacional desligada, OU o catálogo ACBr aponta
+     * provedor de prefeitura (Giss, Betha…), não Padrão Nacional.
+     * Evita SEFIN E0039 em cidades como Maceió (2704302 → GISS).
+     */
+    protected function deveUsarMunicipal(Empresa $empresa, string $cMun): bool
+    {
+        if (! $empresa->nfse_nacional_habilitado) {
+            return true;
+        }
+
+        try {
+            $mun = $this->municipios->resolve($cMun);
+        } catch (NegocioException) {
+            return false;
+        }
+
+        $provedor = strtolower(trim((string) ($mun['provedor'] ?? '')));
+        if ($provedor === '' || $provedor === 'padraonacional') {
+            return false;
+        }
+
+        // Catálogo indica prefeitura (Giss etc.) — não tentar DPS nacional.
+        return true;
+    }
+
+    protected function ehErroMunicipioSemNacional(string $motivo): bool
+    {
+        $l = mb_strtolower($motivo, 'UTF-8');
+
+        return str_contains($l, 'e0039')
+            || str_contains($l, 'emissores públicos nacionais')
+            || str_contains($l, 'emissores publicos nacionais')
+            || str_contains($l, 'parametrizado para utilizar os emissores');
     }
 
     /**

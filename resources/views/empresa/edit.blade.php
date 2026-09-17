@@ -294,8 +294,9 @@
                         <span>
                             <span class="font-medium text-slate-700">Habilitar emissão NFS-e Nacional</span>
                             <span class="mt-0.5 block text-xs text-slate-400">
-                                Marcada: SEFIN Nacional (DPS). Desmarcada: prefeitura pelo IBGE (GISS ABRASF 2.04 na v1).
-                                Ambos usam o certificado A1 abaixo.
+                                Só funciona se o município estiver no Padrão Nacional (SEFIN).
+                                Maceió e demais GISS: deixe desmarcado — o sistema emite na prefeitura
+                                pelo IBGE mesmo com a opção marcada (evita erro E0039).
                             </span>
                         </span>
                     </label>

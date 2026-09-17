@@ -40,17 +40,23 @@ class ProdutoController extends Controller
         $empresa = Empresa::find(auth()->user()->empresa_id);
         $totalNcms = Ncm::count();
 
-        return view('produtos.index', compact('produtos', 'categorias', 'empresa', 'totalNcms'));
+        $produtoEditando = null;
+        $editarId = (int) request('editar', 0);
+        if ($editarId > 0) {
+            $produtoEditando = Produto::query()->find($editarId);
+            if ($produtoEditando) {
+                $this->authorize('update', $produtoEditando);
+            }
+        }
+
+        return view('produtos.index', compact('produtos', 'categorias', 'empresa', 'totalNcms', 'produtoEditando'));
     }
 
-    public function create(): View
+    public function create(): RedirectResponse
     {
         $this->authorize('create', Produto::class);
 
-        $categorias = CategoriaProduto::orderBy('nome')->get();
-        $empresa = Empresa::find(auth()->user()->empresa_id);
-
-        return view('produtos.create', compact('categorias', 'empresa'));
+        return redirect()->route('produtos.index')->with('abrir_incluir', true);
     }
 
     public function store(StoreProdutoRequest $request): RedirectResponse
@@ -61,7 +67,7 @@ class ProdutoController extends Controller
             return redirect()->route('produtos.index')->with('sucesso', 'Produto cadastrado com sucesso.');
         }
 
-        return redirect()->route('produtos.show', $produto)->with('sucesso', 'Produto cadastrado com sucesso.');
+        return redirect()->route('produtos.index')->with('sucesso', 'Produto cadastrado com sucesso.');
     }
 
     public function show(Produto $produto): View
@@ -73,21 +79,22 @@ class ProdutoController extends Controller
         return view('produtos.show', compact('produto'));
     }
 
-    public function edit(Produto $produto): View
+    public function edit(Produto $produto): RedirectResponse
     {
         $this->authorize('update', $produto);
 
-        $categorias = CategoriaProduto::orderBy('nome')->get();
-        $empresa = Empresa::find(auth()->user()->empresa_id);
-
-        return view('produtos.edit', compact('produto', 'categorias', 'empresa'));
+        return redirect()->route('produtos.index', ['editar' => $produto->id]);
     }
 
     public function update(UpdateProdutoRequest $request, Produto $produto): RedirectResponse
     {
         $produto->update($request->validated());
 
-        return redirect()->route('produtos.show', $produto)->with('sucesso', 'Produto atualizado com sucesso.');
+        if ($request->input('return_to') === 'index') {
+            return redirect()->route('produtos.index')->with('sucesso', 'Produto atualizado com sucesso.');
+        }
+
+        return redirect()->route('produtos.index')->with('sucesso', 'Produto atualizado com sucesso.');
     }
 
     public function consultarEan(Request $request, CosmosProdutoService $cosmos): JsonResponse

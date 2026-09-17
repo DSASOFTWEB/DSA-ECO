@@ -19,6 +19,15 @@ class UpdateProdutoRequest extends FormRequest
         $this->prepareFiscalBooleans();
     }
 
+    protected function getRedirectUrl(): string
+    {
+        if ($this->input('return_to') === 'index') {
+            return route('produtos.index', ['editar' => $this->route('produto')->id]);
+        }
+
+        return parent::getRedirectUrl();
+    }
+
     public function rules(): array
     {
         return array_merge([

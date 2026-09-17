@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="h-full" x-data="{ darkMode: localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && matchMedia('(prefers-color-scheme: dark)').matches) }" :class="{ 'dark': darkMode }">
+<html lang="pt-BR" class="h-full">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +9,11 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('styles')
 </head>
-<body class="min-h-full bg-gray-50 text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100" x-data="{ sidebarOpen: false }">
+<body
+    class="min-h-full bg-gray-50 text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100"
+    x-data="appShell()"
+    @keydown.escape.window="sidebarOpen = false"
+>
     @php
         $menuGroups = [
             'Principal' => [
@@ -61,28 +65,87 @@
                 ['relatorios', 'relatorios.index', 'Relatórios', 'report'],
             ],
         ];
+
+        $menuGroupsAtivos = [];
+        foreach ($menuGroups as $groupLabel => $items) {
+            $grupoTemAtivo = false;
+            foreach ($items as [$match, $routeName]) {
+                if (! \Illuminate\Support\Facades\Route::has($routeName)) {
+                    continue;
+                }
+                if (request()->routeIs($match) || request()->routeIs($match.'.*') || request()->routeIs($routeName)) {
+                    $grupoTemAtivo = true;
+                    break;
+                }
+            }
+            $menuGroupsAtivos[\Illuminate\Support\Str::slug($groupLabel)] = $grupoTemAtivo;
+        }
     @endphp
 
     <div x-cloak x-show="sidebarOpen" x-transition.opacity class="fixed inset-0 z-40 bg-gray-900/60 backdrop-blur-sm lg:hidden" @click="sidebarOpen = false"></div>
-    <aside class="fixed inset-y-0 left-0 z-50 flex w-72 -translate-x-full flex-col border-r border-gray-200 bg-white transition-transform duration-300 dark:border-gray-800 dark:bg-gray-900 lg:translate-x-0"
-           :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'" aria-label="Navegação principal">
-        <div class="flex h-20 items-center justify-between border-b border-gray-100 px-6 dark:border-gray-800">
-            <a href="{{ \Illuminate\Support\Facades\Route::has('dashboard') ? route('dashboard') : '#' }}" class="flex min-w-0 items-center gap-3">
+
+    <aside
+        class="fixed inset-y-0 left-0 z-50 flex flex-col border-r border-gray-200 bg-white transition-all duration-300 dark:border-gray-800 dark:bg-gray-900"
+        :class="[
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+            sidebarCollapsed ? 'w-[4.5rem]' : 'w-72',
+            sidebarCollapsed && sidebarPinnedHover ? 'lg:!w-72' : '',
+        ]"
+        @mouseenter="if (sidebarCollapsed && window.matchMedia('(min-width: 1024px)').matches) sidebarPinnedHover = true"
+        @mouseleave="sidebarPinnedHover = false"
+        aria-label="Navegação principal"
+    >
+        <div class="flex h-16 shrink-0 items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800" :class="(sidebarCollapsed && !sidebarPinnedHover) ? 'justify-center' : 'justify-between px-4'">
+            <a href="{{ \Illuminate\Support\Facades\Route::has('dashboard') ? route('dashboard') : '#' }}" class="flex min-w-0 items-center gap-3" :class="(sidebarCollapsed && !sidebarPinnedHover) ? 'justify-center' : ''">
                 <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-600 text-white shadow-theme-sm">
                     <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-width="1.8" d="M3 16.5c2.5-2 4.5-2 7 0s4.5 2 7 0 3.5-2 4-1.5M4 12c2-1.5 4-1.5 6 0s4 1.5 6 0 3.5-1.5 4-1M6 7.5h12"/></svg>
                 </span>
-                <span class="truncate font-semibold text-gray-900 dark:text-white">{{ $empresaAtual->nome ?? 'Parque Aquático' }}</span>
+                <span class="truncate font-semibold text-gray-900 dark:text-white" x-show="!sidebarCollapsed || sidebarPinnedHover" x-cloak>{{ $empresaAtual->nome ?? 'Parque Aquático' }}</span>
             </a>
+            <button
+                type="button"
+                class="icon-button hidden lg:inline-flex"
+                x-show="!sidebarCollapsed || sidebarPinnedHover"
+                x-cloak
+                @click="toggleCollapsed()"
+                :title="sidebarCollapsed ? 'Fixar menu expandido' : 'Recolher menu'"
+                :aria-label="sidebarCollapsed ? 'Fixar menu expandido' : 'Recolher menu'"
+            >
+                {{-- pin / unpin --}}
+                <svg x-show="!sidebarCollapsed" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 17v5m-4.5-8.5L5 16l-1-1 2.5-4.5L5 5l1-1 5.5 1.5L16 3l1 1-2.5 5.5L19 15l-1 1-4.5-2.5Z"/></svg>
+                <svg x-cloak x-show="sidebarCollapsed" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m9 9 6 6m0-6-6 6M5 5l1-1 5.5 1.5L16 3l1 1-2.5 5.5L19 15l-1 1-4.5-2.5L5 16l-1-1 2.5-4.5L5 5Z"/></svg>
+            </button>
             <button type="button" class="icon-button lg:hidden" @click="sidebarOpen = false" aria-label="Fechar menu"><svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-width="2" d="m6 6 12 12M18 6 6 18"/></svg></button>
         </div>
-        <nav class="flex-1 overflow-y-auto px-4 py-5">
-            <div class="space-y-6">
+
+        <nav class="flex-1 overflow-y-auto px-2 py-4" :class="(sidebarCollapsed && !sidebarPinnedHover) ? 'px-2' : 'px-3'">
+            <div class="space-y-1">
                 @foreach ($menuGroups as $groupLabel => $items)
-                    <section aria-labelledby="menu-group-{{ \Illuminate\Support\Str::slug($groupLabel) }}">
-                        <h2 id="menu-group-{{ \Illuminate\Support\Str::slug($groupLabel) }}" class="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                            {{ $groupLabel }}
-                        </h2>
-                        <div class="space-y-1">
+                    @php $groupKey = \Illuminate\Support\Str::slug($groupLabel); @endphp
+                    <section class="pt-2 first:pt-0">
+                        <button
+                            type="button"
+                            class="mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 transition hover:bg-gray-50 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
+                            :class="(sidebarCollapsed && !sidebarPinnedHover) ? 'justify-center px-2' : 'justify-between'"
+                            @click="toggleGroup(@js($groupKey))"
+                            title="{{ $groupLabel }}"
+                            :aria-expanded="isGroupOpen(@js($groupKey), @js($menuGroupsAtivos[$groupKey] ?? false))"
+                        >
+                            <span x-show="!sidebarCollapsed || sidebarPinnedHover" x-cloak>{{ $groupLabel }}</span>
+                            <span x-cloak x-show="sidebarCollapsed && !sidebarPinnedHover" class="h-1 w-1 rounded-full bg-gray-300 dark:bg-gray-600"></span>
+                            <svg
+                                x-show="!sidebarCollapsed || sidebarPinnedHover"
+                                x-cloak
+                                class="h-3.5 w-3.5 shrink-0 transition-transform"
+                                :class="isGroupOpen(@js($groupKey), @js($menuGroupsAtivos[$groupKey] ?? false)) ? 'rotate-180' : ''"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            ><path stroke-linecap="round" stroke-width="2" d="m6 9 6 6 6-6"/></svg>
+                        </button>
+
+                        <div
+                            class="space-y-0.5"
+                            x-show="isGroupOpen(@js($groupKey), @js($menuGroupsAtivos[$groupKey] ?? false)) || (sidebarCollapsed && !sidebarPinnedHover)"
+                        >
                             @foreach ($items as [$match, $routeName, $label, $icon])
                                 @if (\Illuminate\Support\Facades\Route::has($routeName))
                                     @php
@@ -90,9 +153,16 @@
                                         $precisaPermissao = $routeName === 'empresa.edit';
                                     @endphp
                                     @if (! $precisaPermissao || auth()->user()?->can('empresa.gerenciar'))
-                                        <a href="{{ route($routeName) }}" @click="sidebarOpen = false" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $active ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white' }}" @if($active) aria-current="page" @endif>
+                                        <a
+                                            href="{{ route($routeName) }}"
+                                            @click="sidebarOpen = false"
+                                            title="{{ $label }}"
+                                            class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $active ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white' }}"
+                                            :class="(sidebarCollapsed && !sidebarPinnedHover) ? 'justify-center px-2' : ''"
+                                            @if($active) aria-current="page" @endif
+                                        >
                                             <x-nav-icon :name="$icon" class="h-5 w-5 shrink-0" />
-                                            <span>{{ $label }}</span>
+                                            <span x-show="!sidebarCollapsed || sidebarPinnedHover" x-cloak>{{ $label }}</span>
                                         </a>
                                     @endif
                                 @endif
@@ -104,12 +174,20 @@
         </nav>
     </aside>
 
-    <div class="min-h-screen lg:pl-72">
+    <div class="min-h-screen transition-all duration-300" :class="sidebarCollapsed ? 'lg:pl-[4.5rem]' : 'lg:pl-72'">
         <header class="sticky top-0 z-30 flex h-16 items-center border-b border-gray-200 bg-white/95 px-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95 sm:px-6">
-            <button type="button" class="icon-button mr-3 lg:hidden" @click="sidebarOpen = true" aria-label="Abrir menu"><svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+            <button
+                type="button"
+                class="icon-button mr-3"
+                @click="window.matchMedia('(min-width: 1024px)').matches ? toggleCollapsed() : (sidebarOpen = !sidebarOpen)"
+                :aria-label="sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'"
+                :title="sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'"
+            >
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
             <h1 class="min-w-0 flex-1 truncate text-lg font-semibold text-gray-900 dark:text-white">@yield('titulo', 'Painel')</h1>
             <div class="flex items-center gap-2 sm:gap-3">
-                <button type="button" class="icon-button" @click="darkMode=!darkMode; localStorage.setItem('theme',darkMode?'dark':'light')" aria-label="Alternar tema">
+                <button type="button" class="icon-button" @click="toggleDark()" aria-label="Alternar tema">
                     <svg x-show="!darkMode" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-width="1.8" d="M12 3v2m0 14v2m9-9h-2M5 12H3m15.4 6.4L17 17M7 7 5.6 5.6m12.8 0L17 7M7 17l-1.4 1.4M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg>
                     <svg x-cloak x-show="darkMode" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-width="1.8" d="M20 15.5A9 9 0 0 1 8.5 4 9 9 0 1 0 20 15.5Z"/></svg>
                 </button>
@@ -134,6 +212,47 @@
             @yield('conteudo')
         </main>
     </div>
+
+    <script>
+        function appShell() {
+            const savedGroups = (() => {
+                try { return JSON.parse(localStorage.getItem('menuGroupsOpen') || '{}'); } catch (e) { return {}; }
+            })();
+
+            return {
+                darkMode: document.documentElement.classList.contains('dark'),
+                sidebarOpen: false,
+                sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === '1',
+                sidebarPinnedHover: false,
+                openGroups: savedGroups,
+                toggleDark() {
+                    this.darkMode = !this.darkMode;
+                    document.documentElement.classList.toggle('dark', this.darkMode);
+                    localStorage.setItem('theme', this.darkMode ? 'dark' : 'light');
+                },
+                toggleCollapsed() {
+                    this.sidebarCollapsed = !this.sidebarCollapsed;
+                    this.sidebarPinnedHover = false;
+                    localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed ? '1' : '0');
+                },
+                toggleGroup(key) {
+                    if (this.sidebarCollapsed && !this.sidebarPinnedHover) {
+                        this.sidebarCollapsed = false;
+                        localStorage.setItem('sidebarCollapsed', '0');
+                    }
+                    const next = !this.isGroupOpen(key, false);
+                    this.openGroups = { ...this.openGroups, [key]: next };
+                    localStorage.setItem('menuGroupsOpen', JSON.stringify(this.openGroups));
+                },
+                isGroupOpen(key, hasActive) {
+                    if (Object.prototype.hasOwnProperty.call(this.openGroups, key)) {
+                        return !!this.openGroups[key];
+                    }
+                    return !!hasActive;
+                },
+            };
+        }
+    </script>
     @stack('scripts')
 </body>
 </html>

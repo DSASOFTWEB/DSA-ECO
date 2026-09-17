@@ -55,9 +55,17 @@ class ClienteController extends Controller
         return view('clientes.create', compact('unidades'));
     }
 
-    public function store(StoreClienteRequest $request): RedirectResponse
+    public function store(StoreClienteRequest $request): JsonResponse|RedirectResponse
     {
         $cliente = $this->clienteService->criar($request->safe()->except('foto'), $request->file('foto'));
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'id' => $cliente->id,
+                'nome' => $cliente->nome,
+                'cpf' => $cliente->cpf,
+            ], 201);
+        }
 
         return redirect()->route('clientes.show', $cliente)->with('sucesso', 'Cliente cadastrado com sucesso.');
     }

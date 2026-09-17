@@ -21,7 +21,7 @@
             </div>
         </div>
         @can('update', $produto)
-            <a href="{{ route('produtos.edit', $produto) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50">Editar</a>
+            <a href="{{ route('produtos.index', ['editar' => $produto->id]) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50">Editar</a>
         @endcan
     </div>
 

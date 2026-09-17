@@ -153,6 +153,8 @@ class HospedagemFiscalEmissaoTest extends TestCase
             ->assertOk()
             ->assertSee('Reservar')
             ->assertSee('Confirmar reserva')
+            ->assertSee('Novo cliente')
+            ->assertSee('Salvar e selecionar')
             ->assertSee('Ver')
             ->assertSee('Imprimir ficha')
             ->assertSee('Fechar conta');

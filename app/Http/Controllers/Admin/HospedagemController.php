@@ -13,6 +13,7 @@ use App\Models\Cliente;
 use App\Models\Hospedagem;
 use App\Models\Produto;
 use App\Models\Quarto;
+use App\Models\Unidade;
 use App\Models\User;
 use App\Services\CaixaService;
 use App\Services\Fiscal\HospedagemFiscalService;
@@ -63,8 +64,9 @@ class HospedagemController extends Controller
             ? data_get($mapa->first(fn (array $item) => $item['quarto']->id === (int) old('quarto_id')), 'quarto')
             : null;
         $clienteAnterior = old('cliente_id') ? Cliente::find(old('cliente_id')) : null;
+        $unidades = Unidade::ativas()->orderBy('nome')->get();
 
-        return view('hospedagens.mapa', compact('mapa', 'quartoAnterior', 'clienteAnterior'));
+        return view('hospedagens.mapa', compact('mapa', 'quartoAnterior', 'clienteAnterior', 'unidades'));
     }
 
     public function indicadores(): View

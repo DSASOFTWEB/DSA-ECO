@@ -90,7 +90,14 @@
                                 {{ $produto->controla_estoque ? $produto->estoque_atual : '—' }}
                             </span>
                         </td>
-                        <td class="px-4 py-3 text-right"><a href="{{ route('produtos.show', $produto) }}" class="text-sky-700 hover:underline">Ver</a></td>
+                        <td class="px-4 py-3 text-right">
+                            <div class="flex items-center justify-end gap-3">
+                                @can('update', $produto)
+                                    <a href="{{ route('produtos.index', ['editar' => $produto->id] + request()->except('editar', 'page')) }}" class="font-medium text-brand-600 hover:underline">Editar</a>
+                                @endcan
+                                <a href="{{ route('produtos.show', $produto) }}" class="text-sky-700 hover:underline">Ver</a>
+                            </div>
+                        </td>
                     </tr>
                 @empty
                     <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">Nenhum produto cadastrado.</td></tr>
@@ -114,14 +121,35 @@
             </form>
         </x-modal>
     @endcan
+
+    @if ($produtoEditando)
+        @can('update', $produtoEditando)
+            <x-modal name="editar-produto" title="Editar produto" maxWidth="5xl">
+                <form method="POST" action="{{ route('produtos.update', $produtoEditando) }}" class="max-h-[75vh] space-y-2 overflow-y-auto pr-1">
+                    @csrf
+                    @method('PUT')
+                    <input type="hidden" name="return_to" value="index">
+                    @include('produtos._form', ['produto' => $produtoEditando, 'categorias' => $categorias, 'empresa' => $empresa])
+                    <div class="sticky bottom-0 flex justify-end gap-2 border-t border-slate-100 bg-white pt-4 dark:border-gray-800 dark:bg-gray-900">
+                        <a href="{{ route('produtos.index', request()->except('editar')) }}" class="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 dark:hover:bg-white/5">Cancelar</a>
+                        <button class="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-theme-xs transition hover:bg-brand-600">Salvar alterações</button>
+                    </div>
+                </form>
+            </x-modal>
+        @endcan
+    @endif
 @endsection
 
-@if ($errors->any() && old('return_to') === 'index')
-    @push('scripts')
-        <script>
-            document.addEventListener('DOMContentLoaded', () => {
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            @if ($produtoEditando)
+                window.dispatchEvent(new CustomEvent('open-modal', { detail: 'editar-produto' }));
+            @elseif ($errors->any() && old('return_to') === 'index' && ! old('_method'))
                 window.dispatchEvent(new CustomEvent('open-modal', { detail: 'incluir-produto' }));
-            });
-        </script>
-    @endpush
-@endif
+            @elseif (session('abrir_incluir'))
+                window.dispatchEvent(new CustomEvent('open-modal', { detail: 'incluir-produto' }));
+            @endif
+        });
+    </script>
+@endpush

@@ -15,21 +15,18 @@
 
 @section('conteudo')
     <div x-data="{
-            modalReserva: {{ $errors->any() && old('quarto_id') ? 'true' : 'false' }},
             quarto: @js($quartoAnterior),
             clienteSelecionado: @js($clienteAnterior ? ['id' => $clienteAnterior->id, 'nome' => $clienteAnterior->nome, 'cpf' => $clienteAnterior->cpf] : null),
             termo: '',
             resultados: [],
             buscando: false,
+            salvandoCliente: false,
+            clienteErros: {},
+            novoCliente: { nome: '', cpf: '', data_nascimento: '', telefone: '', whatsapp: '', unidade_id: '' },
             abrirReserva(quarto) {
                 this.quarto = quarto;
-                this.modalReserva = true;
+                this.$dispatch('open-modal', 'reserva-hospedagem');
                 this.$nextTick(() => this.$refs.buscaCliente?.focus());
-            },
-            fecharReserva() {
-                this.modalReserva = false;
-                this.resultados = [];
-                this.termo = '';
             },
             buscarCliente() {
                 if (this.termo.trim().length < 2) { this.resultados = []; return; }
@@ -44,9 +41,37 @@
                 this.clienteSelecionado = cliente;
                 this.resultados = [];
                 this.termo = '';
+            },
+            cadastrarCliente(event) {
+                this.salvandoCliente = true;
+                this.clienteErros = {};
+
+                fetch('{{ route('clientes.store') }}', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json' },
+                    body: new FormData(event.target),
+                })
+                    .then(async response => {
+                        const dados = await response.json();
+                        if (!response.ok) {
+                            if (response.status === 422) this.clienteErros = dados.errors ?? {};
+                            throw new Error(dados.message ?? 'Não foi possível cadastrar o cliente.');
+                        }
+                        return dados;
+                    })
+                    .then(cliente => {
+                        this.selecionarCliente(cliente);
+                        this.novoCliente = { nome: '', cpf: '', data_nascimento: '', telefone: '', whatsapp: '', unidade_id: '' };
+                        event.target.reset();
+                        this.$dispatch('close-modal', 'novo-cliente');
+                    })
+                    .catch(erro => {
+                        if (Object.keys(this.clienteErros).length === 0) this.clienteErros = { geral: [erro.message] };
+                    })
+                    .finally(() => { this.salvandoCliente = false; });
             }
         }"
-        @keydown.escape.window="fecharReserva()">
+        x-init="@if ($errors->any() && old('quarto_id')) $nextTick(() => $dispatch('open-modal', 'reserva-hospedagem')); @endif">
     <div class="mb-6 flex flex-wrap items-center gap-2">
         <a href="{{ route('hospedagens.mapa') }}" class="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 {{ ! request('status') ? 'bg-gray-100 dark:bg-white/10' : '' }}">Todos: {{ $mapa->count() }}</a>
         @foreach ($cores as $chave => $cor)
@@ -120,19 +145,15 @@
     </div>
 
     @can('create', App\Models\Hospedagem::class)
-        <div x-cloak x-show="modalReserva" x-transition.opacity class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm" @click.self="fecharReserva()">
-            <div x-show="modalReserva" x-transition class="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-gray-900" role="dialog" aria-modal="true" aria-labelledby="titulo-reserva">
-                <div class="sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white px-6 py-4 dark:border-gray-800 dark:bg-gray-900">
-                    <div>
-                        <h2 id="titulo-reserva" class="text-lg font-semibold text-slate-800 dark:text-white">Nova reserva · Quarto <span x-text="quarto?.numero"></span></h2>
-                        <p class="text-sm text-slate-500"><span x-text="quarto?.unidade"></span> · até <span x-text="quarto?.capacidade"></span> pessoas · R$ <span x-text="quarto?.valor_diaria"></span>/diária</p>
-                    </div>
-                    <button type="button" @click="fecharReserva()" class="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5" aria-label="Fechar">✕</button>
-                </div>
-
-                <form method="POST" action="{{ route('hospedagens.store') }}" class="space-y-5 p-6">
+        <x-modal name="reserva-hospedagem" title="Nova reserva" max-width="2xl">
+                <form method="POST" action="{{ route('hospedagens.store') }}" class="space-y-5">
                     @csrf
                     <input type="hidden" name="quarto_id" :value="quarto?.id ?? ''">
+
+                    <div class="rounded-xl bg-slate-50 p-3 dark:bg-white/5">
+                        <p class="font-semibold text-slate-800 dark:text-white">Quarto <span x-text="quarto?.numero"></span></p>
+                        <p class="text-sm text-slate-500"><span x-text="quarto?.unidade"></span> · até <span x-text="quarto?.capacidade"></span> pessoas · R$ <span x-text="quarto?.valor_diaria"></span>/diária</p>
+                    </div>
 
                     @if ($errors->any())
                         <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
@@ -141,7 +162,14 @@
                     @endif
 
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-200">Hóspede titular</label>
+                        <div class="flex items-center justify-between gap-3">
+                            <label class="block text-sm font-medium text-slate-700 dark:text-slate-200">Hóspede titular</label>
+                            @can('create', App\Models\Cliente::class)
+                                <button type="button" @click="$dispatch('open-modal', 'novo-cliente')" class="inline-flex items-center gap-1 rounded-lg border border-sky-200 px-2.5 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50 dark:border-sky-800 dark:text-sky-400 dark:hover:bg-sky-500/10">
+                                    <span class="text-base leading-none">+</span> Novo cliente
+                                </button>
+                            @endcan
+                        </div>
                         <template x-if="clienteSelecionado">
                             <div class="mt-1 flex items-center justify-between rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700">
                                 <span x-text="clienteSelecionado.nome"></span>
@@ -195,12 +223,30 @@
                     </div>
 
                     <div class="flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-gray-800">
-                        <button type="button" @click="fecharReserva()" class="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/5">Cancelar</button>
+                        <button type="button" @click="$dispatch('close-modal', 'reserva-hospedagem')" class="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/5">Cancelar</button>
                         <button type="submit" class="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Confirmar reserva</button>
                     </div>
                 </form>
-            </div>
-        </div>
+        </x-modal>
+
+        @can('create', App\Models\Cliente::class)
+            <x-modal name="novo-cliente" title="Cadastrar novo cliente" max-width="lg">
+                <form method="POST" action="{{ route('clientes.store') }}" @submit.prevent="cadastrarCliente($event)" class="space-y-5">
+                    @csrf
+                    <div x-show="clienteErros.geral" x-text="clienteErros.geral?.[0]" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"></div>
+
+                    <x-cliente-form-rapido :unidades="$unidades" />
+
+                    <div class="flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-gray-800">
+                        <button type="button" @click="$dispatch('close-modal', 'novo-cliente')" class="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/5">Cancelar</button>
+                        <button type="submit" :disabled="salvandoCliente" class="rounded-lg bg-sky-600 px-5 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:cursor-wait disabled:opacity-60">
+                            <span x-show="!salvandoCliente">Salvar e selecionar</span>
+                            <span x-show="salvandoCliente">Salvando...</span>
+                        </button>
+                    </div>
+                </form>
+            </x-modal>
+        @endcan
     @endcan
     </div>
 @endsection

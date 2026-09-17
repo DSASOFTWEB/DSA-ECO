@@ -180,11 +180,21 @@ class HospedagemFiscalEmissaoTest extends TestCase
             150.0,
             'Hospedagem',
             '090100',
-            [],
+            ['aliq_iss' => 2.0],
         );
 
         $this->assertStringContainsString('<dhEmi>2026-09-16T23:58:00-03:00</dhEmi>', $xml);
         $this->assertStringContainsString('<dCompet>2026-09-16</dCompet>', $xml);
+        $this->assertStringContainsString('<pAliq>2.00</pAliq>', $xml);
+    }
+
+    public function test_normaliza_desdobramentos_ctn_de_hotel_e_pousada(): void
+    {
+        $metodo = new \ReflectionMethod(NfseEmissaoService::class, 'normalizarCTribNac');
+        $service = app(NfseEmissaoService::class);
+
+        $this->assertSame('090105', $metodo->invoke($service, '09.01.05'));
+        $this->assertSame('090101', $metodo->invoke($service, '09.01.01'));
     }
 
     protected function criarHospedagem(Empresa $empresa, Unidade $unidade, User $user, float $valorDiaria = 150): Hospedagem

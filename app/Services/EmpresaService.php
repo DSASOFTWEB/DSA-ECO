@@ -39,7 +39,7 @@ class EmpresaService
             'token_nfse', 'token_ibpt', 'bluesoft_token',
             'certificado_senha',
             'observacao_padrao_nfe', 'observacao_padrao_nfce',
-            'codigo_municipio_ibge', 'codigo_servico_hospedagem_lc116',
+            'codigo_municipio_ibge', 'codigo_servico_hospedagem_lc116', 'aliquota_iss_hospedagem',
         ];
 
         $integracoes = array_intersect_key($dados, array_flip($camposIntegracao));

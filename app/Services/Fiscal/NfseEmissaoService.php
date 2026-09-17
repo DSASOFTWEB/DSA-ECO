@@ -52,9 +52,15 @@ class NfseEmissaoService
         $numero = ((int) $empresa->numero_ultima_nfse) + 1;
 
         $descricao = collect($itens)->map(fn ($i) => $i['descricao'])->implode('; ');
-        $lc116 = (string) ($itens[0]['codigo_servico_lc116']
-            ?? $empresa->codigo_servico_hospedagem_lc116
-            ?? '9.01');
+        $lc116 = (string) ($itens[0]['codigo_servico_lc116'] ?? '');
+        if (! filled($lc116)) {
+            $lc116 = (string) ($empresa->codigo_servico_hospedagem_lc116 ?: '09.01.05');
+        }
+        // O item genérico 09.01 não é um CTN N6 aceito para a atividade.
+        // Neste sistema de pousada, seu desdobramento padrão é 09.01.05.
+        if (in_array(preg_replace('/\D+/', '', $lc116), ['901', '0901'], true)) {
+            $lc116 = '09.01.05';
+        }
         $cTribNac = $this->normalizarCTribNac($lc116, $itens[0]['c_trib_nac'] ?? null);
 
         $xml = $this->montarDpsXml($empresa, $unidade, $hospedagem, $cMun, $serie, $numero, $valor, $descricao, $cTribNac, $itens[0] ?? []);
@@ -231,7 +237,7 @@ class NfseEmissaoService
         $nbsTag = $cNbs ? '<cNBS>'.$cNbs.'</cNBS>' : '';
         $imTag = $im ? '<IM>'.$im.'</IM>' : '';
 
-        $aliq = (float) ($itemRef['aliq_iss'] ?? 0);
+        $aliq = (float) ($itemRef['aliq_iss'] ?? $empresa->aliquota_iss_hospedagem ?? 0);
         // No exemplo autorizado a pAliq não entra quando o município calcula; só envia se informada.
         $pAliqTag = $aliq > 0
             ? '<pAliq>'.number_format($aliq, 2, '.', '').'</pAliq>'
@@ -312,7 +318,7 @@ class NfseEmissaoService
     }
 
     /**
-     * cTribNac N6 — ex.: LC 8.02 → 080201; LC 9.01 → 090100.
+     * cTribNac N6 — ex.: hotel 09.01.01 → 090101; pousada 09.01.05 → 090105.
      */
     protected function normalizarCTribNac(string $lc116, mixed $explicito = null): string
     {

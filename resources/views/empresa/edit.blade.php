@@ -197,9 +197,17 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700">LC 116 hospedagem</label>
-                <input type="text" name="codigo_servico_hospedagem_lc116" value="{{ old('codigo_servico_hospedagem_lc116', $empresa->codigo_servico_hospedagem_lc116) }}" maxlength="10" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="9.01">
-                <p class="mt-1 text-xs text-slate-400">Código do serviço de diária na NFS-e Nacional.</p>
+                <label class="block text-sm font-medium text-slate-700">CTN da hospedagem</label>
+                <input type="text" name="codigo_servico_hospedagem_lc116" value="{{ old('codigo_servico_hospedagem_lc116', $empresa->codigo_servico_hospedagem_lc116 ?: '09.01.05') }}" maxlength="10" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="09.01.05">
+                <p class="mt-1 text-xs text-slate-400">Use 09.01.05 para pousadas/pensões/albergues ou 09.01.01 para hotéis.</p>
+                @error('codigo_servico_hospedagem_lc116')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Alíquota ISS hospedagem (%)</label>
+                <input type="number" name="aliquota_iss_hospedagem" value="{{ old('aliquota_iss_hospedagem', $empresa->aliquota_iss_hospedagem) }}" min="0" max="5" step="0.01" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Ex.: 2,00">
+                <p class="mt-1 text-xs text-slate-400">Conforme o município, geralmente entre 2% e 5%. Deixe vazio para cálculo municipal.</p>
+                @error('aliquota_iss_hospedagem')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
             </div>
 
             <div>

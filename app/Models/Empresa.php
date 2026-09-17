@@ -25,7 +25,7 @@ class Empresa extends Model
     public const AMBIENTE_HOMOLOGACAO = 2;
 
     protected $fillable = [
-        'nome', 'razao_social', 'cnpj',         'ie', 'im', 'cnae', 'regime_tributario', 'aut_xml', 'codigo_municipio_ibge', 'codigo_servico_hospedagem_lc116',
+        'nome', 'razao_social', 'cnpj',         'ie', 'im', 'cnae', 'regime_tributario', 'aut_xml', 'codigo_municipio_ibge', 'codigo_servico_hospedagem_lc116', 'aliquota_iss_hospedagem',
         'logo_path', 'email', 'telefone',
         'plano_saas', 'status', 'trial_termina_em', 'configuracoes',
         'ambiente_nfe', 'csc', 'csc_id',
@@ -62,6 +62,7 @@ class Empresa extends Model
         'numero_ultima_nfce_producao' => 'integer',
         'numero_ultima_nfce_homologacao' => 'integer',
         'numero_ultima_nfse' => 'integer',
+        'aliquota_iss_hospedagem' => 'decimal:4',
     ];
 
     public static function regimesTributarios(): array

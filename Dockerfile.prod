@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         curl \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" pdo_mysql mbstring bcmath gd zip exif pcntl \
+    && docker-php-ext-install -j"$(nproc)" pdo_mysql mbstring bcmath gd zip exif pcntl soap \
     && a2enmod rewrite headers \
     && printf '%s\n' 'ServerTokens Prod' 'ServerSignature Off' > /etc/apache2/conf-available/parque-security.conf \
     && a2enconf parque-security \

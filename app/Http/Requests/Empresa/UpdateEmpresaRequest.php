@@ -26,6 +26,7 @@ class UpdateEmpresaRequest extends FormRequest
             'aut_xml' => ['nullable', 'string', 'max:18'],
             'codigo_municipio_ibge' => ['nullable', 'string', 'size:7', 'regex:/^[0-9]{7}$/'],
             'codigo_servico_hospedagem_lc116' => ['nullable', 'string', 'max:10'],
+            'aliquota_iss_hospedagem' => ['nullable', 'numeric', 'min:0', 'max:5'],
             'email' => ['nullable', 'email', 'max:255'],
             'telefone' => ['nullable', 'string', 'max:20'],
             'endereco' => ['nullable', 'string', 'max:500'],

@@ -20,6 +20,10 @@ use NFePHP\Common\Signer;
  */
 class NfseEmissaoService
 {
+    private const FUSO_EMISSAO = 'America/Sao_Paulo';
+
+    private const MARGEM_RELOGIO_MINUTOS = 5;
+
     public function __construct(
         protected CertificadoA1Service $certificadoA1,
         protected FiscalXmlStorageService $xmlStorage,
@@ -199,9 +203,13 @@ class NfseEmissaoService
         $tpAmb = (int) ($empresa->ambiente_nfe ?: 2);
         $cnpj = preg_replace('/\D+/', '', (string) ($unidade->cnpj ?: $empresa->cnpj));
         $im = preg_replace('/\D+/', '', (string) $empresa->im);
-        // Exemplo SEFIN: 2026-08-26T16:12:01-03:00
-        $dhEmi = now()->format('Y-m-d\TH:i:sP');
-        $dCompet = now()->format('Y-m-d');
+        // A SEFIN rejeita a DPS (E0008) se o relógio do emissor estiver até
+        // poucos segundos à frente do processamento. Usamos o fuso oficial
+        // de Brasília e uma pequena margem, derivando a competência do mesmo
+        // instante para permanecer consistente inclusive na virada do dia.
+        $momentoEmissao = now(self::FUSO_EMISSAO)->subMinutes(self::MARGEM_RELOGIO_MINUTOS);
+        $dhEmi = $momentoEmissao->format('Y-m-d\TH:i:sP');
+        $dCompet = $momentoEmissao->format('Y-m-d');
 
         // Id (45): DPS + cLocEmi(7) + tpInscr(1) + CNPJ(14) + série(5) + nDPS(15)
         // Ex.: DPS270430222195708400012610000000000000000223

@@ -372,10 +372,32 @@ EasyPanel permanece em 80/443.
 
 ### 5. Atualizações seguintes
 
+No PC:
+
 ```powershell
 git push origin main
-ssh vps-dsa-eco "bash /var/www/dsa-eco/deploy/deploy.sh"
+ssh vps-dsa-eco "bash /var/www/dsa-eco/atualize.sh"
 ```
+
+Na VPS:
+
+```bash
+cd /var/www/dsa-eco
+chmod +x atualize.sh
+./atualize.sh
+```
+
+O `atualize.sh` (mesmo padrão do Zeusweb) faz: `git pull --ff-only` → `docker compose up -d --build` → caches artisan → `migrate --force` → health `/up`.
+
+Flags úteis:
+
+```bash
+DISCARD_LOCAL=1 ./atualize.sh   # descarta código local sujo (preserva .env.production)
+SKIP_BUILD=1 ./atualize.sh      # só recreate, sem rebuild
+SKIP_MIGRATE=1 ./atualize.sh
+```
+
+Compatível: `bash deploy/deploy.sh` chama o mesmo `atualize.sh`.
 
 ### Segurança
 

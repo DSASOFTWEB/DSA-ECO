@@ -142,14 +142,21 @@ http://seu-dominio.com.br:9080
 Do PC (depois de `git push origin main`):
 
 ```powershell
-ssh vps-dsa-eco "bash /var/www/dsa-eco/deploy/deploy.sh"
+ssh vps-dsa-eco "bash /var/www/dsa-eco/atualize.sh"
 ```
 
 Ou na VPS:
 
 ```bash
-bash /var/www/dsa-eco/deploy/deploy.sh
+cd /var/www/dsa-eco
+chmod +x atualize.sh
+./atualize.sh
 ```
+
+O script (padrão Zeusweb) faz pull ff-only, rebuild Compose, caches, migrate e health em `/up`.  
+`bash deploy/deploy.sh` continua válido (chama o mesmo `atualize.sh`).
+
+Flags: `DISCARD_LOCAL=1`, `SKIP_BUILD=1`, `SKIP_MIGRATE=1`, `SKIP_CACHE=1`, `SKIP_HEALTH=1`.
 
 ## Segurança rápida
 

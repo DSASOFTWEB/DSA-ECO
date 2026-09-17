@@ -11,8 +11,10 @@ use App\Models\Quarto;
 use App\Models\Unidade;
 use App\Models\User;
 use App\Services\Fiscal\HospedagemFiscalService;
+use App\Services\Fiscal\NfseEmissaoService;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
@@ -158,6 +160,31 @@ class HospedagemFiscalEmissaoTest extends TestCase
             ->assertSee('Ver')
             ->assertSee('Imprimir ficha')
             ->assertSee('Fechar conta');
+    }
+
+    public function test_dps_usa_fuso_de_brasilia_com_margem_contra_rejeicao_e0008(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-09-17 00:03:00', 'America/Sao_Paulo'));
+        [$empresa, $unidade, $user] = $this->criarOperador();
+        $hospedagem = $this->criarHospedagem($empresa, $unidade, $user);
+
+        $metodo = new \ReflectionMethod(NfseEmissaoService::class, 'montarDpsXml');
+        $xml = $metodo->invoke(
+            app(NfseEmissaoService::class),
+            $empresa,
+            $unidade,
+            $hospedagem,
+            '3550308',
+            1,
+            1,
+            150.0,
+            'Hospedagem',
+            '090100',
+            [],
+        );
+
+        $this->assertStringContainsString('<dhEmi>2026-09-16T23:58:00-03:00</dhEmi>', $xml);
+        $this->assertStringContainsString('<dCompet>2026-09-16</dCompet>', $xml);
     }
 
     protected function criarHospedagem(Empresa $empresa, Unidade $unidade, User $user, float $valorDiaria = 150): Hospedagem

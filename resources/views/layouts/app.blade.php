@@ -11,39 +11,55 @@
 </head>
 <body class="min-h-full bg-gray-50 text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100" x-data="{ sidebarOpen: false }">
     @php
-        $menu = [
-            ['dashboard', 'dashboard', 'Dashboard', 'home'],
-            ['clientes', 'clientes.index', 'Clientes', 'users'],
-            ['contratos', 'contratos.index', 'Contratos', 'document'],
-            ['planos', 'planos.index', 'Planos', 'tag'],
-            ['mensalidades', 'mensalidades.index', 'Mensalidades', 'card'],
-            ['financeiro', 'financeiro.index', 'Financeiro', 'cash'],
-            ['movimentacoes', 'movimentacoes.index', 'Movimentações', 'list'],
-            ['transferencias', 'transferencias.index', 'Transferências entre Caixas', 'swap'],
-            ['terminais', 'terminais.index', 'Terminais', 'terminal'],
-            ['caixas', 'caixas.index', 'Caixa', 'wallet'],
-            ['vendas', 'vendas.index', 'Vendas (PDV)', 'cart'],
-            ['food', 'food.index', 'Mesas e Comandas', 'table'],
-            ['hospedagens', 'hospedagens.index', 'Pousada', 'bed'],
-            ['mapa-quartos', 'hospedagens.mapa', 'Mapa de Quartos', 'grid'],
-            ['hospedagens-indicadores', 'hospedagens.indicadores', 'Indicadores da Pousada', 'chart'],
-            ['cafe-da-manha', 'hospedagens.cafe', 'Café da Manhã', 'coffee'],
-            ['quartos', 'quartos.index', 'Quartos', 'door'],
-            ['tipos-entrada', 'tipos-entrada.index', 'Tipos de Entrada', 'ticket'],
-            ['produtos', 'produtos.index', 'Estoque', 'box'],
-            ['comissoes', 'comissoes.index', 'Comissões', 'chart'],
-            ['carteirinhas', 'carteirinhas.index', 'Carteirinhas', 'id'],
-            ['checkin', 'checkin.index', 'Check-in (plano)', 'check-circle'],
-            ['validar-voucher', 'validacao-voucher.index', 'Validar Voucher', 'qr-scan'],
-            ['cortesias', 'cortesias.index', 'Cortesias', 'gift'],
-            ['acessos', 'acessos.index', 'Controle de Acesso', 'shield'],
-            ['relatorios', 'relatorios.index', 'Relatórios', 'report'],
-            ['unidades', 'unidades.index', 'Unidades', 'building'],
-            ['empresa', 'empresa.edit', 'Minha Empresa', 'settings'],
-            ['usuarios', 'usuarios.index', 'Usuários', 'key'],
-            ['auditoria', 'auditoria.index', 'Auditoria', 'search'],
-            ['app-validador', 'app-validador.index', 'App Validador', 'qr-scan'],
-            ['link-vendas', 'unidades.link-externo', 'Link de Vendas Externa', 'link'],
+        $menuGroups = [
+            'Principal' => [
+                ['dashboard', 'dashboard', 'Dashboard', 'home'],
+            ],
+            'Acesso' => [
+                ['app-validador', 'app-validador.index', 'App Validador', 'qr-scan'],
+                ['carteirinhas', 'carteirinhas.index', 'Carteirinhas', 'id'],
+                ['checkin', 'checkin.index', 'Check-in (Plano)', 'check-circle'],
+                ['acessos', 'acessos.index', 'Controle de Acesso', 'shield'],
+                ['cortesias', 'cortesias.index', 'Cortesias', 'gift'],
+                ['tipos-entrada', 'tipos-entrada.index', 'Tipos de Entrada', 'ticket'],
+                ['validar-voucher', 'validacao-voucher.index', 'Validar Voucher', 'qr-scan'],
+            ],
+            'Cadastros' => [
+                ['clientes', 'clientes.index', 'Clientes', 'users'],
+                ['produtos', 'produtos.index', 'Estoque', 'box'],
+                ['planos', 'planos.index', 'Planos', 'tag'],
+                ['terminais', 'terminais.index', 'Terminais', 'terminal'],
+                ['unidades', 'unidades.index', 'Unidades', 'building'],
+                ['usuarios', 'usuarios.index', 'Usuários', 'key'],
+            ],
+            'Comercial' => [
+                ['contratos', 'contratos.index', 'Contratos', 'document'],
+                ['link-vendas', 'unidades.link-externo', 'Link de Vendas Externa', 'link'],
+                ['mensalidades', 'mensalidades.index', 'Mensalidades', 'card'],
+                ['vendas', 'vendas.index', 'Vendas (PDV)', 'cart'],
+            ],
+            'Financeiro' => [
+                ['caixas', 'caixas.index', 'Caixa', 'wallet'],
+                ['comissoes', 'comissoes.index', 'Comissões', 'chart'],
+                ['financeiro', 'financeiro.index', 'Financeiro', 'cash'],
+                ['movimentacoes', 'movimentacoes.index', 'Movimentações', 'list'],
+                ['transferencias', 'transferencias.index', 'Transferências entre Caixas', 'swap'],
+            ],
+            'Hospedagem' => [
+                ['cafe-da-manha', 'hospedagens.cafe', 'Café da Manhã', 'coffee'],
+                ['hospedagens-indicadores', 'hospedagens.indicadores', 'Indicadores da Pousada', 'chart'],
+                ['mapa-quartos', 'hospedagens.mapa', 'Mapa de Quartos', 'grid'],
+                ['hospedagens', 'hospedagens.index', 'Pousada', 'bed'],
+                ['quartos', 'quartos.index', 'Quartos', 'door'],
+            ],
+            'Restaurante' => [
+                ['food', 'food.index', 'Mesas e Comandas', 'table'],
+            ],
+            'Gestão' => [
+                ['auditoria', 'auditoria.index', 'Auditoria', 'search'],
+                ['empresa', 'empresa.edit', 'Minha Empresa', 'settings'],
+                ['relatorios', 'relatorios.index', 'Relatórios', 'report'],
+            ],
         ];
     @endphp
 
@@ -59,22 +75,30 @@
             </a>
             <button type="button" class="icon-button lg:hidden" @click="sidebarOpen = false" aria-label="Fechar menu"><svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-width="2" d="m6 6 12 12M18 6 6 18"/></svg></button>
         </div>
-        <nav class="flex-1 overflow-y-auto px-4 py-6">
-            <p class="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">Menu</p>
-            <div class="space-y-1">
-                @foreach ($menu as [$match, $routeName, $label, $icon])
-                    @if (\Illuminate\Support\Facades\Route::has($routeName))
-                        @php
-                            $active = request()->routeIs($match) || request()->routeIs($match.'.*') || request()->routeIs($routeName);
-                            $precisaPermissao = $routeName === 'empresa.edit';
-                        @endphp
-                        @if (! $precisaPermissao || auth()->user()?->can('empresa.gerenciar'))
-                            <a href="{{ route($routeName) }}" @click="sidebarOpen = false" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $active ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white' }}" @if($active) aria-current="page" @endif>
-                                <x-nav-icon :name="$icon" class="h-5 w-5 shrink-0" />
-                                <span>{{ $label }}</span>
-                            </a>
-                        @endif
-                    @endif
+        <nav class="flex-1 overflow-y-auto px-4 py-5">
+            <div class="space-y-6">
+                @foreach ($menuGroups as $groupLabel => $items)
+                    <section aria-labelledby="menu-group-{{ \Illuminate\Support\Str::slug($groupLabel) }}">
+                        <h2 id="menu-group-{{ \Illuminate\Support\Str::slug($groupLabel) }}" class="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                            {{ $groupLabel }}
+                        </h2>
+                        <div class="space-y-1">
+                            @foreach ($items as [$match, $routeName, $label, $icon])
+                                @if (\Illuminate\Support\Facades\Route::has($routeName))
+                                    @php
+                                        $active = request()->routeIs($match) || request()->routeIs($match.'.*') || request()->routeIs($routeName);
+                                        $precisaPermissao = $routeName === 'empresa.edit';
+                                    @endphp
+                                    @if (! $precisaPermissao || auth()->user()?->can('empresa.gerenciar'))
+                                        <a href="{{ route($routeName) }}" @click="sidebarOpen = false" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $active ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white' }}" @if($active) aria-current="page" @endif>
+                                            <x-nav-icon :name="$icon" class="h-5 w-5 shrink-0" />
+                                            <span>{{ $label }}</span>
+                                        </a>
+                                    @endif
+                                @endif
+                            @endforeach
+                        </div>
+                    </section>
                 @endforeach
             </div>
         </nav>

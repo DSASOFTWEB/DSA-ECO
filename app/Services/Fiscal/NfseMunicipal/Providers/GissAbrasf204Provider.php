@@ -11,14 +11,16 @@ use App\Services\Fiscal\CertificadoA1Service;
 use App\Services\Fiscal\NfseMunicipal\Contracts\NfseMunicipalProvider;
 use App\Services\Fiscal\NfseMunicipal\NfseMunicipalResultado;
 use App\Services\Fiscal\NfseMunicipal\NfseMunicipalSchemaValidator;
+use App\Services\Fiscal\NfseMunicipal\NfseXmlAssinador;
 use App\Services\Fiscal\NfseMunicipal\Soap\AbrasfSoapClient;
 use App\Services\Fiscal\NfseMunicipal\Xml\AbrasfV2RpsBuilder;
-use NFePHP\Common\Signer;
 
 /**
  * Provedor GISS ABRASF 2.04 (ex.: Maceió 2704302) — espelho TACBrNFSeProviderGiss204.
  *
- * Schemas XSD: storage/SchemasXSDgiss (config parque.nfse_giss_schemas_path).
+ * Schemas XSD locais (validação antes do envio):
+ *   storage/SchemasXSDgiss
+ * Config: parque.nfse_giss_schemas_path / NFSE_GISS_SCHEMAS_PATH
  */
 class GissAbrasf204Provider implements NfseMunicipalProvider
 {
@@ -27,6 +29,7 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
         protected AbrasfV2RpsBuilder $builder,
         protected AbrasfSoapClient $soap,
         protected NfseMunicipalSchemaValidator $schemas,
+        protected NfseXmlAssinador $assinador,
     ) {}
 
     public function emitir(
@@ -43,11 +46,12 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
         $hospedagem->loadMissing('cliente');
 
         $montado = $this->builder->montarRps($empresa, $unidade, $hospedagem, $municipio, $itens, $serie, $numeroRps);
-        $rpsAssinado = $this->assinar($empresa, $montado['rps'], 'InfDeclaracaoPrestacaoServico', 'Id');
+        // Assina InfDeclaracao (root = Rps) e depois o LoteRps (root = EnviarLoteRpsEnvio).
+        $rpsAssinado = $this->assinar($empresa, $montado['rps'], 'InfDeclaracaoPrestacaoServico', 'Id', true, 'Rps');
         $rpsInner = $this->builder->extrairRpsParaLote($rpsAssinado);
 
         $lote = $this->builder->montarLoteEnvio($empresa, $unidade, $municipio, $numeroLote, $rpsInner);
-        $loteAssinado = $this->assinar($empresa, $lote, 'LoteRps', 'Id');
+        $loteAssinado = $this->assinar($empresa, $lote, 'LoteRps', 'Id', true, 'EnviarLoteRpsEnvio');
         $this->validarSchema($loteAssinado, 'enviar-lote-rps-envio-v2_04.xsd');
         $cabec = $this->builder->cabecalho();
         $this->validarSchema($cabec, 'cabecalho-v2_04.xsd');
@@ -119,7 +123,16 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
             return;
         }
 
-        $this->schemas->validarSeDisponivel($xml, $arquivoXsd, obrigatorio: false);
+        $base = $this->schemas->caminhoBase();
+        if (! is_dir($base)) {
+            throw new NegocioException(
+                'Pasta de schemas GISS não encontrada. Coloque os XSD em: '
+                .storage_path('SchemasXSDgiss')
+                .' (ou defina NFSE_GISS_SCHEMAS_PATH). Arquivo esperado: '.$arquivoXsd
+            );
+        }
+
+        $this->schemas->validar($xml, $arquivoXsd);
     }
 
     /**
@@ -139,20 +152,29 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
         return $url;
     }
 
-    protected function assinar(Empresa $empresa, string $xml, string $tag, string $idAttr, bool $obrigatorio = true): string
-    {
+    protected function assinar(
+        Empresa $empresa,
+        string $xml,
+        string $tag,
+        string $idAttr,
+        bool $obrigatorio = true,
+        string $rootname = '',
+    ): string {
         $cert = $this->certificadoA1->carregar($empresa);
         $xml = $this->garantirXmlUtf8($xml);
 
-        // Consulta GISS no ACBr assina ConsultarLote; se a tag Id não existir, devolve o XML.
         if (! $obrigatorio && ! preg_match('/<'.$tag.'\b[^>]*\b'.$idAttr.'=/i', $xml)) {
             return $xml;
         }
 
         try {
-            $assinado = Signer::sign($cert['certificate'], $xml, $tag, $idAttr);
-
-            return $this->garantirXmlUtf8($assinado);
+            return $this->assinador->assinar(
+                $cert['certificate'],
+                $xml,
+                $tag,
+                $idAttr,
+                ['rootname' => $rootname]
+            );
         } catch (\Throwable $e) {
             if (! $obrigatorio) {
                 return $xml;

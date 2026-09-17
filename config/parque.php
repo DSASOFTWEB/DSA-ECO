@@ -68,4 +68,14 @@ return [
     // Fallbacks de plataforma quando a empresa não cadastrou o próprio token
     'token_nfse' => env('TOKEN_NFSE', ''),
     'token_ibpt' => env('TOKEN_IBPT', ''),
+
+    /*
+    |--------------------------------------------------------------------------
+    | NFS-e municipal GISS (ABRASF 2.04) — schemas XSD
+    |--------------------------------------------------------------------------
+    | Pasta com os XSD (cabecalho, enviar-lote-rps-envio, tipos-v2_04, xmldsig…).
+    | Padrão: storage/SchemasXSDgiss
+    */
+    'nfse_giss_schemas_path' => env('NFSE_GISS_SCHEMAS_PATH', storage_path('SchemasXSDgiss')),
+    'nfse_giss_validar_schema' => filter_var(env('NFSE_GISS_VALIDAR_SCHEMA', true), FILTER_VALIDATE_BOOL),
 ];

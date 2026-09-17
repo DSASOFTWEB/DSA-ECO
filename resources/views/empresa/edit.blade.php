@@ -149,8 +149,12 @@
         <div class="border-t border-gray-100 pt-6 dark:border-gray-800">
             <h2 class="text-sm font-semibold text-slate-700">Fiscal — NF-e / NFC-e / NFS-e</h2>
             <p class="mt-1 text-xs text-slate-400">
-                Parâmetros do emitente (mesmo modelo do Evora). Tokens em branco mantêm o valor salvo;
-                Cosmos e tokens de NFS-e/IBPT sem valor na empresa usam o fallback do <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">.env</code>.
+                Na NFS-e, o bloco <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">&lt;serv&gt;</code> usa:
+                <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">cLocPrestacao</code>,
+                <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">cTribNac</code>,
+                <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">cTribMun</code> e
+                <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">xDescServ</code> (descrição da diária/consumo).
+                Tokens em branco mantêm o valor salvo.
             </p>
 
             <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-3 [&_input]:min-h-11 [&_input]:border-gray-300 [&_input]:bg-transparent [&_input]:text-gray-800 [&_input]:outline-none [&_input]:transition [&_input]:focus:border-brand-500 [&_input]:focus:ring-3 [&_input]:focus:ring-brand-500/10 dark:[&_input]:border-gray-700 dark:[&_input]:text-white/90 [&_select]:min-h-11 [&_select]:border-gray-300 [&_select]:bg-transparent">
@@ -161,7 +165,7 @@
                     codigo: @js(old('codigo_municipio_ibge', $empresa->codigo_municipio_ibge)),
                 })"
             >
-                <label class="block text-sm font-medium text-slate-700">Cód. município IBGE</label>
+                <label class="block text-sm font-medium text-slate-700">cLocPrestacao — município IBGE</label>
                 <input
                     type="text"
                     name="codigo_municipio_ibge"
@@ -172,10 +176,10 @@
                     maxlength="80"
                     autocomplete="off"
                     class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    placeholder="3550308 ou nome da cidade"
+                    placeholder="2704302 ou nome da cidade"
                 >
                 <p class="mt-1 text-xs text-slate-400">
-                    Obrigatório para emitir NFC-e / NFS-e.
+                    XML: <code class="rounded bg-slate-100 px-1 dark:bg-gray-800">&lt;cLocPrestacao&gt;</code> e <code class="rounded bg-slate-100 px-1 dark:bg-gray-800">&lt;cLocEmi&gt;</code>.
                     <a href="{{ route('cidades.index') }}" class="text-brand-600 hover:underline">Gerenciar cidades</a>
                 </p>
                 <ul
@@ -197,17 +201,31 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700">CTN da hospedagem</label>
+                <label class="block text-sm font-medium text-slate-700">cTribNac — CTN / LC 116 (hospedagem)</label>
                 <input type="text" name="codigo_servico_hospedagem_lc116" value="{{ old('codigo_servico_hospedagem_lc116', $empresa->codigo_servico_hospedagem_lc116 ?: '09.01.05') }}" maxlength="10" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="09.01.05">
-                <p class="mt-1 text-xs text-slate-400">Use 09.01.05 para pousadas/pensões/albergues ou 09.01.01 para hotéis.</p>
+                <p class="mt-1 text-xs text-slate-400">Ex.: 09.01.05 → XML <code class="rounded bg-slate-100 px-1 dark:bg-gray-800">&lt;cTribNac&gt;090105&lt;/cTribNac&gt;</code>. Pousadas/pensões; hotéis: 09.01.01.</p>
                 @error('codigo_servico_hospedagem_lc116')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700">cTribMun — trib. municipal (hospedagem)</label>
+                <input type="text" name="codigo_tributacao_municipal_hospedagem" value="{{ old('codigo_tributacao_municipal_hospedagem', $empresa->codigo_tributacao_municipal_hospedagem) }}" maxlength="20" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Ex.: 010">
+                <p class="mt-1 text-xs text-slate-400">XML: <code class="rounded bg-slate-100 px-1 dark:bg-gray-800">&lt;cTribMun&gt;</code> (código da lista municipal, ex. 010).</p>
+                @error('codigo_tributacao_municipal_hospedagem')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-slate-700">Alíquota ISS hospedagem (%)</label>
                 <input type="number" name="aliquota_iss_hospedagem" value="{{ old('aliquota_iss_hospedagem', $empresa->aliquota_iss_hospedagem) }}" min="0" max="5" step="0.01" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Ex.: 2,00">
-                <p class="mt-1 text-xs text-slate-400">Conforme o município, geralmente entre 2% e 5%. Deixe vazio para cálculo municipal.</p>
+                <p class="mt-1 text-xs text-slate-400">XML: <code class="rounded bg-slate-100 px-1 dark:bg-gray-800">&lt;pAliq&gt;</code>. Deixe vazio se o município calcular.</p>
                 @error('aliquota_iss_hospedagem')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+            </div>
+
+            <div class="sm:col-span-3 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-slate-400">
+                <strong class="font-medium text-slate-600 dark:text-slate-300">xDescServ</strong> —
+                não tem campo próprio: na diária usa o texto gerado da hospedagem
+                (<em>“Hospedagem quarto X — N diária(s)”</em>; em consumo/serviço usa o
+                <strong>nome do produto</strong> (cadastro de Produtos).
             </div>
 
             <div>
@@ -256,8 +274,10 @@
                     <label class="block text-sm font-medium text-slate-700">Provedor NFS-e</label>
                     <select name="nfse_provider" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                         <option value="nacional_gov" @selected(old('nfse_provider', $empresa->nfse_provider ?? 'nacional_gov') === 'nacional_gov')>NFS-e Nacional (Gov.br)</option>
+                        <option value="municipio" @selected(old('nfse_provider', $empresa->nfse_provider ?? '') === 'municipio')>Municipal (prefeitura / ACBr)</option>
                         <option value="integranotas" @selected(old('nfse_provider', $empresa->nfse_provider ?? '') === 'integranotas')>Integra Notas / CloudDFe</option>
                     </select>
+                    <p class="mt-1 text-xs text-slate-400">Com Nacional desmarcada, a emissão usa o provedor do IBGE (ex.: Maceió → GISS).</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Série NFS-e / DPS</label>
@@ -273,9 +293,25 @@
                         <input type="checkbox" name="nfse_nacional_habilitado" value="1" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600" @checked(old('nfse_nacional_habilitado', $empresa->nfse_nacional_habilitado))>
                         <span>
                             <span class="font-medium text-slate-700">Habilitar emissão NFS-e Nacional</span>
-                            <span class="mt-0.5 block text-xs text-slate-400">Usa o certificado A1 abaixo (mesmo padrão Evora / Nacional GOV).</span>
+                            <span class="mt-0.5 block text-xs text-slate-400">
+                                Marcada: SEFIN Nacional (DPS). Desmarcada: prefeitura pelo IBGE (GISS ABRASF 2.04 na v1).
+                                Ambos usam o certificado A1 abaixo.
+                            </span>
                         </span>
                     </label>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">WS usuário (municipal)</label>
+                    <input type="text" name="nfse_ws_user" value="{{ old('nfse_ws_user', $empresa->nfse_ws_user) }}" maxlength="120" autocomplete="off" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Opcional — GISS usa certificado">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">WS senha (municipal)</label>
+                    <input type="password" name="nfse_ws_senha" value="{{ old('nfse_ws_senha') }}" autocomplete="off" placeholder="{{ $empresa->nfse_ws_senha ? '•••••••• (já configurada)' : 'Opcional' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">WS chave acesso</label>
+                    <input type="text" name="nfse_ws_chave_acesso" value="{{ old('nfse_ws_chave_acesso', $empresa->nfse_ws_chave_acesso) }}" maxlength="255" autocomplete="off" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Opcional">
                 </div>
 
                 <div class="sm:col-span-2">

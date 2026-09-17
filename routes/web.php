@@ -206,6 +206,7 @@ Route::middleware('auth')->group(function () {
     Route::post('hospedagens/{hospedagem}/checkout', [HospedagemController::class, 'checkout'])->name('hospedagens.checkout.store');
     Route::post('hospedagens/{hospedagem}/emitir-nfce', [HospedagemController::class, 'emitirNfce'])->name('hospedagens.emitir-nfce');
     Route::post('hospedagens/{hospedagem}/emitir-nfse', [HospedagemController::class, 'emitirNfse'])->name('hospedagens.emitir-nfse');
+    Route::post('hospedagens/{hospedagem}/documentos-fiscais/{documento}/consultar-lote-nfse', [HospedagemController::class, 'consultarLoteNfse'])->name('hospedagens.documentos-fiscais.consultar-lote-nfse');
     Route::get('hospedagens/{hospedagem}/documentos-fiscais/{documento}/xml', [HospedagemController::class, 'downloadXmlFiscal'])->name('hospedagens.documentos-fiscais.xml');
     Route::post('hospedagens/{hospedagem}/cancelar', [HospedagemController::class, 'cancelar'])->name('hospedagens.cancelar');
 

@@ -298,14 +298,15 @@
     {{-- NFS-e Nacional --}}
     <section class="space-y-4" x-show="tipo === 'servico'" x-cloak>
         <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Fiscal NFS-e Nacional (serviço)</h3>
+        <p class="text-xs text-slate-400">Esses valores montam o bloco <code class="rounded bg-slate-100 px-1 dark:bg-gray-800">&lt;cServ&gt;</code> da DPS. A descrição do item vira <code class="rounded bg-slate-100 px-1 dark:bg-gray-800">&lt;xDescServ&gt;</code>.</p>
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
             <div>
-                <label class="block text-sm font-medium text-slate-700">Código LC 116</label>
-                <input type="text" name="codigo_servico_lc116" value="{{ old('codigo_servico_lc116', $p?->codigo_servico_lc116) }}" maxlength="10" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="1.05">
+                <label class="block text-sm font-medium text-slate-700">cTribNac — LC 116</label>
+                <input type="text" name="codigo_servico_lc116" value="{{ old('codigo_servico_lc116', $p?->codigo_servico_lc116) }}" maxlength="10" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="08.02.01">
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700">Cód. trib. municipal</label>
-                <input type="text" name="codigo_tributacao_municipal" value="{{ old('codigo_tributacao_municipal', $p?->codigo_tributacao_municipal) }}" maxlength="20" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <label class="block text-sm font-medium text-slate-700">cTribMun — trib. municipal</label>
+                <input type="text" name="codigo_tributacao_municipal" value="{{ old('codigo_tributacao_municipal', $p?->codigo_tributacao_municipal) }}" maxlength="20" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="010">
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700">CNAE serviço</label>

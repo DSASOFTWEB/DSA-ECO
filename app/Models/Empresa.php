@@ -25,7 +25,7 @@ class Empresa extends Model
     public const AMBIENTE_HOMOLOGACAO = 2;
 
     protected $fillable = [
-        'nome', 'razao_social', 'cnpj',         'ie', 'im', 'cnae', 'regime_tributario', 'aut_xml', 'codigo_municipio_ibge', 'codigo_servico_hospedagem_lc116', 'aliquota_iss_hospedagem',
+        'nome', 'razao_social', 'cnpj',         'ie', 'im', 'cnae', 'regime_tributario', 'aut_xml', 'codigo_municipio_ibge', 'codigo_servico_hospedagem_lc116', 'codigo_tributacao_municipal_hospedagem', 'aliquota_iss_hospedagem',
         'logo_path', 'email', 'telefone',
         'plano_saas', 'status', 'trial_termina_em', 'configuracoes',
         'ambiente_nfe', 'csc', 'csc_id',
@@ -34,6 +34,7 @@ class Empresa extends Model
         'numero_ultima_nfce_producao', 'numero_ultima_nfce_homologacao',
         'numero_ultima_nfse',
         'nfse_provider', 'nfse_nacional_habilitado', 'token_nfse', 'token_ibpt',
+        'nfse_ws_user', 'nfse_ws_senha', 'nfse_ws_chave_acesso',
         'bluesoft_token',
         'certificado_arquivo', 'certificado_senha', 'certificado_validade',
         'observacao_padrao_nfe', 'observacao_padrao_nfce',
@@ -43,6 +44,7 @@ class Empresa extends Model
         'certificado_arquivo',
         'certificado_senha',
         'token_nfse',
+        'nfse_ws_senha',
         'bluesoft_token',
         'csc',
     ];
@@ -53,6 +55,7 @@ class Empresa extends Model
         'ambiente_nfe' => 'integer',
         'nfse_nacional_habilitado' => 'boolean',
         'certificado_senha' => 'encrypted',
+        'nfse_ws_senha' => 'encrypted',
         'certificado_validade' => 'datetime',
         'numero_serie_nfe' => 'integer',
         'numero_serie_nfce' => 'integer',

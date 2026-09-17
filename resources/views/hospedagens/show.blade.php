@@ -314,6 +314,12 @@
                                         <td class="py-2 pr-3 font-mono text-xs text-slate-600">{{ $doc->recibo ?: '—' }}</td>
                                         <td class="py-2 pr-3 text-slate-700">R$ {{ number_format($doc->valor_total, 2, ',', '.') }}</td>
                                         <td class="py-2 text-right">
+                                            @if ($doc->modelo === 'nfse' && $doc->status === 'processando' && $doc->protocolo)
+                                                <form method="POST" action="{{ route('hospedagens.documentos-fiscais.consultar-lote-nfse', [$hospedagem, $doc]) }}" class="mb-1 inline">
+                                                    @csrf
+                                                    <button type="submit" class="text-xs font-semibold text-amber-700 hover:underline">Consultar lote</button>
+                                                </form>
+                                            @endif
                                             @if ($doc->temXmlArquivo())
                                                 <a href="{{ route('hospedagens.documentos-fiscais.xml', [$hospedagem, $doc]) }}" class="text-xs font-semibold text-brand-600 hover:underline">XML</a>
                                                 @if ($doc->xml || $doc->xml_envio_path)

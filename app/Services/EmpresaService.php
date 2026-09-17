@@ -25,7 +25,7 @@ class EmpresaService
         ];
 
         $camposFiscaisSecretos = [
-            'certificado_senha', 'token_nfse', 'bluesoft_token', 'token_ibpt', 'csc',
+            'certificado_senha', 'token_nfse', 'bluesoft_token', 'token_ibpt', 'csc', 'nfse_ws_senha',
         ];
 
         $camposFiscais = [
@@ -37,9 +37,10 @@ class EmpresaService
             'numero_ultima_nfse',
             'nfse_provider', 'nfse_nacional_habilitado',
             'token_nfse', 'token_ibpt', 'bluesoft_token',
+            'nfse_ws_user', 'nfse_ws_senha', 'nfse_ws_chave_acesso',
             'certificado_senha',
             'observacao_padrao_nfe', 'observacao_padrao_nfce',
-            'codigo_municipio_ibge', 'codigo_servico_hospedagem_lc116', 'aliquota_iss_hospedagem',
+            'codigo_municipio_ibge', 'codigo_servico_hospedagem_lc116', 'codigo_tributacao_municipal_hospedagem', 'aliquota_iss_hospedagem',
         ];
 
         $integracoes = array_intersect_key($dados, array_flip($camposIntegracao));

@@ -106,6 +106,29 @@ class HospedagemFiscalService
     }
 
     /**
+     * Reconsulta lote assíncrono municipal (GISS) quando o documento ficou processando.
+     */
+    public function consultarLoteNfse(DocumentoFiscal $documento): DocumentoFiscal
+    {
+        if ($documento->modelo !== DocumentoFiscal::MODELO_NFSE) {
+            throw new NegocioException('Documento não é NFS-e.');
+        }
+
+        $empresa = Empresa::findOrFail($documento->empresa_id);
+        $hospedagem = Hospedagem::query()->find($documento->hospedagem_id);
+        $hospedagem?->loadMissing('quarto.unidade', 'unidade');
+        $unidade = $hospedagem?->unidade ?: $hospedagem?->quarto?->unidade;
+        if (! $unidade && $documento->unidade_id) {
+            $unidade = \App\Models\Unidade::query()->find($documento->unidade_id);
+        }
+        if (! $unidade) {
+            throw new NegocioException('Unidade do documento fiscal não encontrada.');
+        }
+
+        return $this->nfse->consultarLoteMunicipal($empresa, $unidade, $documento);
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function itensProdutos(Hospedagem $hospedagem): array
@@ -149,7 +172,9 @@ class HospedagemFiscalService
         $hospedagem->loadMissing('consumos.produto');
         $itens = [];
 
-        // Diárias = serviço de hospedagem
+        $empresa = Empresa::find($hospedagem->empresa_id);
+
+        // Diárias = serviço de hospedagem (usa parâmetros fiscais da empresa)
         $noites = app(\App\Services\HospedagemService::class)->noites($hospedagem);
         $valorDiaria = (float) $hospedagem->valor_diaria;
         if ($valorDiaria > 0 && $noites > 0) {
@@ -157,7 +182,9 @@ class HospedagemFiscalService
                 'descricao' => 'Hospedagem quarto '.($hospedagem->quarto?->numero ?? '').' — '.$noites.' diária(s)',
                 'quantidade' => (float) $noites,
                 'valor_unitario' => $valorDiaria,
-                'codigo_servico_lc116' => null,
+                'codigo_servico_lc116' => $empresa?->codigo_servico_hospedagem_lc116,
+                'codigo_tributacao_municipal' => $empresa?->codigo_tributacao_municipal_hospedagem,
+                'aliq_iss' => $empresa?->aliquota_iss_hospedagem,
                 'tipo' => 'diaria',
             ];
         }
@@ -175,10 +202,11 @@ class HospedagemFiscalService
                 'descricao' => $consumo->nomeItem(),
                 'quantidade' => (float) $consumo->quantidade,
                 'valor_unitario' => (float) $consumo->valor_unitario,
-                'codigo_servico_lc116' => $produto?->codigo_servico_lc116,
+                'codigo_servico_lc116' => $produto?->codigo_servico_lc116 ?: $empresa?->codigo_servico_hospedagem_lc116,
+                'codigo_tributacao_municipal' => $produto?->codigo_tributacao_municipal ?: $empresa?->codigo_tributacao_municipal_hospedagem,
                 'cnae' => $produto?->cnae_servico,
                 'nbs' => $produto?->nbs,
-                'aliq_iss' => $produto?->aliq_iss,
+                'aliq_iss' => $produto?->aliq_iss ?? $empresa?->aliquota_iss_hospedagem,
                 'consumo_id' => $consumo->id,
                 'tipo' => $ehAvulso ? 'avulso' : 'servico',
             ];

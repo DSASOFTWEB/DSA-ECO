@@ -8,15 +8,13 @@ use App\Models\DocumentoFiscal;
 use App\Models\Empresa;
 use App\Models\Hospedagem;
 use App\Models\Unidade;
+use App\Services\Fiscal\NfseMunicipal\NfseMunicipalEmissor;
 use Illuminate\Support\Facades\Http;
 use NFePHP\Common\Signer;
 
 /**
- * Emite NFS-e Nacional (DPS) para diárias/serviços da hospedagem
- * via SEFIN Nacional com mTLS do certificado A1.
- *
- * Persistência fiscal (igual regra do Gestor):
- * chave, recibo/idDps, protocolo, XML no banco e XML na pasta.
+ * Emite NFS-e: Nacional (DPS/SEFIN) quando habilitada; senão municipal
+ * (ACBr: IBGE → provedor, v1 = GISS ABRASF 2.04).
  */
 class NfseEmissaoService
 {
@@ -27,6 +25,7 @@ class NfseEmissaoService
     public function __construct(
         protected CertificadoA1Service $certificadoA1,
         protected FiscalXmlStorageService $xmlStorage,
+        protected NfseMunicipalEmissor $municipal,
     ) {}
 
     /**
@@ -38,13 +37,14 @@ class NfseEmissaoService
             throw new NegocioException('Não há serviços/diárias para emitir NFS-e nesta hospedagem.');
         }
 
-        if (! $empresa->nfse_nacional_habilitado && ($empresa->nfse_provider ?: 'nacional_gov') === 'nacional_gov') {
-            throw new NegocioException('Habilite a NFS-e Nacional em Dados da empresa antes de emitir.');
-        }
-
         $cMun = preg_replace('/\D+/', '', (string) $empresa->codigo_municipio_ibge);
         if (strlen((string) $cMun) !== 7) {
             throw new NegocioException('Informe o código IBGE do município (7 dígitos) em Dados da empresa.');
+        }
+
+        // Nacional desabilitada → prefeitura (catálogo ACBr / GISS).
+        if (! $empresa->nfse_nacional_habilitado) {
+            return $this->municipal->emitir($empresa, $unidade, $hospedagem, $documento, $itens);
         }
 
         $valor = round(collect($itens)->sum(fn ($i) => ((float) $i['quantidade']) * ((float) $i['valor_unitario'])), 2);
@@ -162,6 +162,11 @@ class NfseEmissaoService
         }
     }
 
+    public function consultarLoteMunicipal(Empresa $empresa, Unidade $unidade, DocumentoFiscal $documento): DocumentoFiscal
+    {
+        return $this->municipal->consultarLoteDocumento($empresa, $unidade, $documento);
+    }
+
     /**
      * @param  array{cert:string,key:string,limpar:callable}  $arquivos
      */
@@ -231,7 +236,13 @@ class NfseEmissaoService
         $xDesc = $this->escaparXml(
             mb_substr($descricao !== '' ? $descricao : 'Servicos de hospedagem', 0, 2000, 'UTF-8')
         );
-        $cTribMun = preg_replace('/\D+/', '', (string) ($itemRef['c_trib_mun'] ?? $itemRef['codigo_tributacao_municipio'] ?? ''));
+        $cTribMun = preg_replace('/\D+/', '', (string) (
+            $itemRef['c_trib_mun']
+            ?? $itemRef['codigo_tributacao_municipal']
+            ?? $itemRef['codigo_tributacao_municipio']
+            ?? $empresa->codigo_tributacao_municipal_hospedagem
+            ?? ''
+        ));
         $cTribMunTag = strlen((string) $cTribMun) > 0 ? '<cTribMun>'.$cTribMun.'</cTribMun>' : '';
         $cNbs = preg_replace('/\D+/', '', (string) ($itemRef['nbs'] ?? '')) ?: null;
         $nbsTag = $cNbs ? '<cNBS>'.$cNbs.'</cNBS>' : '';

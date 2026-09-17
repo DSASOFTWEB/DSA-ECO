@@ -209,7 +209,34 @@ class HospedagemController extends Controller
             return back()->with('erro', $e->getMessage());
         }
 
+        if ($doc->status === DocumentoFiscal::STATUS_PROCESSANDO) {
+            return back()->with('sucesso', $doc->mensagem_erro
+                ?: 'NFS-e enviada. Lote em processamento (protocolo '.$doc->protocolo.'). Use “Consultar lote”.');
+        }
+
         return back()->with('sucesso', 'NFS-e autorizada nº '.$doc->numero.($doc->chave ? ' · chave '.$doc->chave : ''));
+    }
+
+    public function consultarLoteNfse(Hospedagem $hospedagem, DocumentoFiscal $documento): RedirectResponse
+    {
+        $this->authorize('emitirFiscal', $hospedagem);
+
+        if ((int) $documento->hospedagem_id !== (int) $hospedagem->id
+            || (int) $documento->empresa_id !== (int) $hospedagem->empresa_id) {
+            abort(404);
+        }
+
+        try {
+            $doc = $this->hospedagemFiscalService->consultarLoteNfse($documento);
+        } catch (NegocioException|IntegrationException $e) {
+            return back()->with('erro', $e->getMessage());
+        }
+
+        if ($doc->status === DocumentoFiscal::STATUS_AUTORIZADO) {
+            return back()->with('sucesso', 'NFS-e autorizada nº '.$doc->numero.($doc->chave ? ' · verif. '.$doc->chave : ''));
+        }
+
+        return back()->with('sucesso', $doc->mensagem_erro ?: 'Lote ainda em processamento na prefeitura.');
     }
 
     public function downloadXmlFiscal(

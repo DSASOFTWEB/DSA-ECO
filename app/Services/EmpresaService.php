@@ -2,12 +2,17 @@
 
 namespace App\Services;
 
+use App\Exceptions\NegocioException;
 use App\Models\Empresa;
+use App\Services\Fiscal\CertificadoA1Service;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class EmpresaService
 {
+    public function __construct(protected CertificadoA1Service $certificadoA1) {}
+
     public function atualizar(Empresa $empresa, array $dados, ?UploadedFile $logo = null, ?UploadedFile $certificado = null): Empresa
     {
         $endereco = $dados['endereco'] ?? null;
@@ -53,10 +58,32 @@ class EmpresaService
         }
 
         if ($certificado) {
-            $conteudo = file_get_contents($certificado->getRealPath());
-            if (is_string($conteudo) && $conteudo !== '') {
-                $dados['certificado_arquivo'] = $conteudo;
+            $conteudo = $certificado->get();
+            $senha = trim((string) ($fiscais['certificado_senha'] ?? ''));
+
+            if (! is_string($conteudo) || $conteudo === '') {
+                throw ValidationException::withMessages([
+                    'certificado' => 'O arquivo do certificado está vazio. Selecione novamente o .pfx ou .p12.',
+                ]);
             }
+
+            if ($senha === '') {
+                throw ValidationException::withMessages([
+                    'certificado_senha' => 'Informe a senha do certificado que está sendo enviado.',
+                ]);
+            }
+
+            try {
+                // Mesmo fluxo usado no ZeusWeb: valida exatamente os bytes e a
+                // senha recebidos antes de substituir o certificado do banco.
+                $this->certificadoA1->validar($conteudo, $senha);
+            } catch (NegocioException $e) {
+                throw ValidationException::withMessages([
+                    'certificado' => $e->getMessage(),
+                ]);
+            }
+
+            $dados['certificado_arquivo'] = $conteudo;
         }
 
         foreach ($camposFiscaisSecretos as $campo) {

@@ -68,7 +68,7 @@ class UpdateEmpresaRequest extends FormRequest
             'token_nfse' => ['nullable', 'string', 'max:2000'],
             'token_ibpt' => ['nullable', 'string', 'max:120'],
             'bluesoft_token' => ['nullable', 'string', 'max:255'],
-            'certificado' => ['nullable', 'file', 'extensions:pfx,p12', 'max:5120'],
+            'certificado' => ['nullable', 'file', 'extensions:pfx,p12', 'max:15360'],
             'certificado_senha' => ['nullable', 'string', 'max:100'],
             'observacao_padrao_nfe' => ['nullable', 'string', 'max:500'],
             'observacao_padrao_nfce' => ['nullable', 'string', 'max:500'],

@@ -8,6 +8,19 @@ use NFePHP\Common\Certificate;
 
 class CertificadoA1Service
 {
+    public function validar(string $pfx, string $senha): Certificate
+    {
+        if ($pfx === '' || trim($senha) === '') {
+            throw new NegocioException('Envie o certificado digital A1 e informe a senha.');
+        }
+
+        try {
+            return Certificate::readPfx($pfx, $senha);
+        } catch (\Throwable $e) {
+            throw new NegocioException('Certificado ou senha inválidos. Envie um arquivo .pfx ou .p12 válido.');
+        }
+    }
+
     /**
      * @return array{pfx:string, senha:string, certificate:\NFePHP\Common\Certificate}
      */
@@ -23,11 +36,7 @@ class CertificadoA1Service
             throw new NegocioException('Cadastre o certificado digital A1 e a senha em Dados da empresa antes de emitir.');
         }
 
-        try {
-            $certificate = Certificate::readPfx($pfx, $senha);
-        } catch (\Throwable $e) {
-            throw new NegocioException('Não foi possível ler o certificado A1. Verifique o arquivo .pfx e a senha.');
-        }
+        $certificate = $this->validar($pfx, $senha);
 
         return [
             'pfx' => $pfx,

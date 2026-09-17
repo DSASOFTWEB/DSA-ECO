@@ -61,6 +61,7 @@
             ],
             'Gestão' => [
                 ['auditoria', 'auditoria.index', 'Auditoria', 'search'],
+                ['cidades', 'cidades.index', 'Cidades (IBGE)', 'map'],
                 ['empresa', 'empresa.edit', 'Minha Empresa', 'settings'],
                 ['relatorios', 'relatorios.index', 'Relatórios', 'report'],
             ],
@@ -150,7 +151,7 @@
                                 @if (\Illuminate\Support\Facades\Route::has($routeName))
                                     @php
                                         $active = request()->routeIs($match) || request()->routeIs($match.'.*') || request()->routeIs($routeName);
-                                        $precisaPermissao = $routeName === 'empresa.edit';
+                                        $precisaPermissao = in_array($routeName, ['empresa.edit', 'cidades.index'], true);
                                     @endphp
                                     @if (! $precisaPermissao || auth()->user()?->can('empresa.gerenciar'))
                                         <a

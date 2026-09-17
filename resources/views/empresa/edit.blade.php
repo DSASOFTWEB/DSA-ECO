@@ -154,10 +154,46 @@
             </p>
 
             <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-3 [&_input]:min-h-11 [&_input]:border-gray-300 [&_input]:bg-transparent [&_input]:text-gray-800 [&_input]:outline-none [&_input]:transition [&_input]:focus:border-brand-500 [&_input]:focus:ring-3 [&_input]:focus:ring-brand-500/10 dark:[&_input]:border-gray-700 dark:[&_input]:text-white/90 [&_select]:min-h-11 [&_select]:border-gray-300 [&_select]:bg-transparent">
-            <div>
+            <div
+                class="relative"
+                x-data="buscaCidadeIbge({
+                    url: @js(route('cidades.autocomplete')),
+                    codigo: @js(old('codigo_municipio_ibge', $empresa->codigo_municipio_ibge)),
+                })"
+            >
                 <label class="block text-sm font-medium text-slate-700">Cód. município IBGE</label>
-                <input type="text" name="codigo_municipio_ibge" id="empresa-ibge" value="{{ old('codigo_municipio_ibge', $empresa->codigo_municipio_ibge) }}" maxlength="7" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="3550308">
-                <p class="mt-1 text-xs text-slate-400">Obrigatório para emitir NFC-e / NFS-e.</p>
+                <input
+                    type="text"
+                    name="codigo_municipio_ibge"
+                    id="empresa-ibge"
+                    x-model="codigo"
+                    @input.debounce.300ms="buscar()"
+                    @focus="buscar()"
+                    maxlength="80"
+                    autocomplete="off"
+                    class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    placeholder="3550308 ou nome da cidade"
+                >
+                <p class="mt-1 text-xs text-slate-400">
+                    Obrigatório para emitir NFC-e / NFS-e.
+                    <a href="{{ route('cidades.index') }}" class="text-brand-600 hover:underline">Gerenciar cidades</a>
+                </p>
+                <ul
+                    x-cloak
+                    x-show="aberta && itens.length"
+                    class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                >
+                    <template x-for="item in itens" :key="item.codigo">
+                        <li>
+                            <button
+                                type="button"
+                                class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-white/5"
+                                @click="selecionar(item)"
+                                x-text="item.text"
+                            ></button>
+                        </li>
+                    </template>
+                </ul>
             </div>
 
             <div>
@@ -460,7 +496,10 @@ function consultaCnpjForm(cfg) {
                 }
                 const set = (id, val) => {
                     const el = document.getElementById(id);
-                    if (el && val) el.value = val;
+                    if (el && val) {
+                        el.value = val;
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
                 };
                 if (data.cnpj) this.cnpj = data.cnpj;
                 set('empresa-nome', data.nome);
@@ -477,6 +516,39 @@ function consultaCnpjForm(cfg) {
             } finally {
                 this.consultando = false;
             }
+        },
+    };
+}
+
+function buscaCidadeIbge(cfg) {
+    return {
+        url: cfg.url,
+        codigo: cfg.codigo || '',
+        itens: [],
+        aberta: false,
+        async buscar() {
+            const busca = String(this.codigo || '').trim();
+            if (busca.length < 2) {
+                this.itens = [];
+                this.aberta = false;
+                return;
+            }
+            try {
+                const res = await fetch(`${this.url}?busca=${encodeURIComponent(busca)}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                this.itens = res.ok ? await res.json() : [];
+                this.aberta = this.itens.length > 0;
+            } catch (e) {
+                this.itens = [];
+                this.aberta = false;
+            }
+        },
+        selecionar(item) {
+            this.codigo = item.codigo;
+            this.itens = [];
+            this.aberta = false;
         },
     };
 }

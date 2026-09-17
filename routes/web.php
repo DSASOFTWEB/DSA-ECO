@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AcessoController;
 use App\Http\Controllers\Admin\AuditoriaController;
 use App\Http\Controllers\Admin\CaixaController;
 use App\Http\Controllers\Admin\CarteirinhaController;
+use App\Http\Controllers\Admin\CidadeController;
 use App\Http\Controllers\Admin\CheckinController;
 use App\Http\Controllers\Admin\ClienteController;
 use App\Http\Controllers\Admin\ComissaoController;
@@ -251,6 +252,10 @@ Route::middleware('auth')->group(function () {
     Route::put('empresa', [EmpresaController::class, 'update'])->name('empresa.update');
     Route::get('empresa/consultar-cnpj', [EmpresaController::class, 'consultarCnpj'])->name('empresa.consultar-cnpj');
     Route::get('empresa/certificado', [EmpresaController::class, 'downloadCertificado'])->name('empresa.certificado.download');
+
+    Route::get('cidades', [CidadeController::class, 'index'])->name('cidades.index');
+    Route::post('cidades/sincronizar', [CidadeController::class, 'sincronizar'])->name('cidades.sincronizar');
+    Route::get('cidades/autocomplete', [CidadeController::class, 'autocomplete'])->name('cidades.autocomplete');
 
     Route::resource('unidades', UnidadeController::class)->only(['index', 'create', 'store', 'edit', 'update']);
     Route::get('link-vendas', [UnidadeController::class, 'linkExterno'])->name('unidades.link-externo');

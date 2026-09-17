@@ -89,7 +89,13 @@ class Empresa extends Model
 
     public function temCertificadoDigital(): bool
     {
-        return filled($this->attributes['certificado_arquivo'] ?? null);
+        $conteudo = $this->attributes['certificado_arquivo'] ?? null;
+
+        if (is_resource($conteudo)) {
+            return fstat($conteudo)['size'] > 0;
+        }
+
+        return is_string($conteudo) && strlen($conteudo) > 0;
     }
 
     /**

@@ -62,7 +62,10 @@ class EmpresaFiscalCadastroTest extends TestCase
     public function test_upload_certificado_a1_grava_blob_e_senha(): void
     {
         [$empresa, , $user] = $this->criarGestor();
-        $pfx = UploadedFile::fake()->createWithContent('certificado.pfx', str_repeat('A', 2048));
+        $pfx = UploadedFile::fake()->createWithContent(
+            'certificado.pfx',
+            $this->criarPfx('senha-secreta')
+        );
 
         $this->actingAs($user)
             ->post(route('empresa.update'), $this->payloadFiscal([
@@ -78,6 +81,33 @@ class EmpresaFiscalCadastroTest extends TestCase
         $this->assertTrue($empresa->temCertificadoDigital());
         $this->assertSame('senha-secreta', $empresa->certificado_senha);
         $this->assertNotEmpty($empresa->getRawOriginal('certificado_arquivo'));
+    }
+
+    public function test_certificado_invalido_nao_substitui_o_arquivo_ja_salvo(): void
+    {
+        [$empresa, , $user] = $this->criarGestor();
+        $original = $this->criarPfx('senha-original');
+        $empresa->update([
+            'certificado_arquivo' => $original,
+            'certificado_senha' => 'senha-original',
+        ]);
+
+        $invalido = UploadedFile::fake()->createWithContent('certificado.pfx', 'arquivo-invalido');
+
+        $this->actingAs($user)
+            ->from(route('empresa.edit'))
+            ->post(route('empresa.update'), $this->payloadFiscal([
+                '_method' => 'PUT',
+                'nome' => $empresa->nome,
+                'certificado' => $invalido,
+                'certificado_senha' => 'senha-errada',
+            ]))
+            ->assertRedirect(route('empresa.edit'))
+            ->assertSessionHasErrors('certificado');
+
+        $empresa->refresh();
+        $this->assertSame($original, $empresa->getRawOriginal('certificado_arquivo'));
+        $this->assertSame('senha-original', $empresa->certificado_senha);
     }
 
     public function test_cosmos_prioriza_token_da_empresa_sobre_env(): void
@@ -159,5 +189,20 @@ class EmpresaFiscalCadastroTest extends TestCase
         Gate::before(fn () => true);
 
         return [$empresa, $unidade, $user];
+    }
+
+    protected function criarPfx(string $senha): string
+    {
+        $chave = openssl_pkey_new([
+            'private_key_bits' => 2048,
+            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        ]);
+        $csr = openssl_csr_new(['commonName' => 'Empresa Teste'], $chave, ['digest_alg' => 'sha256']);
+        $certificado = openssl_csr_sign($csr, null, $chave, 1, ['digest_alg' => 'sha256']);
+
+        $this->assertNotFalse($certificado);
+        $this->assertTrue(openssl_pkcs12_export($certificado, $pfx, $chave, $senha));
+
+        return $pfx;
     }
 }

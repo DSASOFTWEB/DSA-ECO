@@ -1,0 +1,78 @@
+<?php
+
+namespace NFePHP\EFD\Elements\ICMSIPI;
+
+use NFePHP\EFD\Common\Element;
+use stdClass;
+
+class C197 extends Element
+{
+    const REG = 'C197';
+    const LEVEL = 4;
+    const PARENT = 'C190';
+
+    protected $parameters = [
+        'COD_AJ' => [
+            'type' => 'string',
+            'regex' => '^.{10}$',
+            'required' => true,
+            'info' => 'Código do ajustes/benefício/incentivo, conforme tabela indicada no item 5.3.',
+            'format' => ''
+        ],
+        'DESCR_COMPL_AJ' => [
+            'type' => 'string',
+            'regex' => '^(.*)$',
+            'required' => false,
+            'info' => 'Descrição complementar do ajuste do documento fiscal',
+            'format' => ''
+        ],
+        'COD_ITEM' => [
+            'type' => 'string',
+            'regex' => '^.{0,60}$',
+            'required' => false,
+            'info' => 'Código do item (campo 02 do Registro 0200)',
+            'format' => ''
+        ],
+        'VL_BC_ICMS' => [
+            'type' => 'numeric',
+            'regex' => '^\d+(\.\d*)?|\.\d+$',
+            'required' => false,
+            'info' => 'Base de cálculo do ICMS ou do ICMS ST',
+            'format' => '15v2'
+        ],
+        'ALIQ_ICMS' => [
+            'type' => 'numeric',
+            'regex' => '^\d+(\.\d*)?|\.\d+$',
+            'required' => false,
+            'info' => 'Alíquota do ICMS',
+            'format' => '6v2'
+        ],
+        'VL_ICMS' => [
+            'type' => 'numeric',
+            'regex' => '^\d+(\.\d*)?|\.\d+$',
+            'required' => false,
+            'info' => 'Valor do ICMS ou do ICMS ST',
+            'format' => '15v2'
+        ],
+        'VL_OUTROS' => [
+            'type' => 'numeric',
+            'regex' => '^\d+(\.\d*)?|\.\d+$',
+            'required' => false,
+            'info' => 'Outros valores',
+            'format' => '15v2'
+        ],
+    ];
+
+    /**
+     * Constructor
+     * @param stdClass $std
+     * @param stdClass $vigencia
+     */
+    public function __construct(stdClass $std, stdClass $vigencia = null)
+    {
+        parent::__construct(self::REG, $vigencia);
+        $this->replaceParams( self::REG);
+        $this->std = $this->standarize($std);
+        $this->postValidation();
+    }
+}

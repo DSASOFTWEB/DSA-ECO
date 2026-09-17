@@ -3,7 +3,7 @@
 @section('titulo', 'Editar produto')
 
 @section('conteudo')
-    <form method="POST" action="{{ route('produtos.update', $produto) }}" class="max-w-3xl space-y-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    <form method="POST" action="{{ route('produtos.update', $produto) }}" class="max-w-5xl space-y-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         @csrf
         @method('PUT')
         @include('produtos._form', ['produto' => $produto])

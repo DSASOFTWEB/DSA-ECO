@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\IntegrationException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Produto\StoreProdutoRequest;
 use App\Http\Requests\Produto\UpdateProdutoRequest;
 use App\Models\CategoriaProduto;
+use App\Models\Empresa;
 use App\Models\Produto;
 use App\Services\EstoqueService;
+use App\Services\Integrations\CosmosProdutoService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -25,6 +29,7 @@ class ProdutoController extends Controller
             // (configurada em config/database.php / .env.example) — sem precisar de 'ilike'.
             ->when(request('nome'), fn ($q, $v) => $q->where('nome', 'like', "%{$v}%"))
             ->when(request('categoria_id'), fn ($q, $v) => $q->where('categoria_id', $v))
+            ->when(request('tipo_item'), fn ($q, $v) => $q->where('tipo_item', $v))
             ->orderBy('nome')
             ->paginate(20)
             ->withQueryString();
@@ -71,6 +76,23 @@ class ProdutoController extends Controller
         $produto->update($request->validated());
 
         return redirect()->route('produtos.show', $produto)->with('sucesso', 'Produto atualizado com sucesso.');
+    }
+
+    public function consultarEan(Request $request, CosmosProdutoService $cosmos): JsonResponse
+    {
+        $this->authorize('create', Produto::class);
+
+        $request->validate([
+            'ean' => ['required', 'string', 'max:14'],
+        ]);
+
+        try {
+            $empresa = Empresa::find($request->user()->empresa_id);
+
+            return response()->json($cosmos->consultarPorEan((string) $request->query('ean'), $empresa));
+        } catch (IntegrationException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function ajustarEstoque(Request $request, Produto $produto): RedirectResponse

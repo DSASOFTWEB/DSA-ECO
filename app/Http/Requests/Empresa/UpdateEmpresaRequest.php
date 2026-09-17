@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Empresa;
 
+use App\Models\Empresa;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateEmpresaRequest extends FormRequest
 {
@@ -17,6 +19,11 @@ class UpdateEmpresaRequest extends FormRequest
             'nome' => ['required', 'string', 'max:255'],
             'razao_social' => ['nullable', 'string', 'max:255'],
             'cnpj' => ['nullable', 'string', 'max:20'],
+            'ie' => ['nullable', 'string', 'max:20'],
+            'im' => ['nullable', 'string', 'max:20'],
+            'cnae' => ['nullable', 'string', 'max:7', 'regex:/^[0-9]{0,7}$/'],
+            'regime_tributario' => ['required', Rule::in(array_keys(Empresa::regimesTributarios()))],
+            'aut_xml' => ['nullable', 'string', 'max:18'],
             'email' => ['nullable', 'email', 'max:255'],
             'telefone' => ['nullable', 'string', 'max:20'],
             'endereco' => ['nullable', 'string', 'max:500'],
@@ -41,6 +48,28 @@ class UpdateEmpresaRequest extends FormRequest
             'impressao_colunas' => ['required', 'integer', 'in:32,40,42,48'],
             'impressao_agente_url' => ['nullable', 'url', 'max:255'],
             'impressao_auto_imprimir' => ['nullable', 'boolean'],
+
+            // Fiscal emitente (NF-e / NFC-e / NFS-e)
+            'ambiente_nfe' => ['required', 'integer', Rule::in([1, 2])],
+            'csc' => ['nullable', 'string', 'max:60'],
+            'csc_id' => ['nullable', 'string', 'max:10'],
+            'numero_serie_nfe' => ['required', 'integer', 'min:1', 'max:999'],
+            'numero_serie_nfce' => ['required', 'integer', 'min:1', 'max:999'],
+            'numero_serie_nfse' => ['required', 'integer', 'min:1', 'max:999'],
+            'numero_ultima_nfe_producao' => ['required', 'integer', 'min:0'],
+            'numero_ultima_nfe_homologacao' => ['required', 'integer', 'min:0'],
+            'numero_ultima_nfce_producao' => ['required', 'integer', 'min:0'],
+            'numero_ultima_nfce_homologacao' => ['required', 'integer', 'min:0'],
+            'numero_ultima_nfse' => ['required', 'integer', 'min:0'],
+            'nfse_provider' => ['required', Rule::in(['nacional_gov', 'integranotas'])],
+            'nfse_nacional_habilitado' => ['boolean'],
+            'token_nfse' => ['nullable', 'string', 'max:2000'],
+            'token_ibpt' => ['nullable', 'string', 'max:120'],
+            'bluesoft_token' => ['nullable', 'string', 'max:255'],
+            'certificado' => ['nullable', 'file', 'extensions:pfx,p12', 'max:5120'],
+            'certificado_senha' => ['nullable', 'string', 'max:100'],
+            'observacao_padrao_nfe' => ['nullable', 'string', 'max:500'],
+            'observacao_padrao_nfce' => ['nullable', 'string', 'max:500'],
         ];
     }
 
@@ -48,6 +77,9 @@ class UpdateEmpresaRequest extends FormRequest
     {
         $this->merge([
             'impressao_auto_imprimir' => $this->boolean('impressao_auto_imprimir'),
+            'nfse_nacional_habilitado' => $this->boolean('nfse_nacional_habilitado'),
+            'cnae' => preg_replace('/\D+/', '', (string) $this->input('cnae', '')) ?: null,
+            'aut_xml' => preg_replace('/\D+/', '', (string) $this->input('aut_xml', '')) ?: null,
         ]);
     }
 }

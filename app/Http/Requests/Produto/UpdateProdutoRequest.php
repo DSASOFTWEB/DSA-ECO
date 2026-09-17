@@ -7,14 +7,21 @@ use Illuminate\Validation\Rule;
 
 class UpdateProdutoRequest extends FormRequest
 {
+    use ProdutoFiscalRules;
+
     public function authorize(): bool
     {
         return $this->user()->can('update', $this->route('produto'));
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->prepareFiscalBooleans();
+    }
+
     public function rules(): array
     {
-        return [
+        return array_merge([
             'unidade_id' => ['nullable', Rule::exists('unidades', 'id')->where('empresa_id', $this->user()->empresa_id)],
             'categoria_id' => ['nullable', Rule::exists('categorias_produtos', 'id')->where('empresa_id', $this->user()->empresa_id)],
             'nome' => ['required', 'string', 'max:255'],
@@ -30,6 +37,6 @@ class UpdateProdutoRequest extends FormRequest
             'controla_estoque' => ['boolean'],
             'estoque_minimo' => ['nullable', 'integer', 'min:0'],
             'ativo' => ['boolean'],
-        ];
+        ], $this->regrasFiscaisProduto());
     }
 }

@@ -15,10 +15,20 @@ class Produto extends Model
 {
     use BelongsToTenant, HasFactory, LogsActivity, SoftDeletes;
 
+    public const TIPO_PRODUTO = 'produto';
+
+    public const TIPO_SERVICO = 'servico';
+
     protected $fillable = [
-        'empresa_id', 'unidade_id', 'categoria_id', 'nome', 'sku', 'descricao',
+        'empresa_id', 'unidade_id', 'categoria_id', 'nome', 'tipo_item', 'sku', 'ean',
+        'unidade_comercial', 'descricao', 'imagem_url',
         'preco_custo', 'preco_venda', 'controla_estoque', 'estoque_atual',
         'estoque_minimo', 'ativo',
+        // NFC-e
+        'ncm', 'cest', 'cfop', 'origem', 'cst_icms', 'csosn', 'aliq_icms',
+        'cst_pis', 'aliq_pis', 'cst_cofins', 'aliq_cofins', 'cst_ipi', 'aliq_ipi', 'cod_beneficio',
+        // NFS-e Nacional
+        'codigo_servico_lc116', 'codigo_tributacao_municipal', 'cnae_servico', 'nbs', 'aliq_iss', 'iss_retido',
     ];
 
     protected $casts = [
@@ -26,11 +36,28 @@ class Produto extends Model
         'preco_venda' => 'decimal:2',
         'controla_estoque' => 'boolean',
         'ativo' => 'boolean',
+        'iss_retido' => 'boolean',
+        'origem' => 'integer',
+        'aliq_icms' => 'decimal:4',
+        'aliq_pis' => 'decimal:4',
+        'aliq_cofins' => 'decimal:4',
+        'aliq_ipi' => 'decimal:4',
+        'aliq_iss' => 'decimal:4',
     ];
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()->logFillable()->logOnlyDirty()->dontSubmitEmptyLogs();
+    }
+
+    public function isServico(): bool
+    {
+        return $this->tipo_item === self::TIPO_SERVICO;
+    }
+
+    public function isProduto(): bool
+    {
+        return $this->tipo_item === self::TIPO_PRODUTO;
     }
 
     public function categoria(): BelongsTo
@@ -61,5 +88,15 @@ class Produto extends Model
     public function scopeAtivos($query)
     {
         return $query->where('ativo', true);
+    }
+
+    public function scopeProdutos($query)
+    {
+        return $query->where('tipo_item', self::TIPO_PRODUTO);
+    }
+
+    public function scopeServicos($query)
+    {
+        return $query->where('tipo_item', self::TIPO_SERVICO);
     }
 }

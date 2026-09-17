@@ -3,7 +3,7 @@
 @section('titulo', 'Dados da empresa')
 
 @section('conteudo')
-    <form method="POST" action="{{ route('empresa.update') }}" enctype="multipart/form-data" class="max-w-3xl space-y-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
+    <form method="POST" action="{{ route('empresa.update') }}" enctype="multipart/form-data" class="max-w-5xl space-y-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
         @csrf
         @method('PUT')
 
@@ -39,6 +39,35 @@
             <div>
                 <label class="block text-sm font-medium text-slate-700">CNPJ</label>
                 <input type="text" name="cnpj" value="{{ old('cnpj', $empresa->cnpj) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Inscrição estadual (IE)</label>
+                <input type="text" name="ie" value="{{ old('ie', $empresa->ie) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Inscrição municipal (IM)</label>
+                <input type="text" name="im" value="{{ old('im', $empresa->im) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700">CNAE</label>
+                <input type="text" name="cnae" value="{{ old('cnae', $empresa->cnae) }}" maxlength="7" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Regime tributário</label>
+                <select name="regime_tributario" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    @foreach (\App\Models\Empresa::regimesTributarios() as $valor => $rotulo)
+                        <option value="{{ $valor }}" @selected(old('regime_tributario', $empresa->regime_tributario ?? 'simples') === $valor)>{{ $rotulo }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Autorizador XML (CNPJ)</label>
+                <input type="text" name="aut_xml" value="{{ old('aut_xml', $empresa->aut_xml) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Opcional">
             </div>
 
             <div>
@@ -110,6 +139,133 @@
         </div>
 
         @php $imp = $empresa->configuracaoImpressao(); @endphp
+
+        <div class="border-t border-gray-100 pt-6 dark:border-gray-800">
+            <h2 class="text-sm font-semibold text-slate-700">Fiscal — NF-e / NFC-e / NFS-e</h2>
+            <p class="mt-1 text-xs text-slate-400">
+                Parâmetros do emitente (mesmo modelo do Evora). Tokens em branco mantêm o valor salvo;
+                Cosmos e tokens de NFS-e/IBPT sem valor na empresa usam o fallback do <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">.env</code>.
+            </p>
+
+            <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-3 [&_input]:min-h-11 [&_input]:border-gray-300 [&_input]:bg-transparent [&_input]:text-gray-800 [&_input]:outline-none [&_input]:transition [&_input]:focus:border-brand-500 [&_input]:focus:ring-3 [&_input]:focus:ring-brand-500/10 dark:[&_input]:border-gray-700 dark:[&_input]:text-white/90 [&_select]:min-h-11 [&_select]:border-gray-300 [&_select]:bg-transparent">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Ambiente SEFAZ</label>
+                    <select name="ambiente_nfe" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        <option value="2" @selected((int) old('ambiente_nfe', $empresa->ambiente_nfe ?? 2) === 2)>Homologação</option>
+                        <option value="1" @selected((int) old('ambiente_nfe', $empresa->ambiente_nfe ?? 2) === 1)>Produção</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">CSC (NFC-e)</label>
+                    <input type="password" name="csc" value="{{ old('csc') }}" autocomplete="off" placeholder="{{ $empresa->csc ? '•••••••• (já configurado)' : 'Código CSC' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">CSC ID / idToken</label>
+                    <input type="text" name="csc_id" value="{{ old('csc_id', $empresa->csc_id) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Série NF-e</label>
+                    <input type="number" min="1" name="numero_serie_nfe" value="{{ old('numero_serie_nfe', $empresa->numero_serie_nfe ?? 1) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Últ. NF-e produção</label>
+                    <input type="number" min="0" name="numero_ultima_nfe_producao" value="{{ old('numero_ultima_nfe_producao', $empresa->numero_ultima_nfe_producao ?? 0) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Últ. NF-e homologação</label>
+                    <input type="number" min="0" name="numero_ultima_nfe_homologacao" value="{{ old('numero_ultima_nfe_homologacao', $empresa->numero_ultima_nfe_homologacao ?? 0) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Série NFC-e</label>
+                    <input type="number" min="1" name="numero_serie_nfce" value="{{ old('numero_serie_nfce', $empresa->numero_serie_nfce ?? 1) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Últ. NFC-e produção</label>
+                    <input type="number" min="0" name="numero_ultima_nfce_producao" value="{{ old('numero_ultima_nfce_producao', $empresa->numero_ultima_nfce_producao ?? 0) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Últ. NFC-e homologação</label>
+                    <input type="number" min="0" name="numero_ultima_nfce_homologacao" value="{{ old('numero_ultima_nfce_homologacao', $empresa->numero_ultima_nfce_homologacao ?? 0) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Provedor NFS-e</label>
+                    <select name="nfse_provider" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        <option value="nacional_gov" @selected(old('nfse_provider', $empresa->nfse_provider ?? 'nacional_gov') === 'nacional_gov')>NFS-e Nacional (Gov.br)</option>
+                        <option value="integranotas" @selected(old('nfse_provider', $empresa->nfse_provider ?? '') === 'integranotas')>Integra Notas / CloudDFe</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Série NFS-e / DPS</label>
+                    <input type="number" min="1" name="numero_serie_nfse" value="{{ old('numero_serie_nfse', $empresa->numero_serie_nfse ?? 1) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Últ. NFS-e / DPS</label>
+                    <input type="number" min="0" name="numero_ultima_nfse" value="{{ old('numero_ultima_nfse', $empresa->numero_ultima_nfse ?? 0) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div class="sm:col-span-3">
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                        <input type="checkbox" name="nfse_nacional_habilitado" value="1" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600" @checked(old('nfse_nacional_habilitado', $empresa->nfse_nacional_habilitado))>
+                        <span>
+                            <span class="font-medium text-slate-700">Habilitar emissão NFS-e Nacional</span>
+                            <span class="mt-0.5 block text-xs text-slate-400">Usa o certificado A1 abaixo (mesmo padrão Evora / Nacional GOV).</span>
+                        </span>
+                    </label>
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-slate-700">Token NFS-e (Integra Notas)</label>
+                    <input type="password" name="token_nfse" value="{{ old('token_nfse') }}" autocomplete="off" placeholder="{{ $empresa->token_nfse ? '•••••••• (já configurado)' : 'Vazio = TOKEN_NFSE do .env' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Token IBPT</label>
+                    <input type="password" name="token_ibpt" value="{{ old('token_ibpt') }}" autocomplete="off" placeholder="{{ $empresa->token_ibpt ? '••••••••' : 'Vazio = TOKEN_IBPT do .env' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div class="sm:col-span-3">
+                    <label class="block text-sm font-medium text-slate-700">Token Bluesoft Cosmos (EAN)</label>
+                    <input type="password" name="bluesoft_token" value="{{ old('bluesoft_token') }}" autocomplete="off" placeholder="{{ $empresa->bluesoft_token ? '•••••••• (já configurado na empresa)' : 'Vazio = COSMOS_TOKEN do .env' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <p class="mt-1 text-xs text-slate-400">Prioridade: token da empresa → <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">COSMOS_TOKEN</code> da plataforma.</p>
+                </div>
+
+                <div class="sm:col-span-3">
+                    <label class="block text-sm font-medium text-slate-700">Observação padrão NF-e</label>
+                    <input type="text" name="observacao_padrao_nfe" value="{{ old('observacao_padrao_nfe', $empresa->observacao_padrao_nfe) }}" maxlength="500" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div class="sm:col-span-3">
+                    <label class="block text-sm font-medium text-slate-700">Observação padrão NFC-e</label>
+                    <input type="text" name="observacao_padrao_nfce" value="{{ old('observacao_padrao_nfce', $empresa->observacao_padrao_nfce) }}" maxlength="500" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+            </div>
+        </div>
+
+        <div class="border-t border-gray-100 pt-6 dark:border-gray-800">
+            <h2 class="text-sm font-semibold text-slate-700">Certificado digital A1</h2>
+            <p class="mt-1 text-xs text-slate-400">
+                Arquivo <strong>.pfx / .p12</strong> armazenado no banco (como no Evora). Senha gravada criptografada.
+                @if ($empresa->temCertificadoDigital())
+                    <span class="text-emerald-600">Certificado já cadastrado{{ $empresa->certificado_validade ? ' · validade '.$empresa->certificado_validade->format('d/m/Y') : '' }}.</span>
+                    <a href="{{ route('empresa.certificado.download') }}" class="ml-2 text-sky-600 hover:underline">Baixar .pfx</a>
+                @else
+                    <span class="text-amber-600">Nenhum certificado enviado ainda.</span>
+                @endif
+            </p>
+            <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Arquivo do certificado</label>
+                    <input type="file" name="certificado" accept=".pfx,.p12" class="mt-1 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-500 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white">
+                    @error('certificado')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Senha do certificado</label>
+                    <input type="password" name="certificado_senha" value="{{ old('certificado_senha') }}" autocomplete="new-password" placeholder="{{ $empresa->temCertificadoDigital() ? '•••••••• (deixe em branco pra manter)' : 'Senha do .pfx' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    @error('certificado_senha')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </div>
+            </div>
+        </div>
 
         <div class="border-t border-gray-100 pt-6 dark:border-gray-800">
             <h2 class="text-sm font-semibold text-slate-700">Impressão do cupom (PDV)</h2>

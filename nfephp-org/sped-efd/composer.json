@@ -1,0 +1,91 @@
+{
+    "name": "nfephp-org/sped-efd",
+    "type": "library",
+    "description": "API para geração dos arquivos para SPED EFD",
+    "keywords": [
+        "efd",
+        "sped",
+        "nfephp"
+    ],
+    "homepage": "https://github.com/nfephp-org/sped-efd",
+    "license": [
+        "GPL-3.0-or-later",
+        "LGPL-3.0-or-later",
+        "MIT"
+    ],
+    "authors": [
+        {
+            "name": "Roberto L. Machado",
+            "email": "linux.rlm@gmail.com.br",
+            "homepage": "https://github.com/nfephp-org",
+            "role": "owner"
+        },
+        {
+            "name": "Eduardo Correia",
+            "email": "eduardo.correa@duobox.com.br",
+            "homepage": "https://www.duobox.com.br/novo",
+            "role": "developer"
+        },
+        {
+            "name": "Rauye Rogiski",
+            "email": "rauye.rogiski@duobox.com.br",
+            "homepage": "https://www.duobox.com.br/novo",
+            "role": "developer"
+        },
+        {
+            "name": "Guilherme Calabria Filho",
+            "email": "suporte@plotag.com.br",
+            "homepage": "https://www.plotag.com.br",
+            "role": "developer"
+        },
+        {
+            "name": "Gustavo Lidani",
+            "email": "lidanig0@gmail.com",
+            "homepage": "https://github.com/lidani",
+            "role": "developer"
+        },
+        {
+            "name": "Comunidade NFePHP",
+            "homepage": "https://github.com/nfephp-org/sped-efd/graphs/contributors"
+        }
+    ],
+    "require": {
+        "php": ">= 7.4",
+        "ext-json": "*",
+        "nfephp-org/sped-common": "^5.1.0"
+    },
+    "require-dev": {
+        "squizlabs/php_codesniffer": "^3.6",
+        "phpunit/phpunit": "^9.3",
+        "scrutinizer/ocular": "^1.8",
+        "phpstan/phpstan": "^1.4",
+        "sebastian/phpcpd": "^6.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "NFePHP\\EFD\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "NFePHP\\EFD\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "phpunit": "phpunit",
+        "phpcbf": "vendor/bin/phpcbf --standard=psr2 src/ ",
+        "phpcs": "vendor/bin/phpcs --standard=psr2 src/",
+        "phpstan": "vendor/bin/phpstan analyse src/ --level 7",
+        "test": "phpunit --colors=always",
+        "test-coverage": "phpunit --colors=always --coverage-clover clover.xml"
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0-dev"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true
+    },
+    "minimum-stability": "stable"
+}

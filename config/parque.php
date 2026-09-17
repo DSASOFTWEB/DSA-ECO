@@ -54,4 +54,18 @@ return [
             '104.24.0.0/14,172.64.0.0/13,131.0.72.0/22'
         ))
     ))),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Bluesoft Cosmos (consulta EAN/GTIN + imagem do produto)
+    |--------------------------------------------------------------------------
+    | Token gratuito em https://cosmos.bluesoft.com.br/api
+    */
+    'cosmos_token' => env('COSMOS_TOKEN', ''),
+    'cosmos_base_url' => env('COSMOS_BASE_URL', 'https://api.cosmos.bluesoft.com.br'),
+    'cosmos_timeout' => (int) env('COSMOS_TIMEOUT', 15),
+
+    // Fallbacks de plataforma quando a empresa não cadastrou o próprio token
+    'token_nfse' => env('TOKEN_NFSE', ''),
+    'token_ibpt' => env('TOKEN_IBPT', ''),
 ];

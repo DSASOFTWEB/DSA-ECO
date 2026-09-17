@@ -147,6 +147,7 @@ Route::middleware('auth')->group(function () {
     Route::get('financeiro/transferencias', [TransferenciaCaixaController::class, 'index'])->name('transferencias.index');
     Route::post('financeiro/transferencias', [TransferenciaCaixaController::class, 'store'])->name('transferencias.store');
 
+    Route::get('produtos/consultar-ean', [ProdutoController::class, 'consultarEan'])->name('produtos.consultar-ean');
     Route::resource('produtos', ProdutoController::class);
     Route::post('produtos/{produto}/ajustar-estoque', [ProdutoController::class, 'ajustarEstoque'])->name('produtos.ajustar-estoque');
 
@@ -241,6 +242,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('empresa', [EmpresaController::class, 'edit'])->name('empresa.edit');
     Route::put('empresa', [EmpresaController::class, 'update'])->name('empresa.update');
+    Route::get('empresa/certificado', [EmpresaController::class, 'downloadCertificado'])->name('empresa.certificado.download');
 
     Route::resource('unidades', UnidadeController::class)->only(['index', 'create', 'store', 'edit', 'update']);
     Route::get('link-vendas', [UnidadeController::class, 'linkExterno'])->name('unidades.link-externo');

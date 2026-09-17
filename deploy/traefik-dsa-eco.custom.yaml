@@ -30,7 +30,7 @@ http:
     dsa-eco:
       rule: "Host(`softplanerp.com.br`) || Host(`www.softplanerp.com.br`)"
       entryPoints:
-        - http
+        - https
       service: dsa-eco
 
     dsa-eco-secure:
@@ -38,7 +38,8 @@ http:
       entryPoints:
         - https
       service: dsa-eco
-      tls: {}
+      tls: 
+       certResolver: letsencrypt
 
   services:
     dsa-eco:

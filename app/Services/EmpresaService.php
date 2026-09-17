@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Storage;
 
 class EmpresaService
 {
-    public function atualizar(Empresa $empresa, array $dados, ?UploadedFile $logo): Empresa
+    public function atualizar(Empresa $empresa, array $dados, ?UploadedFile $logo = null, ?UploadedFile $certificado = null): Empresa
     {
         $endereco = $dados['endereco'] ?? null;
 
@@ -17,10 +17,29 @@ class EmpresaService
             'evolution_base_url', 'evolution_api_key', 'evolution_instance',
             'impressao_modo', 'impressao_colunas', 'impressao_agente_url', 'impressao_auto_imprimir',
         ];
-        $integracoes = array_intersect_key($dados, array_flip($camposIntegracao));
 
-        unset($dados['endereco'], $dados['logo']);
-        foreach ($camposIntegracao as $campo) {
+        $camposFiscaisSecretos = [
+            'certificado_senha', 'token_nfse', 'bluesoft_token', 'token_ibpt', 'csc',
+        ];
+
+        $camposFiscais = [
+            'ie', 'im', 'cnae', 'regime_tributario', 'aut_xml', 'ambiente_nfe',
+            'csc', 'csc_id',
+            'numero_serie_nfe', 'numero_serie_nfce', 'numero_serie_nfse',
+            'numero_ultima_nfe_producao', 'numero_ultima_nfe_homologacao',
+            'numero_ultima_nfce_producao', 'numero_ultima_nfce_homologacao',
+            'numero_ultima_nfse',
+            'nfse_provider', 'nfse_nacional_habilitado',
+            'token_nfse', 'token_ibpt', 'bluesoft_token',
+            'certificado_senha',
+            'observacao_padrao_nfe', 'observacao_padrao_nfce',
+        ];
+
+        $integracoes = array_intersect_key($dados, array_flip($camposIntegracao));
+        $fiscais = array_intersect_key($dados, array_flip($camposFiscais));
+
+        unset($dados['endereco'], $dados['logo'], $dados['certificado']);
+        foreach (array_merge($camposIntegracao, $camposFiscais) as $campo) {
             unset($dados[$campo]);
         }
 
@@ -30,6 +49,23 @@ class EmpresaService
             }
 
             $dados['logo_path'] = $logo->store('logos', 'public');
+        }
+
+        if ($certificado) {
+            $conteudo = file_get_contents($certificado->getRealPath());
+            if (is_string($conteudo) && $conteudo !== '') {
+                $dados['certificado_arquivo'] = $conteudo;
+            }
+        }
+
+        foreach ($camposFiscaisSecretos as $campo) {
+            if (! filled($fiscais[$campo] ?? null)) {
+                unset($fiscais[$campo]);
+            }
+        }
+
+        if (array_key_exists('nfse_nacional_habilitado', $fiscais)) {
+            $fiscais['nfse_nacional_habilitado'] = (bool) $fiscais['nfse_nacional_habilitado'];
         }
 
         $configuracoes = $empresa->configuracoes ?? [];
@@ -57,10 +93,11 @@ class EmpresaService
         ];
 
         $dados['configuracoes'] = $configuracoes;
+        $dados = array_merge($dados, $fiscais);
 
         $empresa->update($dados);
 
-        return $empresa;
+        return $empresa->fresh();
     }
 
     /**

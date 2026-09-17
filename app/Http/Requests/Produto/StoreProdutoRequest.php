@@ -7,14 +7,21 @@ use Illuminate\Validation\Rule;
 
 class StoreProdutoRequest extends FormRequest
 {
+    use ProdutoFiscalRules;
+
     public function authorize(): bool
     {
         return $this->user()->can('create', \App\Models\Produto::class);
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->prepareFiscalBooleans();
+    }
+
     public function rules(): array
     {
-        return [
+        return array_merge([
             'unidade_id' => ['nullable', Rule::exists('unidades', 'id')->where('empresa_id', $this->user()->empresa_id)],
             'categoria_id' => ['nullable', Rule::exists('categorias_produtos', 'id')->where('empresa_id', $this->user()->empresa_id)],
             'nome' => ['required', 'string', 'max:255'],
@@ -32,6 +39,6 @@ class StoreProdutoRequest extends FormRequest
             'estoque_atual' => ['nullable', 'integer', 'min:0'],
             'estoque_minimo' => ['nullable', 'integer', 'min:0'],
             'ativo' => ['boolean'],
-        ];
+        ], $this->regrasFiscaisProduto());
     }
 }

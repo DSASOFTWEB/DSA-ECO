@@ -3,7 +3,7 @@
 @section('titulo', 'Novo produto')
 
 @section('conteudo')
-    <form method="POST" action="{{ route('produtos.store') }}" class="max-w-3xl space-y-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    <form method="POST" action="{{ route('produtos.store') }}" class="max-w-5xl space-y-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         @csrf
         @include('produtos._form', ['produto' => null])
         <div class="flex justify-end gap-2">

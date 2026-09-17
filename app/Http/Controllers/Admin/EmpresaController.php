@@ -10,7 +10,9 @@ use App\Models\Unidade;
 use App\Services\EmpresaService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Dados cadastrais da própria empresa (nome, CNPJ, endereço e logo) — não é
@@ -49,8 +51,32 @@ class EmpresaController extends Controller
     {
         $empresa = Empresa::findOrFail($request->user()->empresa_id);
 
-        $this->empresaService->atualizar($empresa, $request->safe()->except('logo'), $request->file('logo'));
+        $this->empresaService->atualizar(
+            $empresa,
+            $request->safe()->except(['logo', 'certificado']),
+            $request->file('logo'),
+            $request->file('certificado'),
+        );
 
         return redirect()->route('empresa.edit')->with('sucesso', 'Dados da empresa atualizados com sucesso.');
+    }
+
+    public function downloadCertificado(): StreamedResponse|Response
+    {
+        Gate::authorize('empresa.gerenciar');
+
+        $empresa = Empresa::findOrFail(request()->user()->empresa_id);
+        abort_unless($empresa->temCertificadoDigital(), 404, 'Certificado digital não cadastrado.');
+
+        $conteudo = $empresa->getRawOriginal('certificado_arquivo');
+        $cnpj = preg_replace('/\D+/', '', (string) $empresa->cnpj) ?: 'empresa';
+
+        return response()->streamDownload(
+            function () use ($conteudo) {
+                echo $conteudo;
+            },
+            "certificado-{$cnpj}.pfx",
+            ['Content-Type' => 'application/x-pkcs12']
+        );
     }
 }

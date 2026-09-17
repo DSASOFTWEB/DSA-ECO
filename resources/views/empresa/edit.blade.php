@@ -3,7 +3,7 @@
 @section('titulo', 'Dados da empresa')
 
 @section('conteudo')
-    <form method="POST" action="{{ route('empresa.update') }}" enctype="multipart/form-data" class="max-w-5xl space-y-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
+    <form id="empresa-form" method="POST" action="{{ route('empresa.update') }}" enctype="multipart/form-data" class="max-w-5xl space-y-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
         @csrf
         @method('PUT')
 
@@ -311,11 +311,7 @@
                 @if ($empresa->temCertificadoDigital())
                     <span class="text-emerald-600">Certificado já cadastrado{{ $empresa->certificado_validade ? ' · validade '.$empresa->certificado_validade->format('d/m/Y') : '' }}.</span>
                     <a href="{{ route('empresa.certificado.download') }}" class="ml-2 text-sky-600 hover:underline">Baixar .pfx</a>
-                    <form method="POST" action="{{ route('empresa.certificado.destroy') }}" class="ml-2 inline" onsubmit="return confirm('Remover o certificado digital e a senha cadastrada?')">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="text-rose-600 hover:underline">Remover certificado</button>
-                    </form>
+                    <button type="submit" form="empresa-remover-certificado" class="ml-2 text-rose-600 hover:underline">Remover certificado</button>
                 @else
                     <span class="text-amber-600">Nenhum certificado enviado ainda.</span>
                 @endif
@@ -387,6 +383,13 @@
             <button class="h-11 rounded-lg bg-brand-500 px-5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">Salvar alterações</button>
         </div>
     </form>
+
+    @if ($empresa->temCertificadoDigital())
+        <form id="empresa-remover-certificado" method="POST" action="{{ route('empresa.certificado.destroy') }}" class="hidden" onsubmit="return confirm('Remover o certificado digital e a senha cadastrada?')">
+            @csrf
+            @method('DELETE')
+        </form>
+    @endif
 
     @can('create', App\Models\PontoAtendimento::class)
     @if($unidades->isNotEmpty())

@@ -156,6 +156,27 @@ class EmpresaFiscalCadastroTest extends TestCase
         Storage::disk('local')->assertMissing($empresa->certificadoCaminho());
     }
 
+    public function test_formulario_de_remocao_do_certificado_nao_fica_aninhado_no_formulario_da_empresa(): void
+    {
+        [$empresa, , $user] = $this->criarGestor();
+        $empresa->update(['certificado_arquivo' => 'certificado-cadastrado']);
+
+        $html = $this->actingAs($user)
+            ->get(route('empresa.edit'))
+            ->assertOk()
+            ->getContent();
+
+        $inicioFormularioEmpresa = strpos($html, 'id="empresa-form"');
+        $fimFormularioEmpresa = strpos($html, '</form>', $inicioFormularioEmpresa);
+        $inicioFormularioRemocao = strpos($html, 'id="empresa-remover-certificado"');
+
+        $this->assertNotFalse($inicioFormularioEmpresa);
+        $this->assertNotFalse($fimFormularioEmpresa);
+        $this->assertNotFalse($inicioFormularioRemocao);
+        $this->assertGreaterThan($fimFormularioEmpresa, $inicioFormularioRemocao);
+        $this->assertStringContainsString('form="empresa-remover-certificado"', $html);
+    }
+
     public function test_cosmos_prioriza_token_da_empresa_sobre_env(): void
     {
         config(['parque.cosmos_token' => 'token-env']);

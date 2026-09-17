@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\IntegrationException;
 use App\Http\Requests\CadastroEmpresaRequest;
 use App\Models\Empresa;
 use App\Models\Unidade;
 use App\Models\User;
+use App\Services\Integrations\CnpjConsultaService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -23,6 +27,19 @@ class CadastroEmpresaController extends Controller
     public function create(): View
     {
         return view('publico.cadastro');
+    }
+
+    public function consultarCnpj(Request $request, CnpjConsultaService $cnpj): JsonResponse
+    {
+        $request->validate([
+            'cnpj' => ['required', 'string', 'max:18'],
+        ]);
+
+        try {
+            return response()->json($cnpj->consultar((string) $request->query('cnpj')));
+        } catch (IntegrationException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function store(CadastroEmpresaRequest $request): RedirectResponse

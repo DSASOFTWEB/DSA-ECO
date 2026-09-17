@@ -28,22 +28,28 @@
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 [&_input]:min-h-11 [&_input]:border-gray-300 [&_input]:bg-transparent [&_input]:text-gray-800 [&_input]:outline-none [&_input]:transition [&_input]:focus:border-brand-500 [&_input]:focus:ring-3 [&_input]:focus:ring-brand-500/10 dark:[&_input]:border-gray-700 dark:[&_input]:text-white/90">
             <div class="sm:col-span-2">
                 <label class="block text-sm font-medium text-slate-700">Nome</label>
-                <input type="text" name="nome" value="{{ old('nome', $empresa->nome) }}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <input type="text" name="nome" id="empresa-nome" value="{{ old('nome', $empresa->nome) }}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-slate-700">Razão social</label>
-                <input type="text" name="razao_social" value="{{ old('razao_social', $empresa->razao_social) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <input type="text" name="razao_social" id="empresa-razao-social" value="{{ old('razao_social', $empresa->razao_social) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
             </div>
 
-            <div>
+            <div x-data="consultaCnpjForm({ url: @js(route('empresa.consultar-cnpj')), cnpj: @js(old('cnpj', $empresa->cnpj)) })">
                 <label class="block text-sm font-medium text-slate-700">CNPJ</label>
-                <input type="text" name="cnpj" value="{{ old('cnpj', $empresa->cnpj) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <div class="mt-1 flex gap-2">
+                    <input type="text" name="cnpj" id="empresa-cnpj" x-model="cnpj" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="00.000.000/0001-00">
+                    <button type="button" @click="consultar()" :disabled="consultando" class="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-white/5">
+                        <span x-text="consultando ? 'Buscando…' : 'Consultar'"></span>
+                    </button>
+                </div>
+                <p class="mt-1 text-xs" :class="erro ? 'text-rose-600' : 'text-slate-400'" x-text="erro || msg || 'Consulta automática preenche razão social, IE, endereço e IBGE.'"></p>
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-slate-700">Inscrição estadual (IE)</label>
-                <input type="text" name="ie" value="{{ old('ie', $empresa->ie) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <input type="text" name="ie" id="empresa-ie" value="{{ old('ie', $empresa->ie) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
             </div>
 
             <div>
@@ -53,7 +59,7 @@
 
             <div>
                 <label class="block text-sm font-medium text-slate-700">CNAE</label>
-                <input type="text" name="cnae" value="{{ old('cnae', $empresa->cnae) }}" maxlength="7" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <input type="text" name="cnae" id="empresa-cnae" value="{{ old('cnae', $empresa->cnae) }}" maxlength="7" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
             </div>
 
             <div>
@@ -72,17 +78,17 @@
 
             <div>
                 <label class="block text-sm font-medium text-slate-700">E-mail</label>
-                <input type="email" name="email" value="{{ old('email', $empresa->email) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <input type="email" name="email" id="empresa-email" value="{{ old('email', $empresa->email) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-slate-700">Telefone</label>
-                <input type="text" name="telefone" value="{{ old('telefone', $empresa->telefone) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <input type="text" name="telefone" id="empresa-telefone" value="{{ old('telefone', $empresa->telefone) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
             </div>
 
             <div class="sm:col-span-2">
                 <label class="block text-sm font-medium text-slate-700">Endereço</label>
-                <input type="text" name="endereco" value="{{ old('endereco', $empresa->configuracoes['endereco'] ?? '') }}" placeholder="Rua, número, bairro - cidade/UF" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <input type="text" name="endereco" id="empresa-endereco" value="{{ old('endereco', $empresa->configuracoes['endereco'] ?? '') }}" placeholder="Rua, número, bairro - cidade/UF" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                 <p class="mt-1 text-xs text-slate-400">Aparece no cabeçalho dos contratos.</p>
             </div>
         </div>
@@ -150,7 +156,7 @@
             <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-3 [&_input]:min-h-11 [&_input]:border-gray-300 [&_input]:bg-transparent [&_input]:text-gray-800 [&_input]:outline-none [&_input]:transition [&_input]:focus:border-brand-500 [&_input]:focus:ring-3 [&_input]:focus:ring-brand-500/10 dark:[&_input]:border-gray-700 dark:[&_input]:text-white/90 [&_select]:min-h-11 [&_select]:border-gray-300 [&_select]:bg-transparent">
             <div>
                 <label class="block text-sm font-medium text-slate-700">Cód. município IBGE</label>
-                <input type="text" name="codigo_municipio_ibge" value="{{ old('codigo_municipio_ibge', $empresa->codigo_municipio_ibge) }}" maxlength="7" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="3550308">
+                <input type="text" name="codigo_municipio_ibge" id="empresa-ibge" value="{{ old('codigo_municipio_ibge', $empresa->codigo_municipio_ibge) }}" maxlength="7" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="3550308">
                 <p class="mt-1 text-xs text-slate-400">Obrigatório para emitir NFC-e / NFS-e.</p>
             </div>
 
@@ -423,3 +429,56 @@
     @endif
     @endcan
 @endsection
+
+@push('scripts')
+<script>
+function consultaCnpjForm(cfg) {
+    return {
+        url: cfg.url,
+        cnpj: cfg.cnpj || '',
+        consultando: false,
+        erro: '',
+        msg: '',
+        async consultar() {
+            this.erro = '';
+            this.msg = '';
+            const digitos = String(this.cnpj || '').replace(/\D+/g, '');
+            if (digitos.length !== 14) {
+                this.erro = 'Informe um CNPJ com 14 dígitos.';
+                return;
+            }
+            this.consultando = true;
+            try {
+                const res = await fetch(`${this.url}?cnpj=${encodeURIComponent(digitos)}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    this.erro = data.message || 'Não foi possível consultar o CNPJ.';
+                    return;
+                }
+                const set = (id, val) => {
+                    const el = document.getElementById(id);
+                    if (el && val) el.value = val;
+                };
+                if (data.cnpj) this.cnpj = data.cnpj;
+                set('empresa-nome', data.nome);
+                set('empresa-razao-social', data.razao_social);
+                set('empresa-ie', data.ie);
+                set('empresa-email', data.email);
+                set('empresa-telefone', data.telefone);
+                set('empresa-endereco', data.endereco);
+                set('empresa-ibge', data.codigo_municipio_ibge);
+                set('empresa-cnae', data.cnae);
+                this.msg = 'Dados preenchidos' + (data.fonte ? ` (${data.fonte})` : '') + '. Revise antes de salvar.';
+            } catch (e) {
+                this.erro = 'Falha de rede ao consultar o CNPJ.';
+            } finally {
+                this.consultando = false;
+            }
+        },
+    };
+}
+</script>
+@endpush

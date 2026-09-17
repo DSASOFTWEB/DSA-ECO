@@ -53,6 +53,7 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:login')->name('login.attempt');
 
     Route::get('/cadastro', [CadastroEmpresaController::class, 'create'])->name('cadastro.create');
+    Route::get('/cadastro/consultar-cnpj', [CadastroEmpresaController::class, 'consultarCnpj'])->middleware('throttle:20,1')->name('cadastro.consultar-cnpj');
     Route::post('/cadastro', [CadastroEmpresaController::class, 'store'])->middleware('throttle:cadastro-empresa')->name('cadastro.store');
 
     Route::get('/esqueci-senha', [PasswordResetController::class, 'showLinkRequestForm'])->name('password.request');
@@ -198,6 +199,8 @@ Route::middleware('auth')->group(function () {
     Route::get('hospedagens/{hospedagem}/ficha', [HospedagemController::class, 'ficha'])->name('hospedagens.ficha');
     Route::post('hospedagens/{hospedagem}/checkin', [HospedagemController::class, 'checkin'])->name('hospedagens.checkin');
     Route::post('hospedagens/{hospedagem}/consumos', [HospedagemController::class, 'consumos'])->name('hospedagens.consumos');
+    Route::post('hospedagens/{hospedagem}/solicitar-limpeza', [HospedagemController::class, 'solicitarLimpeza'])->name('hospedagens.solicitar-limpeza');
+    Route::post('hospedagens/{hospedagem}/nao-perturbe', [HospedagemController::class, 'naoPerturbe'])->name('hospedagens.nao-perturbe');
     Route::get('hospedagens/{hospedagem}/checkout', [HospedagemController::class, 'checkoutForm'])->name('hospedagens.checkout');
     Route::post('hospedagens/{hospedagem}/checkout', [HospedagemController::class, 'checkout'])->name('hospedagens.checkout.store');
     Route::post('hospedagens/{hospedagem}/emitir-nfce', [HospedagemController::class, 'emitirNfce'])->name('hospedagens.emitir-nfce');
@@ -246,6 +249,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('empresa', [EmpresaController::class, 'edit'])->name('empresa.edit');
     Route::put('empresa', [EmpresaController::class, 'update'])->name('empresa.update');
+    Route::get('empresa/consultar-cnpj', [EmpresaController::class, 'consultarCnpj'])->name('empresa.consultar-cnpj');
     Route::get('empresa/certificado', [EmpresaController::class, 'downloadCertificado'])->name('empresa.certificado.download');
 
     Route::resource('unidades', UnidadeController::class)->only(['index', 'create', 'store', 'edit', 'update']);

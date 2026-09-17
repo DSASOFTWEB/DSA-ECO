@@ -14,13 +14,14 @@ class Quarto extends Model
     use BelongsToTenant, HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'empresa_id', 'unidade_id', 'numero', 'capacidade_maxima', 'valor_diaria', 'status', 'precisa_limpeza', 'observacoes',
+        'empresa_id', 'unidade_id', 'numero', 'capacidade_maxima', 'valor_diaria', 'status', 'precisa_limpeza', 'nao_perturbe', 'observacoes',
     ];
 
     protected $casts = [
         'capacidade_maxima' => 'integer',
         'valor_diaria' => 'decimal:2',
         'precisa_limpeza' => 'boolean',
+        'nao_perturbe' => 'boolean',
     ];
 
     public function unidade(): BelongsTo

@@ -9,6 +9,7 @@ use App\Http\Requests\Hospedagem\CheckoutHospedagemRequest;
 use App\Http\Requests\Hospedagem\StoreConsumoRequest;
 use App\Http\Requests\Hospedagem\StoreHospedagemRequest;
 use App\Models\Caixa;
+use App\Models\CategoriaProduto;
 use App\Models\Cliente;
 use App\Models\Hospedagem;
 use App\Models\Produto;
@@ -21,6 +22,7 @@ use App\Services\HospedagemService;
 use App\Services\Relatorios\HospedagemPdfExport;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\Response;
@@ -153,11 +155,32 @@ class HospedagemController extends Controller
             'documentosFiscais' => fn ($q) => $q->latest('id'),
         ]);
 
-        $produtos = Produto::ativos()->orderBy('nome')->get();
+        $produtos = Produto::ativos()
+            ->with('categoria:id,nome')
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'sku', 'preco_venda', 'categoria_id', 'imagem_url', 'controla_estoque', 'estoque_atual']);
+
+        $categorias = CategoriaProduto::query()
+            ->whereIn('id', $produtos->pluck('categoria_id')->filter()->unique())
+            ->orderBy('nome')
+            ->get(['id', 'nome']);
+
         $itensNfce = $this->hospedagemFiscalService->itensProdutos($hospedagem);
         $itensNfse = $this->hospedagemFiscalService->itensServicos($hospedagem);
 
-        return view('hospedagens.show', compact('hospedagem', 'produtos', 'itensNfce', 'itensNfse'));
+        $checkout = null;
+        if ($hospedagem->estaHospedado()) {
+            [$caixaAberto, $caixasDisponiveis] = $this->resolverCaixaOperador(request()->user(), null);
+            $checkout = [
+                'caixaAberto' => $caixaAberto,
+                'caixasDisponiveis' => $caixasDisponiveis,
+                'noites' => $this->hospedagemService->noites($hospedagem),
+                'quantidadeItensNfce' => count($itensNfce),
+                'quantidadeItensNfse' => count($itensNfse),
+            ];
+        }
+
+        return view('hospedagens.show', compact('hospedagem', 'produtos', 'categorias', 'itensNfce', 'itensNfse', 'checkout'));
     }
 
     public function emitirNfce(Hospedagem $hospedagem): RedirectResponse
@@ -230,6 +253,34 @@ class HospedagemController extends Controller
         }
 
         return back()->with('sucesso', 'Consumo lançado com sucesso.');
+    }
+
+    public function solicitarLimpeza(Hospedagem $hospedagem): RedirectResponse
+    {
+        $this->authorize('sinaisQuarto', $hospedagem);
+
+        try {
+            $this->hospedagemService->solicitarLimpeza($hospedagem);
+        } catch (NegocioException $e) {
+            return back()->with('erro', $e->getMessage());
+        }
+
+        return back()->with('sucesso', 'Limpeza do quarto solicitada.');
+    }
+
+    public function naoPerturbe(Request $request, Hospedagem $hospedagem): RedirectResponse
+    {
+        $this->authorize('sinaisQuarto', $hospedagem);
+
+        $ativo = $request->boolean('ativo', ! $hospedagem->quarto->nao_perturbe);
+
+        try {
+            $this->hospedagemService->alternarNaoPerturbe($hospedagem, $ativo);
+        } catch (NegocioException $e) {
+            return back()->with('erro', $e->getMessage());
+        }
+
+        return back()->with('sucesso', $ativo ? 'Quarto marcado como Não perturbe.' : 'Sinal Não perturbe removido.');
     }
 
     public function checkoutForm(Hospedagem $hospedagem): View|RedirectResponse

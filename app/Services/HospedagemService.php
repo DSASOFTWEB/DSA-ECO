@@ -185,7 +185,10 @@ class HospedagemService
             // O quarto fica "sujo" até alguém marcar a limpeza como
             // concluída (ver marcarQuartoLimpo()) — não libera pra nova
             // reserva sozinho no mapa de quartos.
-            $hospedagem->quarto->update(['precisa_limpeza' => true]);
+            $hospedagem->quarto->update([
+                'precisa_limpeza' => true,
+                'nao_perturbe' => false,
+            ]);
 
             return $hospedagem->fresh(['quarto', 'cliente', 'consumos']);
         });
@@ -193,7 +196,43 @@ class HospedagemService
 
     public function marcarQuartoLimpo(Quarto $quarto): void
     {
-        $quarto->update(['precisa_limpeza' => false]);
+        $quarto->update([
+            'precisa_limpeza' => false,
+        ]);
+    }
+
+    /**
+     * Solicita limpeza do quarto durante a estadia (e desliga "não perturbe").
+     */
+    public function solicitarLimpeza(Hospedagem $hospedagem): Quarto
+    {
+        if (! $hospedagem->estaHospedado()) {
+            throw new NegocioException('Só é possível solicitar limpeza com hóspede no quarto.');
+        }
+
+        $hospedagem->quarto->update([
+            'precisa_limpeza' => true,
+            'nao_perturbe' => false,
+        ]);
+
+        return $hospedagem->quarto->fresh();
+    }
+
+    /**
+     * Alterna o sinal "Não perturbe" do quarto (desliga pedido de limpeza).
+     */
+    public function alternarNaoPerturbe(Hospedagem $hospedagem, bool $ativo): Quarto
+    {
+        if (! $hospedagem->estaHospedado()) {
+            throw new NegocioException('Só é possível marcar "Não perturbe" com hóspede no quarto.');
+        }
+
+        $hospedagem->quarto->update([
+            'nao_perturbe' => $ativo,
+            'precisa_limpeza' => $ativo ? false : $hospedagem->quarto->precisa_limpeza,
+        ]);
+
+        return $hospedagem->quarto->fresh();
     }
 
     public function cancelar(Hospedagem $hospedagem): Hospedagem

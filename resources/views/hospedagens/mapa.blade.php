@@ -105,7 +105,7 @@
                             <a href="{{ route('hospedagens.show', $item['hospedagem']) }}" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-gray-700 dark:text-slate-300">Ver</a>
                             <a href="{{ route('hospedagens.ficha', $item['hospedagem']) }}" target="_blank" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-gray-700 dark:text-slate-300">🖨 Imprimir ficha</a>
                             @can('checkout', $item['hospedagem'])
-                                <a href="{{ route('hospedagens.checkout', $item['hospedagem']) }}" class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">Fechar conta</a>
+                                <a href="{{ route('hospedagens.show', [$item['hospedagem'], 'fechar' => 1]) }}" class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">Fechar conta</a>
                             @endcan
                         @elseif ($item['status'] === 'reservado')
                             <a href="{{ route('hospedagens.show', $item['hospedagem']) }}" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-gray-700 dark:text-slate-300">Ver</a>

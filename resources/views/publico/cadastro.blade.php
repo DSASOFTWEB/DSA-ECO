@@ -31,15 +31,24 @@
 
                 @include('partials.flash')
 
-                <form method="POST" action="{{ route('cadastro.store') }}" class="space-y-5">
+                <form method="POST" action="{{ route('cadastro.store') }}" class="space-y-5" x-data="consultaCnpjCadastro(@js(route('cadastro.consultar-cnpj')))">
                     @csrf
 
                     <div>
                         <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Seu parque</h2>
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div class="sm:col-span-2"><x-input label="Nome do parque" name="empresa_nome" :value="old('empresa_nome')" required autofocus placeholder="Ex: Parque Aquático Praia Azul" /></div>
-                            <x-input label="CNPJ (opcional)" name="empresa_cnpj" :value="old('empresa_cnpj')" placeholder="00.000.000/0001-00" />
-                            <x-input label="Telefone (opcional)" name="empresa_telefone" :value="old('empresa_telefone')" placeholder="(00) 00000-0000" />
+                            <div class="sm:col-span-2"><x-input label="Nome do parque" name="empresa_nome" id="cadastro-empresa-nome" :value="old('empresa_nome')" required autofocus placeholder="Ex: Parque Aquático Praia Azul" /></div>
+                            <div>
+                                <label for="empresa_cnpj" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">CNPJ (opcional)</label>
+                                <div class="flex gap-2">
+                                    <input type="text" name="empresa_cnpj" id="empresa_cnpj" x-model="cnpj" value="{{ old('empresa_cnpj') }}" placeholder="00.000.000/0001-00" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                                    <button type="button" @click="consultar()" :disabled="consultando" class="shrink-0 rounded-lg border border-gray-300 px-3 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-white/5">
+                                        <span x-text="consultando ? '…' : 'Consultar'"></span>
+                                    </button>
+                                </div>
+                                <p class="mt-1 text-xs" :class="erro ? 'text-rose-600' : 'text-gray-400'" x-text="erro || msg"></p>
+                            </div>
+                            <x-input label="Telefone (opcional)" name="empresa_telefone" id="cadastro-empresa-telefone" :value="old('empresa_telefone')" placeholder="(00) 00000-0000" />
                             <div class="sm:col-span-2"><x-input label="Nome da primeira unidade" name="unidade_nome" :value="old('unidade_nome', 'Unidade Sede')" required help="Você pode cadastrar outras unidades depois." /></div>
                         </div>
                     </div>
@@ -74,5 +83,46 @@
             </div>
         </aside>
     </main>
+    <script>
+        function consultaCnpjCadastro(url) {
+            return {
+                url,
+                cnpj: @js(old('empresa_cnpj', '')),
+                consultando: false,
+                erro: '',
+                msg: '',
+                async consultar() {
+                    this.erro = '';
+                    this.msg = '';
+                    const digitos = String(this.cnpj || '').replace(/\D+/g, '');
+                    if (digitos.length !== 14) {
+                        this.erro = 'Informe um CNPJ com 14 dígitos.';
+                        return;
+                    }
+                    this.consultando = true;
+                    try {
+                        const res = await fetch(`${this.url}?cnpj=${encodeURIComponent(digitos)}`, {
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        });
+                        const data = await res.json();
+                        if (!res.ok) {
+                            this.erro = data.message || 'Não foi possível consultar o CNPJ.';
+                            return;
+                        }
+                        if (data.cnpj) this.cnpj = data.cnpj;
+                        const nome = document.getElementById('cadastro-empresa-nome') || document.querySelector('[name="empresa_nome"]');
+                        const tel = document.getElementById('cadastro-empresa-telefone') || document.querySelector('[name="empresa_telefone"]');
+                        if (nome && data.nome) nome.value = data.nome;
+                        if (tel && data.telefone) tel.value = data.telefone;
+                        this.msg = 'Dados preenchidos. Revise antes de continuar.';
+                    } catch (e) {
+                        this.erro = 'Falha de rede ao consultar o CNPJ.';
+                    } finally {
+                        this.consultando = false;
+                    }
+                },
+            };
+        }
+    </script>
 </body>
 </html>

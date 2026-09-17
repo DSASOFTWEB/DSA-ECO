@@ -46,4 +46,10 @@ class HospedagemPolicy
     {
         return $user->can('pousada.reservar') && $user->empresa_id === $hospedagem->empresa_id;
     }
+
+    public function sinaisQuarto(User $user, Hospedagem $hospedagem): bool
+    {
+        return ($user->can('pousada.limpeza') || $user->can('pousada.checkin') || $user->can('pousada.consumos'))
+            && $user->empresa_id === $hospedagem->empresa_id;
+    }
 }

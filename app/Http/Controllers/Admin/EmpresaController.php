@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\IntegrationException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Empresa\UpdateEmpresaRequest;
 use App\Models\Empresa;
 use App\Models\PontoAtendimento;
 use App\Models\Unidade;
 use App\Services\EmpresaService;
+use App\Services\Integrations\CnpjConsultaService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -45,6 +49,21 @@ class EmpresaController extends Controller
             : collect();
 
         return view('empresa.edit', compact('empresa', 'unidades', 'unidadeFoodId', 'tipoFood', 'pontosFood'));
+    }
+
+    public function consultarCnpj(Request $request, CnpjConsultaService $cnpj): JsonResponse
+    {
+        Gate::authorize('empresa.gerenciar');
+
+        $request->validate([
+            'cnpj' => ['required', 'string', 'max:18'],
+        ]);
+
+        try {
+            return response()->json($cnpj->consultar((string) $request->query('cnpj')));
+        } catch (IntegrationException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function update(UpdateEmpresaRequest $request): RedirectResponse

@@ -20,6 +20,9 @@
             <a href="{{ route('contratos.pdf', $contrato) }}" target="_blank" class="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5">Contrato em PDF</a>
 
             @if ($contrato->estaAtivo())
+                @can('update', $contrato)
+                    <a href="{{ route('contratos.edit', $contrato) }}" class="inline-flex items-center rounded-lg border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100 dark:border-sky-700 dark:bg-sky-500/10 dark:text-sky-300">Editar plano / vencimento</a>
+                @endcan
                 @can('cancelar', $contrato)
                     <form method="POST" action="{{ route('contratos.cancelar', $contrato) }}" onsubmit="return confirm('Cancelar este contrato? As mensalidades futuras pendentes serão canceladas.')" class="flex gap-2">
                         @csrf

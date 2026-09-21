@@ -92,7 +92,40 @@ class ContratoService
             throw new NegocioException('Somente contratos ativos podem ser editados.');
         }
 
-        return DB::transaction(fn () => $this->contratos->update($contrato, $dados));
+        return DB::transaction(function () use ($contrato, $dados) {
+            if (isset($dados['plano_id']) && (int) $dados['plano_id'] !== (int) $contrato->plano_id) {
+                $plano = Plano::findOrFail($dados['plano_id']);
+
+                if ($plano->empresa_id !== $contrato->empresa_id) {
+                    throw new NegocioException('O plano precisa pertencer à mesma empresa do contrato.');
+                }
+                if (! $plano->ativo) {
+                    throw new NegocioException('Este plano está inativo e não pode ser atribuído.');
+                }
+                if ($plano->max_dependentes < $contrato->dependentes()->count()) {
+                    throw new NegocioException(
+                        "O plano \"{$plano->nome}\" permite no máximo {$plano->max_dependentes} dependente(s)."
+                    );
+                }
+
+                $dados['plano_id'] = $plano->id;
+                // Se o valor não veio, ou continua igual ao do contrato antigo,
+                // aplica o preço do novo plano (troca de plano na recepção).
+                if (
+                    ! array_key_exists('valor_mensal', $dados)
+                    || $dados['valor_mensal'] === null
+                    || $dados['valor_mensal'] === ''
+                    || (float) $dados['valor_mensal'] === (float) $contrato->valor_mensal
+                ) {
+                    $dados['valor_mensal'] = $plano->valor;
+                }
+            }
+
+            $contrato = $this->contratos->update($contrato, $dados);
+            $this->mensalidadeService->sincronizarAbertasDoContrato($contrato->fresh());
+
+            return $contrato->fresh(['cliente', 'plano', 'unidade', 'mensalidades']);
+        });
     }
 
     public function cancelar(Contrato $contrato, string $motivo): Contrato

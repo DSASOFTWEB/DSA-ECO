@@ -67,7 +67,15 @@ class MensalidadeService
             $desconto = round($valorOriginal * ($contrato->desconto_percentual / 100), 2);
             $valorTotal = $valorOriginal - $desconto;
 
+            $dataInicio = Carbon::parse($contrato->data_inicio)->startOfDay();
             $vencimento = $competencia->copy()->day(min((int) $contrato->dia_vencimento, $competencia->daysInMonth));
+
+            // Se o dia de vencimento do mês de início já passou, a 1ª cobrança
+            // vence na data de início — evita mensalidade "pendente atrasada"
+            // no mesmo dia em que o contrato é criado.
+            if ($vencimento->lt($dataInicio)) {
+                $vencimento = $dataInicio->copy();
+            }
 
             return $this->mensalidades->create([
                 'contrato_id' => $contrato->id,
@@ -81,6 +89,43 @@ class MensalidadeService
                 'status' => 'pendente',
             ]);
         });
+    }
+
+    /**
+     * Recalcula valor/vencimento das mensalidades abertas (pendente/atrasado)
+     * após alteração de plano ou dia de vencimento no contrato.
+     */
+    public function sincronizarAbertasDoContrato(Contrato $contrato): void
+    {
+        $abertas = Mensalidade::query()
+            ->where('contrato_id', $contrato->id)
+            ->whereIn('status', ['pendente', 'atrasado'])
+            ->get();
+
+        $valorOriginal = (float) $contrato->valor_mensal;
+        $desconto = round($valorOriginal * ((float) $contrato->desconto_percentual / 100), 2);
+        $valorTotal = $valorOriginal - $desconto;
+        $hoje = now()->startOfDay();
+
+        foreach ($abertas as $mensalidade) {
+            $competencia = $mensalidade->competencia->copy()->startOfMonth();
+            $vencimento = $competencia->copy()->day(min((int) $contrato->dia_vencimento, $competencia->daysInMonth));
+
+            $status = $mensalidade->status;
+            if ($status === 'atrasado' && $vencimento->gte($hoje)) {
+                $status = 'pendente';
+            } elseif ($status === 'pendente' && $vencimento->lt($hoje)) {
+                $status = 'atrasado';
+            }
+
+            $mensalidade->update([
+                'valor_original' => $valorOriginal,
+                'desconto' => $desconto,
+                'valor_total' => $valorTotal,
+                'data_vencimento' => $vencimento->toDateString(),
+                'status' => $status,
+            ]);
+        }
     }
 
     /**

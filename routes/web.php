@@ -105,7 +105,7 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('planos', PlanoController::class)->except(['show']);
 
-    Route::resource('contratos', ContratoController::class)->only(['index', 'create', 'store', 'show']);
+    Route::resource('contratos', ContratoController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
     Route::get('contratos/{contrato}/pdf', [ContratoController::class, 'pdf'])->name('contratos.pdf');
     Route::post('contratos/{contrato}/cancelar', [ContratoController::class, 'cancelar'])->name('contratos.cancelar');
     Route::post('contratos/{contrato}/reativar', [ContratoController::class, 'reativar'])->name('contratos.reativar');

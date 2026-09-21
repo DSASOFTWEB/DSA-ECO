@@ -6,6 +6,7 @@ use App\Exceptions\NegocioException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Contrato\CancelarContratoRequest;
 use App\Http\Requests\Contrato\StoreContratoRequest;
+use App\Http\Requests\Contrato\UpdateContratoRequest;
 use App\Models\Cliente;
 use App\Models\Contrato;
 use App\Models\Plano;
@@ -59,6 +60,26 @@ class ContratoController extends Controller
         $contrato->load(['cliente', 'plano', 'unidade', 'vendedor', 'dependentes', 'mensalidades' => fn ($q) => $q->latest('competencia')]);
 
         return view('contratos.show', compact('contrato'));
+    }
+
+    public function edit(Contrato $contrato): View
+    {
+        $this->authorize('update', $contrato);
+
+        $planos = Plano::ativos()->orderBy('nome')->get();
+
+        return view('contratos.edit', compact('contrato', 'planos'));
+    }
+
+    public function update(UpdateContratoRequest $request, Contrato $contrato): RedirectResponse
+    {
+        try {
+            $contrato = $this->contratoService->atualizar($contrato, $request->validated());
+        } catch (NegocioException $e) {
+            return back()->withInput()->with('erro', $e->getMessage());
+        }
+
+        return redirect()->route('contratos.show', $contrato)->with('sucesso', 'Plano e vencimento atualizados. Mensalidades abertas foram recalculadas.');
     }
 
     public function pdf(Contrato $contrato, ContratoPdfExport $export): Response

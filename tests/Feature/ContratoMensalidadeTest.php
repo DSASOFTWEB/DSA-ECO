@@ -46,10 +46,66 @@ class ContratoMensalidadeTest extends TestCase
         $mensalidade = $contrato->mensalidades->first();
         $this->assertSame('pendente', $mensalidade->status);
         $this->assertEquals(150.00, (float) $mensalidade->valor_total);
-        // Competência de março, vencimento no dia 10 configurado no contrato.
-        $this->assertSame('2026-03-10', $mensalidade->data_vencimento->toDateString());
+        // Dia 10 já passou em 15/03 — 1ª mensalidade vence na data de início.
+        $this->assertSame('2026-03-15', $mensalidade->data_vencimento->toDateString());
 
         $this->assertNotNull($cliente->fresh()->carteirinha, 'A carteirinha deveria ser emitida automaticamente ao contratar.');
+
+        Carbon::setTestNow();
+    }
+
+    public function test_contratar_com_dia_de_vencimento_futuro_mantem_o_dia(): void
+    {
+        Carbon::setTestNow('2026-03-05');
+
+        $cliente = Cliente::factory()->create();
+        $plano = Plano::factory()->create(['empresa_id' => $cliente->empresa_id, 'valor' => 100.00]);
+        $unidade = Unidade::factory()->create(['empresa_id' => $cliente->empresa_id]);
+
+        $contrato = app(ContratoService::class)->contratar([
+            'unidade_id' => $unidade->id,
+            'cliente_id' => $cliente->id,
+            'plano_id' => $plano->id,
+            'data_inicio' => '2026-03-05',
+            'dia_vencimento' => 10,
+        ]);
+
+        $this->assertSame('2026-03-10', $contrato->mensalidades->first()->data_vencimento->toDateString());
+
+        Carbon::setTestNow();
+    }
+
+    public function test_atualizar_plano_e_vencimento_recalcula_mensalidade_aberta(): void
+    {
+        Carbon::setTestNow('2026-03-05');
+
+        $cliente = Cliente::factory()->create();
+        $planoA = Plano::factory()->create(['empresa_id' => $cliente->empresa_id, 'valor' => 100.00, 'nome' => 'Basico']);
+        $planoB = Plano::factory()->create(['empresa_id' => $cliente->empresa_id, 'valor' => 200.00, 'nome' => 'Premium']);
+        $unidade = Unidade::factory()->create(['empresa_id' => $cliente->empresa_id]);
+
+        $contrato = app(ContratoService::class)->contratar([
+            'unidade_id' => $unidade->id,
+            'cliente_id' => $cliente->id,
+            'plano_id' => $planoA->id,
+            'data_inicio' => '2026-03-05',
+            'dia_vencimento' => 10,
+        ]);
+
+        $atualizado = app(ContratoService::class)->atualizar($contrato, [
+            'plano_id' => $planoB->id,
+            'dia_vencimento' => 20,
+            'desconto_percentual' => 0,
+        ]);
+
+        $this->assertSame($planoB->id, $atualizado->plano_id);
+        $this->assertEquals(200.00, (float) $atualizado->valor_mensal);
+        $this->assertSame(20, (int) $atualizado->dia_vencimento);
+
+        $mensalidade = $atualizado->mensalidades->first();
+        $this->assertEquals(200.00, (float) $mensalidade->valor_total);
+        $this->assertSame('2026-03-20', $mensalidade->data_vencimento->toDateString());
+        $this->assertSame('pendente', $mensalidade->status);
 
         Carbon::setTestNow();
     }

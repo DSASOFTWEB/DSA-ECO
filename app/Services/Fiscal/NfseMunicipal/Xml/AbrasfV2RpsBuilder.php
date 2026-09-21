@@ -71,7 +71,8 @@ class AbrasfV2RpsBuilder
         $dh = now('America/Sao_Paulo')->subMinutes(2);
         $dataEmissao = $dh->format('Y-m-d');
         $competencia = $dh->format('Y-m-d');
-        $idInf = 'rps'.$numeroRps;
+        // Espelho ACBr DefinirIDDeclaracao: Dec_{numero}{serie}
+        $idInf = 'Dec_'.$numeroRps.$serie;
 
         $optanteSn = in_array($empresa->regime_tributario, [Empresa::REGIME_SIMPLES, Empresa::REGIME_SIMPLES_EXCESSO, Empresa::REGIME_MEI], true) ? '1' : '2';
 
@@ -133,7 +134,8 @@ class AbrasfV2RpsBuilder
     ): string {
         $cnpj = preg_replace('/\D+/', '', (string) ($unidade->cnpj ?: $empresa->cnpj));
         $im = preg_replace('/\D+/', '', (string) $empresa->im);
-        $idLote = 'lote'.$numeroLote;
+        // Espelho ACBr DefinirIDLote: Lote_{numero}
+        $idLote = 'Lote_'.$numeroLote;
 
         $prestador = '<Prestador xmlns="'.self::NS_TIPOS.'">'
             .'<CpfCnpj><Cnpj>'.$cnpj.'</Cnpj></CpfCnpj>'
@@ -232,17 +234,22 @@ class AbrasfV2RpsBuilder
     }
 
     /**
-     * LC 116 → ItemListaServico ABRASF (ex.: 09.01.05 → 901, ou 09.01).
+     * LC 116 → ItemListaServico ABRASF (espelho ACBr NormatizarItemServico).
+     * Ex.: 09.01.05 → 09.01.05; 9.01 → 09.01; 901 → 09.01.
      */
     protected function itemListaServico(string $lc116): string
     {
-        $limpo = trim($lc116);
-        $partes = preg_split('/[.\-\/]/', $limpo) ?: [];
-        $item = str_pad(preg_replace('/\D+/', '', (string) ($partes[0] ?? '0')) ?: '0', 2, '0', STR_PAD_LEFT);
-        $sub = str_pad(preg_replace('/\D+/', '', (string) ($partes[1] ?? '0')) ?: '0', 2, '0', STR_PAD_LEFT);
+        $digitos = preg_replace('/\D+/', '', trim($lc116)) ?: '0';
 
-        // Formato clássico ABRASF: "9.01" ou "901"
-        return ltrim($item, '0').'.'.$sub;
+        if (strlen($digitos) >= 5) {
+            $digitos = str_pad((string) (int) $digitos, 6, '0', STR_PAD_LEFT);
+
+            return substr($digitos, 0, 2).'.'.substr($digitos, 2, 2).'.'.substr($digitos, 4, 2);
+        }
+
+        $digitos = str_pad((string) (int) $digitos, 4, '0', STR_PAD_LEFT);
+
+        return substr($digitos, 0, 2).'.'.substr($digitos, 2, 2);
     }
 
     protected function money(float $valor, int $casas = 2): string

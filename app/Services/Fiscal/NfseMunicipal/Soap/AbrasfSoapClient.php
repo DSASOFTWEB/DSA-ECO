@@ -21,10 +21,12 @@ class AbrasfSoapClient
         string $dadosMsg,
         array $pem,
     ): string {
-        $cabecEsc = htmlspecialchars($cabecalho, ENT_XML1 | ENT_COMPAT, 'UTF-8');
-        $dadosEsc = htmlspecialchars($dadosMsg, ENT_XML1 | ENT_COMPAT, 'UTF-8');
+        // GISS valida o XML interno: declaração XML dentro de nfseDadosMsg gera E160.
+        $cabecEsc = htmlspecialchars($this->semDeclaracaoXml($cabecalho), ENT_XML1 | ENT_COMPAT, 'UTF-8');
+        $dadosEsc = htmlspecialchars($this->semDeclaracaoXml($dadosMsg), ENT_XML1 | ENT_COMPAT, 'UTF-8');
 
-        $body = '<?xml version="1.0" encoding="UTF-8"?>'
+        $decl = '<'.'?xml version="1.0" encoding="UTF-8"?'.'>';
+        $body = $decl
             .'<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"'
             .' xmlns:nfse="http://nfse.abrasf.org.br">'
             .'<soapenv:Header/>'
@@ -58,6 +60,14 @@ class AbrasfSoapClient
         }
 
         return $this->extrairOutputXml($xml);
+    }
+
+    protected function semDeclaracaoXml(string $xml): string
+    {
+        $xml = preg_replace('/^\xEF\xBB\xBF/', '', $xml) ?? $xml;
+        $xml = preg_replace('/^<\?xml[^?]*\?>\s*/i', '', ltrim($xml)) ?? ltrim($xml);
+
+        return $xml;
     }
 
     protected function extrairOutputXml(string $soapXml): string

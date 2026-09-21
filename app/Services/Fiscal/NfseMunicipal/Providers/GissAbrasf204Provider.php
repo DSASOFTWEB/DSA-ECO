@@ -44,6 +44,7 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
     ): NfseMunicipalResultado {
         $url = $this->url($empresa, $municipio);
         $hospedagem->loadMissing('cliente');
+        $this->validarEmitente($empresa, $unidade);
 
         $montado = $this->builder->montarRps($empresa, $unidade, $hospedagem, $municipio, $itens, $serie, $numeroRps);
         // Assina InfDeclaracao (root = Rps) e depois o LoteRps (root = EnviarLoteRpsEnvio).
@@ -133,6 +134,21 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
         }
 
         $this->schemas->validar($xml, $arquivoXsd);
+    }
+
+    protected function validarEmitente(Empresa $empresa, Unidade $unidade): void
+    {
+        $cnpj = preg_replace('/\D+/', '', (string) ($unidade->cnpj ?: $empresa->cnpj));
+        $im = preg_replace('/\D+/', '', (string) $empresa->im);
+
+        if (strlen((string) $cnpj) !== 14) {
+            throw new NegocioException('CNPJ do emitente inválido para NFS-e municipal (informe 14 dígitos na empresa/unidade).');
+        }
+        if ($im === '') {
+            throw new NegocioException(
+                'Inscrição Municipal (IM) obrigatória para NFS-e GISS. Informe em Dados da empresa.'
+            );
+        }
     }
 
     /**
@@ -290,24 +306,44 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
      */
     protected function primeiroErro(string $xml): array
     {
-        if (preg_match('/<(?:\w+:)?Codigo>([^<]+)<\/(?:\w+:)?Codigo>.*<(?:\w+:)?Mensagem>([^<]+)<\/(?:\w+:)?Mensagem>/is', $xml, $m)
-            || preg_match('/<(?:\w+:)?Mensagem>([^<]+)<\/(?:\w+:)?Mensagem>.*<(?:\w+:)?Codigo>([^<]+)<\/(?:\w+:)?Codigo>/is', $xml, $m2)) {
-            if (isset($m[1], $m[2])) {
-                return [trim($m[1]), trim(html_entity_decode($m[2]))];
+        $codigo = '';
+        $mensagem = '';
+        $correcao = '';
+
+        if (preg_match('/<(?:\w+:)?MensagemRetorno\b[^>]*>(.*?)<\/(?:\w+:)?MensagemRetorno>/is', $xml, $bloco)) {
+            $chunk = $bloco[1];
+            if (preg_match('/<(?:\w+:)?Codigo>([^<]+)</i', $chunk, $m)) {
+                $codigo = trim($m[1]);
             }
-            if (isset($m2[1], $m2[2])) {
-                return [trim($m2[2]), trim(html_entity_decode($m2[1]))];
+            if (preg_match('/<(?:\w+:)?Mensagem>([^<]+)</i', $chunk, $m)) {
+                $mensagem = trim(html_entity_decode($m[1]));
+            }
+            if (preg_match('/<(?:\w+:)?Correcao>([^<]+)</i', $chunk, $m)) {
+                $correcao = trim(html_entity_decode($m[1]));
             }
         }
 
-        $codigo = $this->tagValor($xml, 'Codigo') ?? '';
-        $mensagem = $this->tagValor($xml, 'Mensagem')
-            ?? $this->tagValor($xml, 'Descricao')
-            ?? '';
+        if ($codigo === '' && $mensagem === '') {
+            $codigo = $this->tagValor($xml, 'Codigo') ?? '';
+            $mensagem = $this->tagValor($xml, 'Mensagem')
+                ?? $this->tagValor($xml, 'Descricao')
+                ?? '';
+            $correcao = $this->tagValor($xml, 'Correcao') ?? '';
+        }
 
-        // Situação "4" etc. sem mensagem útil
         if ($mensagem === '' && preg_match('/ainda|aguard|processando|em processamento/i', $xml)) {
             $mensagem = 'Lote ainda não processado.';
+        }
+
+        if ($correcao !== '' && $mensagem !== '' && ! str_contains(mb_strtolower($mensagem), mb_strtolower($correcao))) {
+            $mensagem = rtrim($mensagem, '.').'. '.$correcao;
+        } elseif ($mensagem === '' && $correcao !== '') {
+            $mensagem = $correcao;
+        }
+
+        // E160 costuma ser genérico: deixa o código visível para o usuário.
+        if ($codigo !== '' && $mensagem !== '' && ! str_contains($mensagem, $codigo)) {
+            $mensagem = '['.$codigo.'] '.$mensagem;
         }
 
         return [$codigo, $mensagem];

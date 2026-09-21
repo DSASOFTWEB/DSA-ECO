@@ -89,7 +89,8 @@ class NfseMunicipalCatalogTest extends TestCase
         );
 
         $this->assertStringContainsString('InfDeclaracaoPrestacaoServico', $montado['rps']);
-        $this->assertStringContainsString('<ItemListaServico>9.01</ItemListaServico>', $montado['rps']);
+        $this->assertStringContainsString('<ItemListaServico>09.01.05</ItemListaServico>', $montado['rps']);
+        $this->assertStringContainsString('Id="Dec_421"', $montado['rps']);
         $this->assertStringContainsString('<CodigoTributacaoMunicipio>010</CodigoTributacaoMunicipio>', $montado['rps']);
         $this->assertStringContainsString('<Discriminacao>Hospedagem teste</Discriminacao>', $montado['rps']);
         $this->assertStringContainsString('<CodigoMunicipio>2704302</CodigoMunicipio>', $montado['rps']);

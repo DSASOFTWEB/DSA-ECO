@@ -96,6 +96,7 @@ class NfseMunicipalCatalogTest extends TestCase
         $this->assertStringContainsString('<CodigoMunicipio>2704302</CodigoMunicipio>', $montado['rps']);
         // Dividir100: 5% → 0.0500
         $this->assertStringContainsString('<Aliquota>0.0500</Aliquota>', $montado['rps']);
+        $this->assertStringContainsString('<trib><totTrib><pTotTribSN>0.00</pTotTribSN></totTrib></trib>', $montado['rps']);
     }
 
     public function test_erro_indica_processando(): void

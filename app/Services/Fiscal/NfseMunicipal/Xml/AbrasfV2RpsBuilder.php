@@ -76,9 +76,17 @@ class AbrasfV2RpsBuilder
 
         $optanteSn = in_array($empresa->regime_tributario, [Empresa::REGIME_SIMPLES, Empresa::REGIME_SIMPLES_EXCESSO, Empresa::REGIME_MEI], true) ? '1' : '2';
 
+        // Schema portal 2.4 (05/2026) + exemplos GISS: grupo trib/totTrib no Valores.
+        // indTotTrib=0 = não informar estimativa (Dec. 8.264/2014); SN usa pTotTribSN.
+        $totTrib = $optanteSn === '1'
+            ? '<pTotTribSN>0.00</pTotTribSN>'
+            : '<indTotTrib>0</indTotTrib>';
+        $trib = '<trib><totTrib>'.$totTrib.'</totTrib></trib>';
+
         $valores = '<Valores>'
             .'<ValorServicos>'.$this->money($valor).'</ValorServicos>'
             .($aliqXml > 0 ? '<Aliquota>'.$this->money($aliqXml, 4).'</Aliquota>' : '')
+            .$trib
             .'</Valores>';
 
         $servico = '<Servico>'

@@ -1,24 +1,8 @@
-Schemas XSD GISS ABRASF 2.04
-============================
+Schemas XSD GISS ABRASF 2.04 (portal vigente - Servicos Prestados)
+Fonte: https://dev.giss.com.br/giss-ajuda/desenvolvedores.html
+Pacote: Schemas_XSD-Servicos_Prestados.rar
+Versao do Schema: 2.4 | Ultima atualizacao portal: 05/05/2026
+Sincronizado em: 2026-09-21
 
-Pasta padrao lida pelo sistema (NAO precisa copiar para outro lugar):
-
-  storage/SchemasXSDgiss/
-
-Arquivos obrigatorios:
-  - tipos-v2_04.xsd
-  - enviar-lote-rps-envio-v2_04.xsd
-  - consultar-lote-rps-envio-v2_04.xsd
-  - cabecalho-v2_04.xsd
-  - xmldsig-core-schema20020212.xsd
-
-Config opcional no .env:
-  NFSE_GISS_SCHEMAS_PATH=/caminho/absoluto/SchemasXSDgiss
-  NFSE_GISS_VALIDAR_SCHEMA=true
-
-No Docker: a pasta deve existir DENTRO do container em
-  /var/www/html/storage/SchemasXSDgiss
-(rebuild da imagem ou docker compose cp).
-
-A mensagem "Arquivo em desacordo com o XML Schema" vem da PREFEITURA (GISS)
-ao validar o XML enviado — nao significa que a pasta de XSD esta vazia.
+Arquivo critico: tipos-v2_04.xsd (namespace http://www.giss.com.br/tipos-v2_04.xsd)
+Validacao local: parque.nfse_giss_schemas_path -> storage/SchemasXSDgiss

@@ -242,20 +242,20 @@ class AbrasfV2RpsBuilder
     }
 
     /**
-     * LC 116 → ItemListaServico ABRASF (espelho ACBr NormatizarItemServico).
-     * Ex.: 09.01.05 → 09.01.05; 9.01 → 09.01; 901 → 09.01.
+     * LC 116 → ItemListaServico GISS (tipos-v2_04 enumeration XX.XX com zero à esquerda).
+     * Ex.: 8.02 / 802 → 08.02; 09.01.05 / 090105 → 09.01.
      */
     protected function itemListaServico(string $lc116): string
     {
-        $digitos = preg_replace('/\D+/', '', trim($lc116)) ?: '0';
+        $raw = preg_replace('/\D+/', '', trim($lc116)) ?: '0';
 
-        if (strlen($digitos) >= 5) {
-            $digitos = str_pad((string) (int) $digitos, 6, '0', STR_PAD_LEFT);
-
-            return substr($digitos, 0, 2).'.'.substr($digitos, 2, 2).'.'.substr($digitos, 4, 2);
+        // Enumeração do portal só aceita item.subitem (4 dígitos). Ignora o 3º nível LC116.
+        if (strlen($raw) >= 5) {
+            $raw = str_pad((string) (int) $raw, 6, '0', STR_PAD_LEFT);
+            $digitos = substr($raw, 0, 4);
+        } else {
+            $digitos = str_pad((string) (int) $raw, 4, '0', STR_PAD_LEFT);
         }
-
-        $digitos = str_pad((string) (int) $digitos, 4, '0', STR_PAD_LEFT);
 
         return substr($digitos, 0, 2).'.'.substr($digitos, 2, 2);
     }

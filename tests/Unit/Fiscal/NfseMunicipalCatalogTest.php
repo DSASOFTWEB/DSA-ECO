@@ -89,7 +89,7 @@ class NfseMunicipalCatalogTest extends TestCase
         );
 
         $this->assertStringContainsString('InfDeclaracaoPrestacaoServico', $montado['rps']);
-        $this->assertStringContainsString('<ItemListaServico>09.01.05</ItemListaServico>', $montado['rps']);
+        $this->assertStringContainsString('<ItemListaServico>09.01</ItemListaServico>', $montado['rps']);
         $this->assertStringContainsString('Id="Dec_421"', $montado['rps']);
         $this->assertStringContainsString('<CodigoTributacaoMunicipio>010</CodigoTributacaoMunicipio>', $montado['rps']);
         $this->assertStringContainsString('<Discriminacao>Hospedagem teste</Discriminacao>', $montado['rps']);
@@ -97,6 +97,19 @@ class NfseMunicipalCatalogTest extends TestCase
         // Dividir100: 5% → 0.0500
         $this->assertStringContainsString('<Aliquota>0.0500</Aliquota>', $montado['rps']);
         $this->assertStringContainsString('<trib><totTrib><pTotTribSN>0.00</pTotTribSN></totTrib></trib>', $montado['rps']);
+    }
+
+    public function test_item_lista_servico_respeita_enumeration_giss_com_zero(): void
+    {
+        $builder = app(AbrasfV2RpsBuilder::class);
+        $ref = new \ReflectionMethod($builder, 'itemListaServico');
+        $ref->setAccessible(true);
+
+        $this->assertSame('08.02', $ref->invoke($builder, '8.02'));
+        $this->assertSame('08.02', $ref->invoke($builder, '08.02'));
+        $this->assertSame('08.02', $ref->invoke($builder, '802'));
+        $this->assertSame('09.01', $ref->invoke($builder, '09.01.05'));
+        $this->assertSame('09.01', $ref->invoke($builder, '9.01'));
     }
 
     public function test_erro_indica_processando(): void

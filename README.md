@@ -261,6 +261,11 @@ docs/DEPLOY-VPS.md      Guia espelhado da seção Deploy na VPS
 docs/DEPLOY-EASYPANEL-TRAEFIK.md  EasyPanel em 80/443; app em :9080
 ```
 
+## Deploy na LOCAL (DEV)
+docker compose exec -T app php artisan config:clear
+docker compose up -d --build app
+
+
 ## Deploy na VPS (produção)
 
 Publicação com **Docker Compose** na **porta 9080**. EasyPanel continua em 80/443 — não alterar.

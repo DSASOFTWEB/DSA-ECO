@@ -38,7 +38,7 @@ class MensalidadeService
         $competencia = $referencia->copy()->startOfMonth();
         $geradas = 0;
 
-        foreach ($this->contratos->ativosComVencimentoNoDia($dia) as $contrato) {
+        foreach ($this->contratos->ativosComVencimentoNoDia($dia, $referencia) as $contrato) {
             try {
                 $mensalidade = $this->gerarParaContrato($contrato, $competencia);
                 $geradas += $mensalidade->wasRecentlyCreated ? 1 : 0;
@@ -80,6 +80,7 @@ class MensalidadeService
             return $this->mensalidades->create([
                 'contrato_id' => $contrato->id,
                 'empresa_id' => $contrato->empresa_id,
+                'tipo' => 'mensalidade',
                 'competencia' => $competencia->toDateString(),
                 'valor_original' => $valorOriginal,
                 'desconto' => $desconto,
@@ -89,6 +90,65 @@ class MensalidadeService
                 'status' => 'pendente',
             ]);
         });
+    }
+
+    /**
+     * Registra a caução como cobrança de entrada, separada das mensalidades
+     * recorrentes. A constraint contrato+competência+tipo mantém a operação
+     * idempotente sem impedir que caução e mensalidade caiam no mesmo mês.
+     */
+    public function gerarCaucaoParaContrato(Contrato $contrato): Mensalidade
+    {
+        $competencia = $contrato->data_inicio->copy()->startOfMonth();
+        $existente = $this->mensalidades->porContratoECompetencia($contrato->id, $competencia, 'caucao');
+
+        if ($existente) {
+            return $existente;
+        }
+
+        return $this->mensalidades->create([
+            'contrato_id' => $contrato->id,
+            'empresa_id' => $contrato->empresa_id,
+            'tipo' => 'caucao',
+            'competencia' => $competencia->toDateString(),
+            'valor_original' => $contrato->valor_caucao,
+            'desconto' => 0,
+            'acrescimo' => 0,
+            'valor_total' => $contrato->valor_caucao,
+            'data_vencimento' => $contrato->data_inicio->toDateString(),
+            'status' => 'pendente',
+            'observacoes' => 'Caução de entrada do contrato.',
+        ]);
+    }
+
+    public function gerarPrimeiraMensalidade(Contrato $contrato): Mensalidade
+    {
+        $vencimento = $contrato->primeiro_vencimento
+            ? $contrato->primeiro_vencimento->copy()->startOfDay()
+            : $contrato->data_inicio->copy()->addDays(30)->startOfDay();
+        $competencia = $vencimento->copy()->startOfMonth();
+        $existente = $this->mensalidades->porContratoECompetencia($contrato->id, $competencia);
+
+        if ($existente) {
+            return $existente;
+        }
+
+        $valorOriginal = (float) $contrato->valor_mensal;
+        $desconto = round($valorOriginal * ((float) $contrato->desconto_percentual / 100), 2);
+
+        return $this->mensalidades->create([
+            'contrato_id' => $contrato->id,
+            'empresa_id' => $contrato->empresa_id,
+            'tipo' => 'mensalidade',
+            'competencia' => $competencia->toDateString(),
+            'valor_original' => $valorOriginal,
+            'desconto' => $desconto,
+            'acrescimo' => 0,
+            'valor_total' => $valorOriginal - $desconto,
+            'data_vencimento' => $vencimento->toDateString(),
+            'status' => 'pendente',
+            'observacoes' => 'Primeira mensalidade do contrato.',
+        ]);
     }
 
     /**
@@ -108,8 +168,22 @@ class MensalidadeService
         $hoje = now()->startOfDay();
 
         foreach ($abertas as $mensalidade) {
+            if ($mensalidade->ehCaucao()) {
+                $mensalidade->update([
+                    'valor_original' => $contrato->valor_caucao,
+                    'desconto' => 0,
+                    'valor_total' => $contrato->valor_caucao,
+                ]);
+
+                continue;
+            }
+
             $competencia = $mensalidade->competencia->copy()->startOfMonth();
-            $vencimento = $competencia->copy()->day(min((int) $contrato->dia_vencimento, $competencia->daysInMonth));
+            $ehPrimeira = $contrato->primeiro_vencimento
+                && $competencia->isSameMonth($contrato->primeiro_vencimento);
+            $vencimento = $ehPrimeira
+                ? $contrato->primeiro_vencimento->copy()
+                : $competencia->copy()->day(min((int) $contrato->dia_vencimento, $competencia->daysInMonth));
 
             $status = $mensalidade->status;
             if ($status === 'atrasado' && $vencimento->gte($hoje)) {
@@ -208,5 +282,42 @@ class MensalidadeService
             ->where('status', 'pendente')
             ->whereDate('data_vencimento', '>=', now()->toDateString())
             ->update(['status' => 'cancelado']);
+    }
+
+    public function prorrogarProximaMensalidade(Contrato $contrato, Carbon $novaData): Mensalidade
+    {
+        return DB::transaction(function () use ($contrato, $novaData) {
+            $mensalidade = $contrato->mensalidades()
+                ->where('tipo', 'mensalidade')
+                ->whereIn('status', ['pendente', 'atrasado'])
+                ->orderBy('data_vencimento')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $mensalidade) {
+                throw new \App\Exceptions\NegocioException('Este contrato não possui mensalidade aberta para prorrogar.');
+            }
+
+            if ($novaData->startOfDay()->lte($mensalidade->data_vencimento->startOfDay())) {
+                throw new \App\Exceptions\NegocioException('A nova data precisa ser posterior ao vencimento atual.');
+            }
+
+            $primeiraMensalidadeId = $contrato->mensalidades()
+                ->where('tipo', 'mensalidade')
+                ->oldest('id')
+                ->value('id');
+
+            $mensalidade->update([
+                'data_vencimento' => $novaData->toDateString(),
+                'status' => 'pendente',
+                'observacoes' => trim(($mensalidade->observacoes ? $mensalidade->observacoes.' ' : '').'Vencimento prorrogado em '.now()->format('d/m/Y').'.'),
+            ]);
+
+            if ($mensalidade->id === $primeiraMensalidadeId) {
+                $contrato->update(['primeiro_vencimento' => $novaData->toDateString()]);
+            }
+
+            return $mensalidade->fresh();
+        });
     }
 }

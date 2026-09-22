@@ -302,17 +302,40 @@
                     </label>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">WS usuário (municipal)</label>
-                    <input type="text" name="nfse_ws_user" value="{{ old('nfse_ws_user', $empresa->nfse_ws_user) }}" maxlength="120" autocomplete="off" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Opcional — GISS usa certificado">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">WS senha (municipal)</label>
-                    <input type="password" name="nfse_ws_senha" value="{{ old('nfse_ws_senha') }}" autocomplete="off" placeholder="{{ $empresa->nfse_ws_senha ? '•••••••• (já configurada)' : 'Opcional' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">WS chave acesso</label>
-                    <input type="text" name="nfse_ws_chave_acesso" value="{{ old('nfse_ws_chave_acesso', $empresa->nfse_ws_chave_acesso) }}" maxlength="255" autocomplete="off" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Opcional">
+                <div class="sm:col-span-3" x-data="{ auth: '{{ old('nfse_auth_mode', $empresa->nfse_auth_mode ?? 'certificado') }}' }">
+                    <label class="block text-sm font-medium text-slate-700">Autenticação NFS-e municipal</label>
+                    <p class="mt-1 text-xs text-slate-400">
+                        GISS (Maceió) usa certificado digital A1 para assinar o XML e no mTLS.
+                        Alguns provedores também pedem usuário/senha do portal — escolha abaixo.
+                    </p>
+                    <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:gap-6">
+                        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                            <input type="radio" name="nfse_auth_mode" value="certificado" x-model="auth" class="h-4 w-4 border-gray-300 text-brand-600" @checked(old('nfse_auth_mode', $empresa->nfse_auth_mode ?? 'certificado') === 'certificado')>
+                            Via certificado digital A1
+                        </label>
+                        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                            <input type="radio" name="nfse_auth_mode" value="usuario_senha" x-model="auth" class="h-4 w-4 border-gray-300 text-brand-600" @checked(old('nfse_auth_mode', $empresa->nfse_auth_mode ?? '') === 'usuario_senha')>
+                            Via usuário e senha do portal
+                        </label>
+                    </div>
+                    @error('nfse_auth_mode')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+
+                    <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-3" x-show="auth === 'usuario_senha'" x-cloak>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Usuário do portal</label>
+                            <input type="text" name="nfse_ws_user" value="{{ old('nfse_ws_user', $empresa->nfse_ws_user) }}" maxlength="120" autocomplete="off" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Login do webservice / portal">
+                            @error('nfse_ws_user')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Senha do portal</label>
+                            <input type="password" name="nfse_ws_senha" value="{{ old('nfse_ws_senha') }}" autocomplete="off" placeholder="{{ $empresa->nfse_ws_senha ? '•••••••• (já configurada)' : 'Senha do portal' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            @error('nfse_ws_senha')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Chave de acesso</label>
+                            <input type="text" name="nfse_ws_chave_acesso" value="{{ old('nfse_ws_chave_acesso', $empresa->nfse_ws_chave_acesso) }}" maxlength="255" autocomplete="off" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Opcional">
+                        </div>
+                    </div>
                 </div>
 
                 <div class="sm:col-span-2">

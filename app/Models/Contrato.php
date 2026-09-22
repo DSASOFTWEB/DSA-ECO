@@ -18,16 +18,18 @@ class Contrato extends Model
 
     protected $fillable = [
         'empresa_id', 'unidade_id', 'cliente_id', 'plano_id', 'vendedor_id',
-        'numero_contrato', 'data_inicio', 'data_fim', 'dia_vencimento',
-        'valor_mensal', 'desconto_percentual', 'status', 'motivo_cancelamento', 'cancelado_em', 'reativado_em',
+        'numero_contrato', 'data_inicio', 'data_fim', 'dia_vencimento', 'primeiro_vencimento',
+        'valor_mensal', 'valor_caucao', 'desconto_percentual', 'status', 'motivo_cancelamento', 'cancelado_em', 'reativado_em',
     ];
 
     protected $casts = [
         'data_inicio' => 'date',
         'data_fim' => 'date',
+        'primeiro_vencimento' => 'date',
         'cancelado_em' => 'datetime',
         'reativado_em' => 'datetime',
         'valor_mensal' => 'decimal:2',
+        'valor_caucao' => 'decimal:2',
         'desconto_percentual' => 'decimal:2',
         'dia_vencimento' => 'integer',
     ];

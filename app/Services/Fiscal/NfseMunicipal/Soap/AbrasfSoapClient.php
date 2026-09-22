@@ -6,12 +6,13 @@ use App\Exceptions\IntegrationException;
 use Illuminate\Support\Facades\Http;
 
 /**
- * Cliente SOAP 1.1 ABRASF (nfseCabecMsg + nfseDadosMsg) com mTLS.
+ * Cliente SOAP 1.1 ABRASF (nfseCabecMsg + nfseDadosMsg) com mTLS e/ou Basic Auth.
  */
 class AbrasfSoapClient
 {
     /**
-     * @param  array{cert:string,key:string}  $pem
+     * @param  array{cert?:string,key?:string}|null  $pem  PEM para mTLS (certificado A1)
+     * @param  array{user?:string,password?:string}|null  $basicAuth  Usuário/senha do portal
      */
     public function chamar(
         string $url,
@@ -19,7 +20,8 @@ class AbrasfSoapClient
         string $requestElement,
         string $cabecalho,
         string $dadosMsg,
-        array $pem,
+        ?array $pem = null,
+        ?array $basicAuth = null,
     ): string {
         // GISS valida o XML interno: declaração XML dentro de nfseDadosMsg gera E160.
         $cabecEsc = htmlspecialchars($this->semDeclaracaoXml($cabecalho), ENT_XML1 | ENT_COMPAT, 'UTF-8');
@@ -38,18 +40,26 @@ class AbrasfSoapClient
             .'</soapenv:Body>'
             .'</soapenv:Envelope>';
 
-        $response = Http::timeout(90)
+        $pending = Http::timeout(90)
             ->withHeaders([
                 'Content-Type' => 'text/xml; charset=utf-8',
                 'SOAPAction' => $soapAction,
-            ])
-            ->withOptions([
-                'cert' => $pem['cert'],
-                'ssl_key' => [$pem['key'], ''],
-                'verify' => true,
-            ])
-            ->withBody($body, 'text/xml; charset=utf-8')
-            ->post($url);
+            ]);
+
+        $options = ['verify' => true];
+        if (is_array($pem) && ! empty($pem['cert']) && ! empty($pem['key'])) {
+            $options['cert'] = $pem['cert'];
+            $options['ssl_key'] = [$pem['key'], ''];
+        }
+        $pending = $pending->withOptions($options);
+
+        $user = trim((string) ($basicAuth['user'] ?? ''));
+        $pass = (string) ($basicAuth['password'] ?? '');
+        if ($user !== '') {
+            $pending = $pending->withBasicAuth($user, $pass);
+        }
+
+        $response = $pending->withBody($body, 'text/xml; charset=utf-8')->post($url);
 
         $xml = $response->body();
         if (! $response->successful() && trim($xml) === '') {
@@ -80,7 +90,6 @@ class AbrasfSoapClient
             }
         }
 
-        // Alguns provedores devolvem a resposta já como XML filho.
         foreach (['EnviarLoteRpsResposta', 'ConsultarLoteRpsResposta'] as $tag) {
             if (preg_match('/<'.$tag.'\b[^>]*>.*<\/'.$tag.'>/is', $soapXml, $m)) {
                 return $m[0];

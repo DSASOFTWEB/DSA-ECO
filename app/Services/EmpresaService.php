@@ -35,7 +35,7 @@ class EmpresaService
             'numero_ultima_nfe_producao', 'numero_ultima_nfe_homologacao',
             'numero_ultima_nfce_producao', 'numero_ultima_nfce_homologacao',
             'numero_ultima_nfse',
-            'nfse_provider', 'nfse_nacional_habilitado',
+            'nfse_provider', 'nfse_auth_mode', 'nfse_nacional_habilitado',
             'token_nfse', 'token_ibpt', 'bluesoft_token',
             'nfse_ws_user', 'nfse_ws_senha', 'nfse_ws_chave_acesso',
             'certificado_senha',

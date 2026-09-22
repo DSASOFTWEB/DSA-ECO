@@ -8,6 +8,7 @@ use App\Models\Dependente;
 use App\Services\ClienteService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class DependenteController extends Controller
 {
@@ -21,7 +22,7 @@ class DependenteController extends Controller
             'nome' => ['required', 'string', 'max:255'],
             'cpf' => ['nullable', 'string', 'max:14'],
             'data_nascimento' => ['required', 'date'],
-            'parentesco' => ['nullable', 'string', 'max:40'],
+            'parentesco' => ['required', 'string', 'max:40', Rule::in(Dependente::niveisParentesco())],
         ]);
 
         $this->clienteService->adicionarDependente($cliente, $dados);

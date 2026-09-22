@@ -52,17 +52,31 @@ class ContratoService
         $dependentesIds = $dados['dependentes'] ?? [];
         unset($dados['dependentes']);
 
+        $agendamentoPrimeiroVencimento = $dados['agendamento_primeiro_vencimento'] ?? '30_dias';
+        unset($dados['agendamento_primeiro_vencimento']);
+
         if ($plano->max_dependentes < count($dependentesIds)) {
             throw new NegocioException("O plano \"{$plano->nome}\" permite no máximo {$plano->max_dependentes} dependente(s).");
         }
 
-        return DB::transaction(function () use ($dados, $plano, $cliente, $dependentesIds) {
+        return DB::transaction(function () use ($dados, $plano, $cliente, $dependentesIds, $agendamentoPrimeiroVencimento) {
             // empresa_id vem sempre do cliente (fonte da verdade), nunca de
             // preenchimento implícito via usuário autenticado — assim o
             // contrato fica correto mesmo criado fora de um contexto HTTP
             // (ex.: importação em lote, comando artisan, teste automatizado).
             $dados['empresa_id'] = $cliente->empresa_id;
             $dados['valor_mensal'] = $dados['valor_mensal'] ?? $plano->valor;
+            $dados['valor_caucao'] = $dados['valor_caucao'] ?? $dados['valor_mensal'];
+            $dataInicio = Carbon::parse($dados['data_inicio'])->startOfDay();
+            $primeiroVencimento = $agendamentoPrimeiroVencimento === 'data_escolhida' && ! empty($dados['primeiro_vencimento'])
+                ? Carbon::parse($dados['primeiro_vencimento'])->startOfDay()
+                : $dataInicio->copy()->addDays(30);
+
+            if ($primeiroVencimento->lte($dataInicio)) {
+                throw new NegocioException('O primeiro pagamento deve ser posterior à data de início.');
+            }
+
+            $dados['primeiro_vencimento'] = $primeiroVencimento->toDateString();
             $dados['numero_contrato'] = $this->gerarNumeroContrato();
             $dados['status'] = 'ativo';
 
@@ -72,8 +86,8 @@ class ContratoService
                 $contrato->dependentes()->sync($dependentesIds);
             }
 
-            $competencia = Carbon::parse($contrato->data_inicio)->startOfMonth();
-            $this->mensalidadeService->gerarParaContrato($contrato, $competencia);
+            $this->mensalidadeService->gerarCaucaoParaContrato($contrato);
+            $this->mensalidadeService->gerarPrimeiraMensalidade($contrato);
 
             $this->carteirinhaService->emitirParaCliente($contrato->cliente);
             foreach ($contrato->dependentes as $dependente) {
@@ -93,6 +107,27 @@ class ContratoService
         }
 
         return DB::transaction(function () use ($contrato, $dados) {
+            $caucaoPaga = $contrato->mensalidades()
+                ->where('tipo', 'caucao')
+                ->where('status', 'pago')
+                ->exists();
+
+            if ($caucaoPaga && isset($dados['valor_caucao']) && (float) $dados['valor_caucao'] !== (float) $contrato->valor_caucao) {
+                throw new NegocioException('A caução já foi paga e não pode ter o valor alterado.');
+            }
+
+            $primeiraMensalidadePaga = $contrato->mensalidades()
+                ->where('tipo', 'mensalidade')
+                ->oldest('id')
+                ->first()?->estaPaga() ?? false;
+
+            if (
+                $primeiraMensalidadePaga
+                && isset($dados['primeiro_vencimento'])
+                && Carbon::parse($dados['primeiro_vencimento'])->toDateString() !== $contrato->primeiro_vencimento?->toDateString()
+            ) {
+                throw new NegocioException('A primeira mensalidade já foi paga e seu vencimento não pode ser alterado.');
+            }
             if (isset($dados['plano_id']) && (int) $dados['plano_id'] !== (int) $contrato->plano_id) {
                 $plano = Plano::findOrFail($dados['plano_id']);
 
@@ -126,6 +161,20 @@ class ContratoService
 
             return $contrato->fresh(['cliente', 'plano', 'unidade', 'mensalidades']);
         });
+    }
+
+    public function prorrogar(Contrato $contrato, string $novaDataVencimento): Contrato
+    {
+        if (! $contrato->estaAtivo()) {
+            throw new NegocioException('Somente contratos ativos podem ter cobranças prorrogadas.');
+        }
+
+        $this->mensalidadeService->prorrogarProximaMensalidade(
+            $contrato,
+            Carbon::parse($novaDataVencimento)->startOfDay(),
+        );
+
+        return $contrato->fresh(['mensalidades']);
     }
 
     public function cancelar(Contrato $contrato, string $motivo): Contrato

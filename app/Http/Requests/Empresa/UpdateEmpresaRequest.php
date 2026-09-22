@@ -66,9 +66,16 @@ class UpdateEmpresaRequest extends FormRequest
             'numero_ultima_nfce_homologacao' => ['required', 'integer', 'min:0'],
             'numero_ultima_nfse' => ['required', 'integer', 'min:0'],
             'nfse_provider' => ['required', Rule::in(['nacional_gov', 'integranotas', 'municipio'])],
+            'nfse_auth_mode' => ['required', Rule::in(array_keys(Empresa::nfseAuthModes()))],
             'nfse_nacional_habilitado' => ['boolean'],
             'token_nfse' => ['nullable', 'string', 'max:2000'],
-            'nfse_ws_user' => ['nullable', 'string', 'max:120'],
+            'nfse_ws_user' => [
+                'nullable',
+                'string',
+                'max:120',
+                Rule::requiredIf(fn () => $this->input('nfse_provider') === 'municipio'
+                    && $this->input('nfse_auth_mode') === Empresa::NFSE_AUTH_USUARIO_SENHA),
+            ],
             'nfse_ws_senha' => ['nullable', 'string', 'max:255'],
             'nfse_ws_chave_acesso' => ['nullable', 'string', 'max:255'],
             'token_ibpt' => ['nullable', 'string', 'max:120'],
@@ -85,6 +92,7 @@ class UpdateEmpresaRequest extends FormRequest
         $this->merge([
             'impressao_auto_imprimir' => $this->boolean('impressao_auto_imprimir'),
             'nfse_nacional_habilitado' => $this->boolean('nfse_nacional_habilitado'),
+            'nfse_auth_mode' => $this->input('nfse_auth_mode', Empresa::NFSE_AUTH_CERTIFICADO),
             'cnae' => preg_replace('/\D+/', '', (string) $this->input('cnae', '')) ?: null,
             'aut_xml' => preg_replace('/\D+/', '', (string) $this->input('aut_xml', '')) ?: null,
             'codigo_municipio_ibge' => preg_replace('/\D+/', '', (string) $this->input('codigo_municipio_ibge', '')) ?: null,

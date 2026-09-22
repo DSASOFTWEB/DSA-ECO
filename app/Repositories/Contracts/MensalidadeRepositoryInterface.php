@@ -10,5 +10,5 @@ interface MensalidadeRepositoryInterface extends RepositoryInterface
 
     public function atrasadas(): Collection;
 
-    public function porContratoECompetencia(int $contratoId, \DateTimeInterface $competencia): ?\App\Models\Mensalidade;
+    public function porContratoECompetencia(int $contratoId, \DateTimeInterface $competencia, string $tipo = 'mensalidade'): ?\App\Models\Mensalidade;
 }

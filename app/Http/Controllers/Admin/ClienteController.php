@@ -74,9 +74,26 @@ class ClienteController extends Controller
     {
         $this->authorize('view', $cliente);
 
-        $cliente->load(['dependentes.carteirinha', 'contratos.plano', 'carteirinha', 'unidade']);
+        $cliente->load([
+            'dependentes.carteirinha',
+            'contratos' => fn ($q) => $q->latest('data_inicio'),
+            'contratos.plano',
+            'contratos.mensalidades' => fn ($q) => $q->orderByDesc('competencia')->orderByDesc('data_vencimento'),
+            'carteirinha',
+            'unidade',
+            'contratoAtivo.plano',
+        ]);
 
-        return view('clientes.show', compact('cliente'));
+        $historicoPagamentos = $cliente->contratos
+            ->flatMap(fn ($contrato) => $contrato->mensalidades->map(function ($mensalidade) use ($contrato) {
+                $mensalidade->setRelation('contrato', $contrato);
+
+                return $mensalidade;
+            }))
+            ->sortByDesc(fn ($m) => $m->competencia?->format('Y-m-d').'|'.$m->data_vencimento?->format('Y-m-d'))
+            ->values();
+
+        return view('clientes.show', compact('cliente', 'historicoPagamentos'));
     }
 
     public function edit(Cliente $cliente): View

@@ -12,9 +12,14 @@ use NFePHP\Common\Signer;
  * Assinatura XMLDSig para GISS: o Signer do NFePHP ignora nova assinatura
  * se já existir qualquer <Signature> (ex.: RPS dentro do lote). Aqui forçamos
  * assinar a tag pedida mesmo com assinaturas prévias.
+ *
+ * Importante: NÃO clonar o nó antes do C14N — em PHP o clone perde o
+ * namespace herdado e o digest vira o SHA-1 de string vazia (E172 no GISS).
  */
 class NfseXmlAssinador
 {
+    private const NS_DSIG = 'http://www.w3.org/2000/09/xmldsig#';
+
     /**
      * @param  array{algorithm?:int,canonical?:array,rootname?:string}  $opcoes
      */
@@ -51,17 +56,18 @@ class NfseXmlAssinador
             throw new NegocioException("Atributo {$mark} ausente em {$tagName} para assinatura.");
         }
 
-        // Se esta tag já tem Signature filha direta, remove para reassinar.
+        // URI "#Id" exige atributo tipado como ID no DOM.
+        $node->setIdAttribute($mark, true);
+
+        // Remove Signature filha do root cujo Reference aponta para este Id.
+        $id = '#'.$node->getAttribute($mark);
         foreach (iterator_to_array($root->childNodes) as $child) {
-            if ($child instanceof DOMElement && $child->localName === 'Signature' && $child->parentNode === $root) {
-                // Mantém assinaturas de outros nós (RPS); só evita duplicar no root atual
-                // quando URI aponta para o mesmo Id — removemos Signature cujo Reference URI casa.
-                $id = '#'.$node->getAttribute($mark);
-                $refs = $child->getElementsByTagName('Reference');
-                $ref = $refs->item(0);
-                if ($ref && $ref->getAttribute('URI') === $id) {
-                    $root->removeChild($child);
-                }
+            if (! $child instanceof DOMElement || $child->localName !== 'Signature') {
+                continue;
+            }
+            $ref = $child->getElementsByTagName('Reference')->item(0);
+            if ($ref && $ref->getAttribute('URI') === $id) {
+                $root->removeChild($child);
             }
         }
 
@@ -73,8 +79,6 @@ class NfseXmlAssinador
     }
 
     /**
-     * Espelho de NFePHP\Common\Signer::createSignature (sempre acrescenta).
-     *
      * @param  array<int, mixed>  $canonical
      */
     protected function criarAssinatura(
@@ -86,7 +90,6 @@ class NfseXmlAssinador
         int $algorithm,
         array $canonical,
     ): void {
-        $nsDSIG = 'http://www.w3.org/2000/09/xmldsig#';
         $nsCannonMethod = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';
         $nsSignatureMethod = 'http://www.w3.org/2000/09/xmldsig#rsa-sha1';
         $nsDigestMethod = 'http://www.w3.org/2000/09/xmldsig#sha1';
@@ -98,54 +101,62 @@ class NfseXmlAssinador
         }
 
         $idSigned = trim($node->getAttribute($mark));
-        $canonicalNode = clone $node;
-        $c14n = $canonicalNode->C14N($canonical[0], $canonical[1]);
+        // Digest no próprio nó (não clonar): herda xmlns do ancestral.
+        $c14n = $node->C14N($canonical[0], $canonical[1], $canonical[2] ?? null, $canonical[3] ?? null);
         $digestValue = base64_encode(hash($digestAlgorithm, $c14n, true));
 
-        $signatureNode = $dom->createElementNS($nsDSIG, 'Signature');
+        // Prefixo ds: como nos exemplos oficiais GISS / XSD dsig:Signature.
+        $signatureNode = $dom->createElementNS(self::NS_DSIG, 'ds:Signature');
         $root->appendChild($signatureNode);
 
-        $signedInfoNode = $dom->createElement('SignedInfo');
+        $signedInfoNode = $dom->createElementNS(self::NS_DSIG, 'ds:SignedInfo');
         $signatureNode->appendChild($signedInfoNode);
 
-        $canonicalMethodNode = $dom->createElement('CanonicalizationMethod');
+        $canonicalMethodNode = $dom->createElementNS(self::NS_DSIG, 'ds:CanonicalizationMethod');
         $signedInfoNode->appendChild($canonicalMethodNode);
         $canonicalMethodNode->setAttribute('Algorithm', $nsCannonMethod);
 
-        $signatureMethodNode = $dom->createElement('SignatureMethod');
+        $signatureMethodNode = $dom->createElementNS(self::NS_DSIG, 'ds:SignatureMethod');
         $signedInfoNode->appendChild($signatureMethodNode);
         $signatureMethodNode->setAttribute('Algorithm', $nsSignatureMethod);
 
-        $referenceNode = $dom->createElement('Reference');
+        $referenceNode = $dom->createElementNS(self::NS_DSIG, 'ds:Reference');
         $signedInfoNode->appendChild($referenceNode);
         $referenceNode->setAttribute('URI', $idSigned !== '' ? '#'.$idSigned : '');
 
-        $transformsNode = $dom->createElement('Transforms');
+        $transformsNode = $dom->createElementNS(self::NS_DSIG, 'ds:Transforms');
         $referenceNode->appendChild($transformsNode);
-        $transf1 = $dom->createElement('Transform');
+
+        $transf1 = $dom->createElementNS(self::NS_DSIG, 'ds:Transform');
         $transformsNode->appendChild($transf1);
         $transf1->setAttribute('Algorithm', 'http://www.w3.org/2000/09/xmldsig#enveloped-signature');
-        $transf2 = $dom->createElement('Transform');
+
+        $transf2 = $dom->createElementNS(self::NS_DSIG, 'ds:Transform');
         $transformsNode->appendChild($transf2);
         $transf2->setAttribute('Algorithm', $nsCannonMethod);
 
-        $digestMethodNode = $dom->createElement('DigestMethod');
+        $digestMethodNode = $dom->createElementNS(self::NS_DSIG, 'ds:DigestMethod');
         $referenceNode->appendChild($digestMethodNode);
         $digestMethodNode->setAttribute('Algorithm', $nsDigestMethod);
 
-        $digestValueNode = $dom->createElement('DigestValue', $digestValue);
+        $digestValueNode = $dom->createElementNS(self::NS_DSIG, 'ds:DigestValue', $digestValue);
         $referenceNode->appendChild($digestValueNode);
 
-        $c14nSignedInfo = $signedInfoNode->C14N($canonical[0], $canonical[1]);
+        $c14nSignedInfo = $signedInfoNode->C14N($canonical[0], $canonical[1], $canonical[2] ?? null, $canonical[3] ?? null);
         $signatureValue = base64_encode($certificate->sign($c14nSignedInfo, $algorithm));
-        $signatureValueNode = $dom->createElement('SignatureValue', $signatureValue);
+
+        $signatureValueNode = $dom->createElementNS(self::NS_DSIG, 'ds:SignatureValue', $signatureValue);
         $signatureNode->appendChild($signatureValueNode);
 
-        $keyInfoNode = $dom->createElement('KeyInfo');
+        $keyInfoNode = $dom->createElementNS(self::NS_DSIG, 'ds:KeyInfo');
         $signatureNode->appendChild($keyInfoNode);
-        $x509DataNode = $dom->createElement('X509Data');
+        $x509DataNode = $dom->createElementNS(self::NS_DSIG, 'ds:X509Data');
         $keyInfoNode->appendChild($x509DataNode);
-        $x509CertificateNode = $dom->createElement('X509Certificate', $certificate->publicKey->unFormated());
+        $x509CertificateNode = $dom->createElementNS(
+            self::NS_DSIG,
+            'ds:X509Certificate',
+            $certificate->publicKey->unFormated()
+        );
         $x509DataNode->appendChild($x509CertificateNode);
     }
 

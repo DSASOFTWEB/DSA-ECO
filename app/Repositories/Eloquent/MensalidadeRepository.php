@@ -32,11 +32,12 @@ class MensalidadeRepository extends BaseRepository implements MensalidadeReposit
             ->get();
     }
 
-    public function porContratoECompetencia(int $contratoId, \DateTimeInterface $competencia): ?Mensalidade
+    public function porContratoECompetencia(int $contratoId, \DateTimeInterface $competencia, string $tipo = 'mensalidade'): ?Mensalidade
     {
         return $this->model
             ->where('contrato_id', $contratoId)
             ->whereDate('competencia', $competencia)
+            ->where('tipo', $tipo)
             ->first();
     }
 

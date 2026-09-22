@@ -24,7 +24,17 @@ class UpdateContratoRequest extends FormRequest
             'plano_id' => ['required', Rule::exists('planos', 'id')->where('empresa_id', $empresaId)],
             'dia_vencimento' => ['required', 'integer', 'between:1,28'],
             'valor_mensal' => ['nullable', 'numeric', 'min:0'],
+            'valor_caucao' => ['required', 'numeric', 'min:0.01'],
+            'primeiro_vencimento' => ['required', 'date', 'after:data_inicio'],
             'desconto_percentual' => ['nullable', 'numeric', 'between:0,100'],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        /** @var Contrato $contrato */
+        $contrato = $this->route('contrato');
+
+        $this->merge(['data_inicio' => $contrato->data_inicio->toDateString()]);
     }
 }

@@ -15,7 +15,7 @@ class Mensalidade extends Model
     use BelongsToTenant, HasFactory, LogsActivity;
 
     protected $fillable = [
-        'contrato_id', 'empresa_id', 'competencia', 'valor_original', 'desconto',
+        'contrato_id', 'empresa_id', 'tipo', 'competencia', 'valor_original', 'desconto',
         'acrescimo', 'valor_total', 'data_vencimento', 'data_pagamento', 'status',
         'forma_pagamento', 'gateway_transaction_id', 'observacoes',
     ];
@@ -63,6 +63,11 @@ class Mensalidade extends Model
     public function estaPaga(): bool
     {
         return $this->status === 'pago';
+    }
+
+    public function ehCaucao(): bool
+    {
+        return $this->tipo === 'caucao';
     }
 
     public function diasEmAtraso(): int

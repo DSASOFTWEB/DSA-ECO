@@ -57,7 +57,7 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
         $cabec = $this->builder->cabecalho();
         $this->validarSchema($cabec, 'cabecalho-v2_04.xsd');
 
-        $pem = $this->certificadoA1->arquivosTemporariosPem($empresa);
+        [$pem, $basicAuth, $limpar] = $this->credenciaisTransporte($empresa);
 
         try {
             $resposta = $this->soap->chamar(
@@ -67,6 +67,7 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
                 $cabec,
                 $loteAssinado,
                 $pem,
+                $basicAuth,
             );
 
             return $this->interpretarEnvio($resposta, $loteAssinado, $numeroLote, (string) $serie, (string) $numeroRps);
@@ -75,7 +76,7 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
         } catch (\Throwable $e) {
             return NfseMunicipalResultado::erro('Erro de comunicação GISS: '.$e->getMessage());
         } finally {
-            ($pem['limpar'])();
+            $limpar();
         }
     }
 
@@ -91,7 +92,7 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
         $consultaAssinada = $this->assinar($empresa, $consulta, 'ConsultarLoteRpsEnvio', 'Id', false);
         $this->validarSchema($consultaAssinada, 'consultar-lote-rps-envio-v2_04.xsd');
         $cabec = $this->builder->cabecalho();
-        $pem = $this->certificadoA1->arquivosTemporariosPem($empresa);
+        [$pem, $basicAuth, $limpar] = $this->credenciaisTransporte($empresa);
 
         try {
             $resposta = $this->soap->chamar(
@@ -101,6 +102,7 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
                 $cabec,
                 $consultaAssinada,
                 $pem,
+                $basicAuth,
             );
 
             return $this->interpretarConsulta($resposta, $protocolo, $numeroLote);
@@ -114,7 +116,7 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
         } catch (\Throwable $e) {
             return NfseMunicipalResultado::processando($protocolo, $numeroLote);
         } finally {
-            ($pem['limpar'])();
+            $limpar();
         }
     }
 
@@ -177,9 +179,11 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
         string $rootname = '',
     ): string {
         $cert = $this->certificadoA1->carregar($empresa);
+        $this->validarCnpjCertificado($empresa, $cert['certificate']);
         $xml = $this->garantirXmlUtf8($xml);
 
-        if (! $obrigatorio && ! preg_match('/<'.$tag.'\b[^>]*\b'.$idAttr.'=/i', $xml)) {
+        if (! $obrigatorio && ! preg_match('/<'.$tag.'\b[^>]*>\s*[^>]*\b'.$idAttr.'=/i', $xml)
+            && ! preg_match('/<'.$tag.'\b[^>]*\b'.$idAttr.'=/i', $xml)) {
             return $xml;
         }
 
@@ -196,6 +200,74 @@ class GissAbrasf204Provider implements NfseMunicipalProvider
                 return $xml;
             }
             throw new NegocioException('Falha ao assinar XML NFS-e municipal: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * GISS: assinatura XML sempre com A1; transporte mTLS e/ou Basic Auth conforme config.
+     *
+     * @return array{0:?array{cert:string,key:string},1:?array{user:string,password:string},2:callable}
+     */
+    protected function credenciaisTransporte(Empresa $empresa): array
+    {
+        $pem = null;
+        $limpar = static function (): void {};
+        $basicAuth = null;
+
+        $precisaCertTransporte = $empresa->usaAuthNfseCertificado() || $empresa->temCertificadoDigital();
+        if ($precisaCertTransporte && $empresa->temCertificadoDigital()) {
+            $tmp = $this->certificadoA1->arquivosTemporariosPem($empresa);
+            $pem = ['cert' => $tmp['cert'], 'key' => $tmp['key']];
+            $limpar = $tmp['limpar'];
+        }
+
+        if ($empresa->usaAuthNfseUsuarioSenha()) {
+            $user = trim((string) ($empresa->nfse_ws_user ?? ''));
+            $senha = (string) ($empresa->nfse_ws_senha ?? '');
+            if ($user === '') {
+                throw new NegocioException(
+                    'Informe o usuário e a senha do portal NFS-e municipal em Dados da empresa (modo usuário/senha).'
+                );
+            }
+            $basicAuth = ['user' => $user, 'password' => $senha];
+        }
+
+        if ($pem === null && $basicAuth === null) {
+            throw new NegocioException(
+                'Configure a autenticação NFS-e municipal: certificado A1 ou usuário/senha do portal.'
+            );
+        }
+
+        // GISS exige mTLS com certificado mesmo com login do portal.
+        if ($pem === null && $empresa->usaAuthNfseUsuarioSenha()) {
+            throw new NegocioException(
+                'O GISS exige certificado digital A1 para assinar e transmitir o XML, além do usuário/senha do portal.'
+            );
+        }
+
+        return [$pem, $basicAuth, $limpar];
+    }
+
+    protected function validarCnpjCertificado(Empresa $empresa, \NFePHP\Common\Certificate $certificate): void
+    {
+        $cnpjEmpresa = preg_replace('/\D+/', '', (string) $empresa->cnpj);
+        if (strlen((string) $cnpjEmpresa) !== 14) {
+            return;
+        }
+
+        $cnpjCert = preg_replace('/\D+/', '', (string) ($certificate->publicKey->cnpj() ?? ''));
+        if ($cnpjCert === '' || strlen($cnpjCert) < 8) {
+            return;
+        }
+
+        // Aceita CNPJ do estabelecimento ou mesma raiz (matriz/filial).
+        $raizEmpresa = substr($cnpjEmpresa, 0, 8);
+        $raizCert = substr($cnpjCert, 0, 8);
+        if ($cnpjCert !== $cnpjEmpresa && $raizCert !== $raizEmpresa) {
+            throw new NegocioException(
+                'E172: o CNPJ do certificado digital ('.$cnpjCert.') não corresponde ao CNPJ do prestador ('.$cnpjEmpresa.'). '
+                .'Use um A1 da empresa (ou da matriz com a mesma raiz).'
+            );
         }
     }
 

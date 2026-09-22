@@ -14,9 +14,16 @@ class ContratoRepository extends BaseRepository implements ContratoRepositoryInt
         parent::__construct($model);
     }
 
-    public function ativosComVencimentoNoDia(int $dia): Collection
+    public function ativosComVencimentoNoDia(int $dia, \DateTimeInterface $referencia): Collection
     {
-        return $this->model->where('status', 'ativo')->where('dia_vencimento', $dia)->get();
+        return $this->model
+            ->where('status', 'ativo')
+            ->where('dia_vencimento', $dia)
+            ->where(function (Builder $query) use ($referencia) {
+                $query->whereNull('primeiro_vencimento')
+                    ->orWhereDate('primeiro_vencimento', '<=', $referencia);
+            })
+            ->get();
     }
 
     public function ativosPorCliente(int $clienteId): Collection

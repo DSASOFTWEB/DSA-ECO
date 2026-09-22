@@ -219,6 +219,43 @@ class EmpresaFiscalCadastroTest extends TestCase
             ->assertJsonPath('nome', 'ITEM ENV');
     }
 
+    public function test_formulario_expoe_opcoes_de_autenticacao_nfse_municipal(): void
+    {
+        [, , $user] = $this->criarGestor();
+
+        $html = $this->actingAs($user)
+            ->get(route('empresa.edit'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('name="nfse_auth_mode"', $html);
+        $this->assertStringContainsString('value="certificado"', $html);
+        $this->assertStringContainsString('value="usuario_senha"', $html);
+        $this->assertStringContainsString('Via certificado digital A1', $html);
+        $this->assertStringContainsString('Via usuário e senha do portal', $html);
+    }
+
+    public function test_salva_modo_autenticacao_usuario_senha_do_portal(): void
+    {
+        [$empresa, , $user] = $this->criarGestor();
+
+        $this->actingAs($user)
+            ->put(route('empresa.update'), $this->payloadFiscal([
+                'nome' => $empresa->nome,
+                'nfse_provider' => 'municipio',
+                'nfse_auth_mode' => 'usuario_senha',
+                'nfse_ws_user' => 'portal.user',
+                'nfse_ws_senha' => 'portal-secret',
+            ]))
+            ->assertRedirect(route('empresa.edit'));
+
+        $empresa->refresh();
+        $this->assertSame('usuario_senha', $empresa->nfse_auth_mode);
+        $this->assertSame('portal.user', $empresa->nfse_ws_user);
+        $this->assertSame('portal-secret', $empresa->nfse_ws_senha);
+        $this->assertTrue($empresa->usaAuthNfseUsuarioSenha());
+    }
+
     /**
      * @param  array<string, mixed>  $extra
      * @return array<string, mixed>
@@ -238,6 +275,7 @@ class EmpresaFiscalCadastroTest extends TestCase
             'numero_ultima_nfce_homologacao' => 0,
             'numero_ultima_nfse' => 0,
             'nfse_provider' => 'nacional_gov',
+            'nfse_auth_mode' => 'certificado',
             'impressao_modo' => 'dom',
             'impressao_colunas' => 48,
         ], $extra);

@@ -107,7 +107,8 @@ class AbrasfV2RpsBuilder
 
         $tomador = $this->montarTomador($hospedagem, $empresa, $unidade, $cMun);
 
-        $inf = '<InfDeclaracaoPrestacaoServico Id="'.$idInf.'" xmlns="'.self::NS_TIPOS.'">'
+        // xmlns só no Rps pai: InfDeclaracao herda (evita xmlns duplicado no C14N).
+        $inf = '<InfDeclaracaoPrestacaoServico Id="'.$idInf.'">'
             .'<Rps>'
             .'<IdentificacaoRps>'
             .'<Numero>'.$numeroRps.'</Numero>'

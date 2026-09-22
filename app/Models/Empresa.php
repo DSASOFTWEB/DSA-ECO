@@ -24,6 +24,10 @@ class Empresa extends Model
 
     public const AMBIENTE_HOMOLOGACAO = 2;
 
+    public const NFSE_AUTH_CERTIFICADO = 'certificado';
+
+    public const NFSE_AUTH_USUARIO_SENHA = 'usuario_senha';
+
     protected $fillable = [
         'nome', 'razao_social', 'cnpj',         'ie', 'im', 'cnae', 'regime_tributario', 'aut_xml', 'codigo_municipio_ibge', 'codigo_servico_hospedagem_lc116', 'codigo_tributacao_municipal_hospedagem', 'aliquota_iss_hospedagem',
         'logo_path', 'email', 'telefone',
@@ -33,7 +37,7 @@ class Empresa extends Model
         'numero_ultima_nfe_producao', 'numero_ultima_nfe_homologacao',
         'numero_ultima_nfce_producao', 'numero_ultima_nfce_homologacao',
         'numero_ultima_nfse',
-        'nfse_provider', 'nfse_nacional_habilitado', 'token_nfse', 'token_ibpt',
+        'nfse_provider', 'nfse_auth_mode', 'nfse_nacional_habilitado', 'token_nfse', 'token_ibpt',
         'nfse_ws_user', 'nfse_ws_senha', 'nfse_ws_chave_acesso',
         'bluesoft_token',
         'certificado_arquivo', 'certificado_senha', 'certificado_validade',
@@ -76,6 +80,29 @@ class Empresa extends Model
             self::REGIME_NORMAL => 'Regime Normal',
             self::REGIME_MEI => 'MEI',
         ];
+    }
+
+    /**
+     * Formas de autenticação no webservice NFS-e municipal.
+     *
+     * @return array<string, string>
+     */
+    public static function nfseAuthModes(): array
+    {
+        return [
+            self::NFSE_AUTH_CERTIFICADO => 'Certificado digital A1',
+            self::NFSE_AUTH_USUARIO_SENHA => 'Usuário e senha do portal',
+        ];
+    }
+
+    public function usaAuthNfseCertificado(): bool
+    {
+        return ($this->nfse_auth_mode ?: self::NFSE_AUTH_CERTIFICADO) === self::NFSE_AUTH_CERTIFICADO;
+    }
+
+    public function usaAuthNfseUsuarioSenha(): bool
+    {
+        return ($this->nfse_auth_mode ?: self::NFSE_AUTH_CERTIFICADO) === self::NFSE_AUTH_USUARIO_SENHA;
     }
 
     /**

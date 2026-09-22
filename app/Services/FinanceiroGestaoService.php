@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\NegocioException;
 use App\Models\Caixa;
+use App\Models\CaixaMovimentacao;
 use App\Models\ContaPagar;
 use App\Models\ContaReceber;
 use App\Models\User;
@@ -127,6 +128,151 @@ class FinanceiroGestaoService
         }
 
         $conta->update(['status' => 'cancelado']);
+    }
+
+    /**
+     * Desfaz a baixa de uma conta a receber: volta para pendente/atrasado e
+     * estorna o lançamento de caixa vinculado (quando o caixa ainda está aberto).
+     */
+    public function estornarContaReceber(ContaReceber $conta, User $usuario): ContaReceber
+    {
+        if (! $conta->estaRecebida()) {
+            throw new NegocioException('Só é possível estornar contas já recebidas.');
+        }
+
+        return DB::transaction(function () use ($conta, $usuario) {
+            $this->estornarMovimentacaoVinculada(
+                $conta->caixaMovimentacao,
+                $usuario,
+                "Estorno recebimento conta #{$conta->id}: {$conta->descricao}"
+            );
+
+            $status = $conta->data_vencimento->isPast() ? 'atrasado' : 'pendente';
+
+            $conta->update([
+                'status' => $status,
+                'data_recebimento' => null,
+                'forma_pagamento' => null,
+                'caixa_movimentacao_id' => null,
+            ]);
+
+            return $conta->fresh();
+        });
+    }
+
+    /**
+     * Desfaz a baixa de uma conta a pagar (mesma lógica do receber).
+     */
+    public function estornarContaPagar(ContaPagar $conta, User $usuario): ContaPagar
+    {
+        if (! $conta->estaPaga()) {
+            throw new NegocioException('Só é possível estornar contas já pagas.');
+        }
+
+        return DB::transaction(function () use ($conta, $usuario) {
+            $this->estornarMovimentacaoVinculada(
+                $conta->caixaMovimentacao,
+                $usuario,
+                "Estorno pagamento conta #{$conta->id}: {$conta->descricao}"
+            );
+
+            $status = $conta->data_vencimento->isPast() ? 'atrasado' : 'pendente';
+
+            $conta->update([
+                'status' => $status,
+                'data_pagamento' => null,
+                'forma_pagamento' => null,
+                'caixa_movimentacao_id' => null,
+            ]);
+
+            return $conta->fresh();
+        });
+    }
+
+    /**
+     * Remove contas a pagar/receber avulsas da empresa (soft delete).
+     * Contas baixadas são estornadas antes (caixa aberto) ou apenas reabertas
+     * sem mexer no caixa fechado.
+     *
+     * @return array{pagar: int, receber: int, avisos: list<string>}
+     */
+    public function limparContasAvulsasDaEmpresa(int $empresaId, User $usuario): array
+    {
+        return DB::transaction(function () use ($empresaId, $usuario) {
+            $avisos = [];
+            $pagar = 0;
+            $receber = 0;
+
+            foreach (ContaReceber::query()->where('empresa_id', $empresaId)->get() as $conta) {
+                if ($conta->estaRecebida()) {
+                    try {
+                        $this->estornarContaReceber($conta, $usuario);
+                    } catch (NegocioException $e) {
+                        $avisos[] = "Conta a receber #{$conta->id}: {$e->getMessage()}";
+                        $conta->update([
+                            'status' => $conta->data_vencimento->isPast() ? 'atrasado' : 'pendente',
+                            'data_recebimento' => null,
+                            'forma_pagamento' => null,
+                            'caixa_movimentacao_id' => null,
+                        ]);
+                    }
+                }
+                $conta->delete();
+                $receber++;
+            }
+
+            foreach (ContaPagar::query()->where('empresa_id', $empresaId)->get() as $conta) {
+                if ($conta->estaPaga()) {
+                    try {
+                        $this->estornarContaPagar($conta, $usuario);
+                    } catch (NegocioException $e) {
+                        $avisos[] = "Conta a pagar #{$conta->id}: {$e->getMessage()}";
+                        $conta->update([
+                            'status' => $conta->data_vencimento->isPast() ? 'atrasado' : 'pendente',
+                            'data_pagamento' => null,
+                            'forma_pagamento' => null,
+                            'caixa_movimentacao_id' => null,
+                        ]);
+                    }
+                }
+                $conta->delete();
+                $pagar++;
+            }
+
+            return compact('pagar', 'receber', 'avisos');
+        });
+    }
+
+    /**
+     * Estorno na origem (conta a pagar/receber): permite reverter lançamento
+     * automático vinculado, desde que o caixa ainda esteja aberto.
+     */
+    protected function estornarMovimentacaoVinculada(?CaixaMovimentacao $movimentacao, User $usuario, string $descricao): void
+    {
+        if (! $movimentacao || $movimentacao->estaEstornada()) {
+            return;
+        }
+
+        $caixa = $movimentacao->caixa;
+        if (! $caixa || ! $caixa->estaAberto()) {
+            throw new NegocioException('O caixa vinculado está fechado. Reabra o caixa antes de estornar, ou ajuste o saldo manualmente.');
+        }
+
+        $caixa->movimentacoes()->create([
+            'tipo' => $movimentacao->tipo === 'entrada' ? 'saida' : 'entrada',
+            'categoria' => 'ajuste',
+            'descricao' => $descricao,
+            'valor' => $movimentacao->valor,
+            'forma_pagamento' => $movimentacao->forma_pagamento,
+            'referencia_type' => CaixaMovimentacao::class,
+            'referencia_id' => $movimentacao->id,
+            'usuario_id' => $usuario->id,
+        ]);
+
+        $movimentacao->update([
+            'estornado_em' => now(),
+            'estornado_por_id' => $usuario->id,
+        ]);
     }
 
     /**

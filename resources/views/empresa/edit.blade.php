@@ -444,6 +444,42 @@
         </div>
     </form>
 
+    <section class="mt-8 max-w-5xl space-y-4 rounded-2xl border border-rose-200 bg-rose-50/60 p-5 shadow-sm dark:border-rose-900/50 dark:bg-rose-950/30 sm:p-7">
+        <div>
+            <h2 class="text-sm font-semibold text-rose-800 dark:text-rose-300">Manutenção financeira</h2>
+            <p class="mt-1 text-xs text-rose-700/80 dark:text-rose-300/70">
+                Remove contas a pagar e a receber avulsas desta empresa. Não apaga mensalidades, vendas, PDV nem histórico de caixa já fechado.
+                Contas baixadas são estornadas automaticamente quando o caixa ainda estiver aberto.
+            </p>
+        </div>
+        <form
+            method="POST"
+            action="{{ route('empresa.limpar-financeiro') }}"
+            class="flex flex-wrap items-end gap-3"
+            onsubmit="return confirm('Isso remove todas as contas a pagar/receber avulsas. Continuar?')"
+        >
+            @csrf
+            <div>
+                <label class="block text-xs font-medium text-rose-800 dark:text-rose-300">Digite LIMPAR para confirmar</label>
+                <input
+                    type="text"
+                    name="confirmacao"
+                    required
+                    autocomplete="off"
+                    placeholder="LIMPAR"
+                    class="mt-1 w-40 rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm dark:border-rose-800 dark:bg-gray-900"
+                >
+                @error('confirmacao')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+            </div>
+            <button type="submit" class="h-11 rounded-lg bg-rose-600 px-4 text-sm font-semibold text-white hover:bg-rose-700">
+                Limpar financeiro
+            </button>
+            <a href="{{ route('financeiro.index') }}" class="h-11 inline-flex items-center text-sm font-medium text-rose-800 underline-offset-2 hover:underline dark:text-rose-300">
+                Ir para Financeiro →
+            </a>
+        </form>
+    </section>
+
     @if ($empresa->temCertificadoDigital())
         <form id="empresa-remover-certificado" method="POST" action="{{ route('empresa.certificado.destroy') }}" class="hidden" onsubmit="return confirm('Remover o certificado digital e a senha cadastrada?')">
             @csrf

@@ -172,7 +172,15 @@
                                             </form>
                                         @endcan
                                     @elseif ($conta->status === 'pago')
-                                        <span class="text-xs text-slate-400">Pago em {{ $conta->data_pagamento->format('d/m/Y') }}</span>
+                                        <div class="space-y-1">
+                                            <span class="text-xs text-slate-400">Pago em {{ $conta->data_pagamento->format('d/m/Y') }}</span>
+                                            @can('update', $conta)
+                                                <form method="POST" action="{{ route('contas-pagar.estornar', $conta) }}" onsubmit="return confirm('Estornar este pagamento? A conta volta para em aberto e o caixa (se aberto) recebe o ajuste inverso.')">
+                                                    @csrf
+                                                    <button class="text-xs font-medium text-amber-700 hover:underline dark:text-amber-400">Estornar / ajustar</button>
+                                                </form>
+                                            @endcan
+                                        </div>
                                     @else
                                         <span class="text-xs text-slate-400">—</span>
                                     @endif
@@ -260,7 +268,15 @@
                                             </form>
                                         @endcan
                                     @elseif ($conta->status === 'recebido')
-                                        <span class="text-xs text-slate-400">Recebido em {{ $conta->data_recebimento->format('d/m/Y') }}</span>
+                                        <div class="space-y-1">
+                                            <span class="text-xs text-slate-400">Recebido em {{ $conta->data_recebimento->format('d/m/Y') }}</span>
+                                            @can('update', $conta)
+                                                <form method="POST" action="{{ route('contas-receber.estornar', $conta) }}" onsubmit="return confirm('Estornar este recebimento? A conta volta para em aberto e o caixa (se aberto) recebe o ajuste inverso.')">
+                                                    @csrf
+                                                    <button class="text-xs font-medium text-amber-700 hover:underline dark:text-amber-400">Estornar / ajustar</button>
+                                                </form>
+                                            @endcan
+                                        </div>
                                     @else
                                         <span class="text-xs text-slate-400">—</span>
                                     @endif

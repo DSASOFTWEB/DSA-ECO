@@ -122,11 +122,13 @@ Route::middleware('auth')->group(function () {
     Route::post('financeiro/contas-pagar', [ContaPagarController::class, 'store'])->name('contas-pagar.store');
     Route::put('financeiro/contas-pagar/{contaPagar}', [ContaPagarController::class, 'update'])->name('contas-pagar.update');
     Route::post('financeiro/contas-pagar/{contaPagar}/pagar', [ContaPagarController::class, 'pagar'])->name('contas-pagar.pagar');
+    Route::post('financeiro/contas-pagar/{contaPagar}/estornar', [ContaPagarController::class, 'estornar'])->name('contas-pagar.estornar');
     Route::delete('financeiro/contas-pagar/{contaPagar}', [ContaPagarController::class, 'destroy'])->name('contas-pagar.destroy');
 
     Route::post('financeiro/contas-receber', [ContaReceberController::class, 'store'])->name('contas-receber.store');
     Route::put('financeiro/contas-receber/{contaReceber}', [ContaReceberController::class, 'update'])->name('contas-receber.update');
     Route::post('financeiro/contas-receber/{contaReceber}/receber', [ContaReceberController::class, 'receber'])->name('contas-receber.receber');
+    Route::post('financeiro/contas-receber/{contaReceber}/estornar', [ContaReceberController::class, 'estornar'])->name('contas-receber.estornar');
     Route::delete('financeiro/contas-receber/{contaReceber}', [ContaReceberController::class, 'destroy'])->name('contas-receber.destroy');
 
     // "parameters" explícito: o singular automático de "terminais" dá
@@ -254,6 +256,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('empresa', [EmpresaController::class, 'edit'])->name('empresa.edit');
     Route::put('empresa', [EmpresaController::class, 'update'])->name('empresa.update');
+    Route::post('empresa/limpar-financeiro', [EmpresaController::class, 'limparFinanceiro'])->name('empresa.limpar-financeiro');
     Route::get('empresa/consultar-cnpj', [EmpresaController::class, 'consultarCnpj'])->name('empresa.consultar-cnpj');
     Route::get('empresa/certificado', [EmpresaController::class, 'downloadCertificado'])->name('empresa.certificado.download');
     Route::delete('empresa/certificado', [EmpresaController::class, 'destroyCertificado'])->name('empresa.certificado.destroy');

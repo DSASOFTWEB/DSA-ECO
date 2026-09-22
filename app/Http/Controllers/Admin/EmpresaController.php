@@ -9,6 +9,7 @@ use App\Models\Empresa;
 use App\Models\PontoAtendimento;
 use App\Models\Unidade;
 use App\Services\EmpresaService;
+use App\Services\FinanceiroGestaoService;
 use App\Services\Fiscal\CertificadoA1Service;
 use App\Services\Integrations\CnpjConsultaService;
 use Illuminate\Contracts\View\View;
@@ -30,6 +31,7 @@ class EmpresaController extends Controller
     public function __construct(
         protected EmpresaService $empresaService,
         protected CertificadoA1Service $certificadoA1,
+        protected FinanceiroGestaoService $financeiroGestaoService,
     ) {}
 
     public function edit(): View
@@ -82,6 +84,33 @@ class EmpresaController extends Controller
         );
 
         return redirect()->route('empresa.edit')->with('sucesso', 'Dados da empresa atualizados com sucesso.');
+    }
+
+    /**
+     * Apaga contas a pagar/receber avulsas da empresa. Não mexe em
+     * mensalidades, vendas, PDV nem histórico de caixa fechado.
+     */
+    public function limparFinanceiro(Request $request): RedirectResponse
+    {
+        Gate::authorize('empresa.gerenciar');
+
+        $request->validate([
+            'confirmacao' => ['required', 'in:LIMPAR'],
+        ], [
+            'confirmacao.in' => 'Digite LIMPAR para confirmar a limpeza do financeiro.',
+        ]);
+
+        $empresaId = (int) $request->user()->empresa_id;
+        $resultado = $this->financeiroGestaoService->limparContasAvulsasDaEmpresa($empresaId, $request->user());
+
+        $msg = "Financeiro limpo: {$resultado['receber']} conta(s) a receber e {$resultado['pagar']} conta(s) a pagar removidas.";
+        if ($resultado['avisos'] !== []) {
+            return redirect()->route('empresa.edit')
+                ->with('sucesso', $msg)
+                ->with('erro', 'Alguns lançamentos de caixa não puderam ser estornados (caixa fechado): '.implode(' ', $resultado['avisos']));
+        }
+
+        return redirect()->route('empresa.edit')->with('sucesso', $msg);
     }
 
     public function downloadCertificado(): StreamedResponse|Response

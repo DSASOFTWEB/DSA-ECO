@@ -88,6 +88,19 @@ class ContaPagarController extends Controller
         return back()->with('sucesso', $mensagem);
     }
 
+    public function estornar(Request $request, ContaPagar $contaPagar): RedirectResponse
+    {
+        $this->authorize('update', $contaPagar);
+
+        try {
+            $this->financeiroGestaoService->estornarContaPagar($contaPagar, $request->user());
+        } catch (NegocioException $e) {
+            return back()->with('erro', $e->getMessage());
+        }
+
+        return back()->with('sucesso', 'Pagamento estornado. A conta voltou para em aberto.');
+    }
+
     /**
      * Caixas abertos candidatos pra lançar a baixa: prioriza a unidade da
      * PRÓPRIA conta (quando ela tem uma definida — comportamento já

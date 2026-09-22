@@ -90,6 +90,19 @@ class ContaReceberController extends Controller
         return back()->with('sucesso', $mensagem);
     }
 
+    public function estornar(Request $request, ContaReceber $contaReceber): RedirectResponse
+    {
+        $this->authorize('update', $contaReceber);
+
+        try {
+            $this->financeiroGestaoService->estornarContaReceber($contaReceber, $request->user());
+        } catch (NegocioException $e) {
+            return back()->with('erro', $e->getMessage());
+        }
+
+        return back()->with('sucesso', 'Recebimento estornado. A conta voltou para em aberto.');
+    }
+
     /**
      * Mesma lógica de ContaPagarController::resolverCaixaDaConta.
      */

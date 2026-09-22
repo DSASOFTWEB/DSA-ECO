@@ -74,6 +74,12 @@
 
     <h3>Cláusula 4ª — Dos Valores e Pagamento</h3>
     <p>
+        No ato da contratação será cobrada uma caução, a título de entrada, no valor de
+        <strong>R$ {{ number_format($contrato->valor_caucao, 2, ',', '.') }}</strong>.
+        A primeira mensalidade vencerá em
+        <strong>{{ $contrato->primeiro_vencimento?->format('d/m/Y') ?? 'data a definir' }}</strong>.
+    </p>
+    <p>
         O valor da mensalidade é de <strong>R$ {{ number_format($contrato->valor_mensal, 2, ',', '.') }}</strong>,
         @if ($contrato->desconto_percentual > 0) com desconto de {{ rtrim(rtrim(number_format($contrato->desconto_percentual, 2, ',', '.'), '0'), ',') }}% aplicado, @endif
         com vencimento todo dia <strong>{{ $contrato->dia_vencimento }}</strong> de cada mês. O valor poderá ser reajustado anualmente, conforme atualização administrativa e índice de correção definido pela CONTRATADA.

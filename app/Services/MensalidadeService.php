@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\NegocioException;
 use App\Models\Caixa;
 use App\Models\CaixaMovimentacao;
 use App\Models\Contrato;
@@ -12,6 +13,7 @@ use App\Repositories\Contracts\MensalidadeRepositoryInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Núcleo financeiro recorrente: geração das mensalidades a partir dos
@@ -42,7 +44,7 @@ class MensalidadeService
             try {
                 $mensalidade = $this->gerarParaContrato($contrato, $competencia);
                 $geradas += $mensalidade->wasRecentlyCreated ? 1 : 0;
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 // Uma falha isolada não pode interromper a geração dos demais contratos.
                 Log::error('Falha ao gerar mensalidade', [
                     'contrato_id' => $contrato->id,
@@ -97,8 +99,12 @@ class MensalidadeService
      * recorrentes. A constraint contrato+competência+tipo mantém a operação
      * idempotente sem impedir que caução e mensalidade caiam no mesmo mês.
      */
-    public function gerarCaucaoParaContrato(Contrato $contrato): Mensalidade
+    public function gerarCaucaoParaContrato(Contrato $contrato): ?Mensalidade
     {
+        if ((float) $contrato->valor_caucao <= 0) {
+            return null;
+        }
+
         $competencia = $contrato->data_inicio->copy()->startOfMonth();
         $existente = $this->mensalidades->porContratoECompetencia($contrato->id, $competencia, 'caucao');
 
@@ -297,11 +303,11 @@ class MensalidadeService
                 ->first();
 
             if (! $mensalidade) {
-                throw new \App\Exceptions\NegocioException('Este contrato não possui mensalidade aberta para prorrogar.');
+                throw new NegocioException('Este contrato não possui mensalidade aberta para prorrogar.');
             }
 
             if ($novaData->startOfDay()->lte($mensalidade->data_vencimento->startOfDay())) {
-                throw new \App\Exceptions\NegocioException('A nova data precisa ser posterior ao vencimento atual.');
+                throw new NegocioException('A nova data precisa ser posterior ao vencimento atual.');
             }
 
             $primeiraMensalidadeId = $contrato->mensalidades()

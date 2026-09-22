@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\NegocioException;
 use App\Models\Cliente;
 use App\Models\Plano;
 use App\Models\Unidade;
@@ -141,7 +142,7 @@ class ContratoMensalidadeTest extends TestCase
         $dependente1 = $cliente->dependentes()->create(['nome' => 'Dep 1', 'data_nascimento' => '2015-01-01']);
         $dependente2 = $cliente->dependentes()->create(['nome' => 'Dep 2', 'data_nascimento' => '2016-01-01']);
 
-        $this->expectException(\App\Exceptions\NegocioException::class);
+        $this->expectException(NegocioException::class);
 
         app(ContratoService::class)->contratar([
             'unidade_id' => $unidade->id,
@@ -234,12 +235,11 @@ class ContratoMensalidadeTest extends TestCase
             'dia_vencimento' => 10,
         ]);
 
-        // Mensalidade já vencida (do mês passado) permanece intocada pelo cancelamento.
-        $mensalidadeAtrasada = $contrato->mensalidades()->create([
-            'empresa_id' => $contrato->empresa_id,
-            'competencia' => now()->subMonth()->startOfMonth(),
-            'valor_original' => 150,
-            'valor_total' => 150,
+        // A primeira mensalidade já vencida permanece intocada pelo cancelamento.
+        $mensalidadeAtrasada = $contrato->mensalidades()
+            ->where('tipo', 'mensalidade')
+            ->firstOrFail();
+        $mensalidadeAtrasada->update([
             'data_vencimento' => now()->subMonth(),
             'status' => 'atrasado',
         ]);

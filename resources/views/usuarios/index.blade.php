@@ -27,7 +27,9 @@
                         <td class="px-4 py-3 font-medium text-slate-800">{{ $user->name }}</td>
                         <td class="px-4 py-3 text-slate-500">{{ $user->email }}</td>
                         <td class="px-4 py-3 text-slate-500">{{ $user->unidade?->nome ?? '—' }}</td>
-                        <td class="px-4 py-3 text-slate-500">{{ $user->roles->pluck('name')->join(', ') }}</td>
+                        <td class="px-4 py-3 text-slate-500">
+                            {{ $user->roles->map(fn ($r) => \App\Support\ModulosPermissoes::labelPapel($r->name))->join(', ') ?: '—' }}
+                        </td>
                         <td class="px-4 py-3"><x-status-badge :status="$user->status" /></td>
                         <td class="px-4 py-3 text-right">
                             @can('update', $user)

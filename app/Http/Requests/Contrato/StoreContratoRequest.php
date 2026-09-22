@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Contrato;
 
+use App\Models\Contrato;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -9,7 +10,7 @@ class StoreContratoRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('create', \App\Models\Contrato::class);
+        return $this->user()->can('create', Contrato::class);
     }
 
     public function rules(): array
@@ -29,7 +30,7 @@ class StoreContratoRequest extends FormRequest
             'data_inicio' => ['required', 'date'],
             'dia_vencimento' => ['required', 'integer', 'between:1,28'],
             'valor_mensal' => ['nullable', 'numeric', 'min:0'],
-            'valor_caucao' => ['required', 'numeric', 'min:0.01'],
+            'valor_caucao' => ['required', 'numeric', 'min:0'],
             'agendamento_primeiro_vencimento' => ['required', Rule::in(['30_dias', 'data_escolhida'])],
             'primeiro_vencimento' => ['nullable', 'required_if:agendamento_primeiro_vencimento,data_escolhida', 'date', 'after:data_inicio'],
             'desconto_percentual' => ['nullable', 'numeric', 'between:0,100'],

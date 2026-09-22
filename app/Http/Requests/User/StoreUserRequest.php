@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests\User;
 
+use App\Support\ModulosPermissoes;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\Validator;
 
 class StoreUserRequest extends FormRequest
 {
@@ -25,10 +27,21 @@ class StoreUserRequest extends FormRequest
             'percentual_comissao' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'percentual_comissao_reativacao' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'password' => ['required', Password::defaults()],
-            'roles' => ['required', 'array', 'min:1'],
-            // super_admin é reservado à equipe interna — nunca atribuível por
-            // este formulário, mesmo por um admin do próprio tenant.
+            'roles' => ['nullable', 'array'],
             'roles.*' => ['string', Rule::exists('roles', 'name')->whereNotIn('name', ['super_admin'])],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['string', Rule::in(ModulosPermissoes::todasPermissoes())],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $roles = $this->input('roles', []);
+            $permissions = $this->input('permissions', []);
+            if ((! is_array($roles) || $roles === []) && (! is_array($permissions) || $permissions === [])) {
+                $validator->errors()->add('permissions', 'Selecione ao menos um perfil ou um módulo de acesso.');
+            }
+        });
     }
 }

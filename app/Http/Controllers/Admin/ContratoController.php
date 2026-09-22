@@ -58,7 +58,16 @@ class ContratoController extends Controller
     {
         $this->authorize('view', $contrato);
 
-        $contrato->load(['cliente', 'plano', 'unidade', 'vendedor', 'dependentes', 'mensalidades' => fn ($q) => $q->latest('competencia')]);
+        $contrato->load([
+            'cliente',
+            'plano',
+            'unidade',
+            'vendedor',
+            'dependentes',
+            'mensalidades' => fn ($q) => $q->orderByRaw("CASE WHEN tipo = 'caucao' THEN 0 ELSE 1 END")
+                ->orderBy('data_vencimento')
+                ->orderBy('competencia'),
+        ]);
 
         return view('contratos.show', compact('contrato'));
     }

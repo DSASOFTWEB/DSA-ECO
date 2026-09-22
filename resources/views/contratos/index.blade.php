@@ -27,9 +27,9 @@
                     <th class="px-4 py-3">Cliente</th>
                     <th class="px-4 py-3">Plano</th>
                     <th class="px-4 py-3">Valor mensal</th>
-                    <th class="px-4 py-3">Vencimento</th>
+                    <th class="px-4 py-3">1º venc.</th>
                     <th class="px-4 py-3">Status</th>
-                    <th class="px-4 py-3"></th>
+                    <th class="px-4 py-3 text-right">Ações</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-50">
@@ -39,16 +39,20 @@
                         <td class="px-4 py-3 font-medium text-slate-800">{{ $contrato->cliente->nome }}</td>
                         <td class="px-4 py-3 text-slate-500">{{ $contrato->plano->nome }}</td>
                         <td class="px-4 py-3 text-slate-500">R$ {{ number_format($contrato->valor_mensal, 2, ',', '.') }}</td>
-                        <td class="px-4 py-3 text-slate-500">dia {{ $contrato->dia_vencimento }}</td>
+                        <td class="px-4 py-3 text-slate-500">
+                            {{ $contrato->primeiro_vencimento?->format('d/m/Y') ?? 'dia '.$contrato->dia_vencimento }}
+                        </td>
                         <td class="px-4 py-3"><x-status-badge :status="$contrato->status" /></td>
-                        <td class="px-4 py-3 text-right whitespace-nowrap">
-                            <a href="{{ route('contratos.show', $contrato) }}" class="text-sky-700 hover:underline">Ver</a>
-                            @if ($contrato->estaAtivo())
-                                @can('update', $contrato)
-                                    <a href="{{ route('contratos.edit', $contrato) }}" class="ml-3 text-indigo-700 hover:underline">Editar</a>
-                                    <a href="{{ route('contratos.prorrogar-form', $contrato) }}" class="ml-3 text-amber-700 hover:underline">Prorrogar</a>
-                                @endcan
-                            @endif
+                        <td class="px-4 py-3">
+                            <div class="flex flex-wrap items-center justify-end gap-2">
+                                <a href="{{ route('contratos.show', $contrato) }}" class="inline-flex rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">Ver</a>
+                                @if ($contrato->estaAtivo())
+                                    @can('update', $contrato)
+                                        <a href="{{ route('contratos.edit', $contrato) }}" class="inline-flex rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100">Editar</a>
+                                        <a href="{{ route('contratos.prorrogar-form', $contrato) }}" class="inline-flex rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100">Prorrogar</a>
+                                    @endcan
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 @empty

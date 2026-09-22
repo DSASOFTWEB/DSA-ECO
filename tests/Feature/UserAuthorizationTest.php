@@ -62,6 +62,47 @@ class UserAuthorizationTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_admin_pode_salvar_modulos_de_acesso_no_usuario(): void
+    {
+        $admin = $this->criarAdminTenant();
+        $this->seedPermissoesCompletas();
+
+        $alvo = User::factory()->create([
+            'empresa_id' => $admin->empresa_id,
+            'unidade_id' => $admin->unidade_id,
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('usuarios.update', $alvo), [
+                'name' => $alvo->name,
+                'email' => $alvo->email,
+                'status' => 'ativo',
+                'roles' => ['vendedor'],
+                'permissions' => ['clientes.visualizar', 'vendas.criar', 'vendas.visualizar'],
+            ])
+            ->assertRedirect(route('usuarios.index'));
+
+        $alvo->refresh();
+        $this->assertTrue($alvo->hasRole('vendedor'));
+        $this->assertTrue($alvo->hasPermissionTo('clientes.visualizar'));
+        $this->assertTrue($alvo->hasPermissionTo('vendas.criar'));
+        $this->assertFalse($alvo->hasDirectPermission('contratos.criar'));
+        $this->assertEqualsCanonicalizing(
+            ['clientes.visualizar', 'vendas.criar', 'vendas.visualizar'],
+            $alvo->getDirectPermissions()->pluck('name')->all()
+        );
+    }
+
+    private function seedPermissoesCompletas(): void
+    {
+        foreach (\App\Support\ModulosPermissoes::todasPermissoes() as $nome) {
+            Permission::findOrCreate($nome, 'web');
+        }
+        foreach (\App\Support\ModulosPermissoes::permissoesPorPapel() as $papel => $lista) {
+            Role::findOrCreate($papel, 'web')->syncPermissions($lista);
+        }
+    }
+
     private function criarAdminTenant(): User
     {
         foreach (['usuarios.visualizar', 'usuarios.criar', 'usuarios.editar', 'usuarios.excluir'] as $nome) {

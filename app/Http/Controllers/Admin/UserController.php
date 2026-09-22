@@ -7,6 +7,7 @@ use App\Http\Requests\User\StoreUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Models\Unidade;
 use App\Models\User;
+use App\Support\ModulosPermissoes;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Hash;
@@ -36,12 +37,10 @@ class UserController extends Controller
     public function store(StoreUserRequest $request): RedirectResponse
     {
         $dados = $request->validated();
-        $roles = $dados['roles'];
-        unset($dados['roles']);
+        $roles = $dados['roles'] ?? [];
+        $permissions = $dados['permissions'] ?? [];
+        unset($dados['roles'], $dados['permissions']);
 
-        // Só quem já é admin do tenant pode promover outra pessoa a admin —
-        // sem isso, qualquer papel com "usuarios.criar" (ex.: gerente)
-        // poderia se autoconceder/conceder o papel mais alto do tenant.
         if (in_array('admin', $roles, true)) {
             $this->authorize('atribuirAdmin', User::class);
         }
@@ -50,23 +49,13 @@ class UserController extends Controller
         $dados['empresa_id'] = $request->user()->empresa_id;
 
         $user = User::create($dados);
-        $user->syncRoles($roles);
+        $this->sincronizarAcesso($user, $roles, $permissions);
 
         return redirect()->route('usuarios.index')->with('sucesso', "Usuário \"{$user->name}\" criado com sucesso.");
     }
 
-    /**
-     * O parâmetro precisa se chamar $usuario (não $user) — a rota gerada por
-     * Route::resource('usuarios', ...) usa {usuario}, e o model binding
-     * implícito do Laravel casa o parâmetro do model pelo NOME, não só pelo
-     * tipo. Com nomes diferentes, o Laravel não lançava erro nenhum: só
-     * injetava um User vazio (novo, sem dados) em vez do usuário de verdade,
-     * e a Policy negava tudo (comparava empresa_id null com null !== nada).
-     */
     public function edit(User $usuario): View
     {
-        // Binding quebrado (parâmetro de rota ≠ tipagem) injeta User novo
-        // sem id — a Policy responde 403 e mascara o problema real.
         abort_unless($usuario->exists, 404);
 
         $this->authorize('update', $usuario);
@@ -82,13 +71,12 @@ class UserController extends Controller
         abort_unless($usuario->exists, 404);
 
         $dados = $request->validated();
-        $roles = $dados['roles'] ?? null;
-        unset($dados['roles']);
+        $roles = array_key_exists('roles', $dados) ? ($dados['roles'] ?? []) : null;
+        $permissions = array_key_exists('permissions', $dados) ? ($dados['permissions'] ?? []) : null;
+        unset($dados['roles'], $dados['permissions']);
 
         if (! empty($dados['password'])) {
             $dados['password'] = Hash::make($dados['password']);
-            // Senha trocada por quem edita (não pela própria pessoa) — revoga
-            // tokens de API já emitidos, mesma cautela do "esqueci a senha".
             $usuario->tokens()->delete();
         } else {
             unset($dados['password']);
@@ -96,14 +84,17 @@ class UserController extends Controller
 
         $usuario->update($dados);
 
-        if ($roles !== null) {
+        if ($roles !== null || $permissions !== null) {
             $this->authorize('gerenciarPapeis', $usuario);
+
+            $roles ??= $usuario->getRoleNames()->all();
+            $permissions ??= $usuario->getAllPermissions()->pluck('name')->all();
 
             if (in_array('admin', $roles, true)) {
                 $this->authorize('atribuirAdmin', User::class);
             }
 
-            $usuario->syncRoles($roles);
+            $this->sincronizarAcesso($usuario, $roles, $permissions);
         }
 
         return redirect()->route('usuarios.index')->with('sucesso', 'Usuário atualizado com sucesso.');
@@ -118,5 +109,32 @@ class UserController extends Controller
         $usuario->update(['status' => 'inativo']);
 
         return redirect()->route('usuarios.index')->with('sucesso', 'Usuário inativado.');
+    }
+
+    /**
+     * Perfis (roles) + matriz de módulos. As permissões marcadas na matriz
+     * são gravadas no usuário; se só veio perfil, aplica o pacote padrão.
+     *
+     * @param  list<string>  $roles
+     * @param  list<string>  $permissions
+     */
+    protected function sincronizarAcesso(User $user, array $roles, array $permissions): void
+    {
+        $permissions = array_values(array_intersect(
+            array_unique($permissions),
+            ModulosPermissoes::todasPermissoes()
+        ));
+
+        if ($permissions === [] && $roles !== []) {
+            foreach ($roles as $papel) {
+                foreach (ModulosPermissoes::permissoesPorPapel()[$papel] ?? [] as $perm) {
+                    $permissions[] = $perm;
+                }
+            }
+            $permissions = array_values(array_unique($permissions));
+        }
+
+        $user->syncRoles($roles);
+        $user->syncPermissions($permissions);
     }
 }

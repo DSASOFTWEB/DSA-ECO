@@ -278,8 +278,8 @@ funcionalidades acessórias — o quadro abaixo é explícito sobre a diferença
 |---|---|---|---|---|
 | Clientes + dependentes | Completo | CRUD completo | CRUD completo | **Completo** |
 | Planos | Completo | CRUD (sem `show`, não necessário) | CRUD | **Completo** |
-| Contratos | Completo (contratar/cancelar, limite de dependentes) | index/create/store/show + cancelar | index/create/show | **Completo** no fluxo principal; não há tela de *edição* de contrato (alteração de plano vigente) — troca de plano hoje é cancelar + recontratar |
-| Mensalidades | Completo (gerar, marcar como paga, idempotência) | index/show + baixa manual + gerar Pix | index/show | **Completo** no fluxo principal |
+| Contratos | Completo (contratar/editar/cancelar, caução, primeiro vencimento flexível, prorrogação e limite de dependentes) | CRUD do fluxo principal + cancelar/reativar/prorrogar | index/create/show/edit/prorrogar | **Completo** no fluxo principal; pagamentos liquidados são preservados nas edições |
+| Mensalidades | Completo (caução separada, geração recorrente, marcar como paga, idempotência) | index/show + baixa manual + gerar Pix | index/show | **Completo** no fluxo principal |
 | Cobrança WhatsApp | Completo (Service, Job, Notification, canal customizado) | acionado via scheduler/Job, sem tela dedicada | — | **Esqueleto funcional**: dispara de verdade dado `EVOLUTION_API_URL`/`EVOLUTION_API_KEY` válidos; não há tela de histórico de envios (fica registrado só via log/activity log) |
 | Pagamentos Mercado Pago/Pix | Completo (geração de cobrança, webhook com validação de assinatura, Job de processamento) | endpoint de webhook + botão "gerar Pix" na mensalidade | reaproveita a tela de mensalidade | **Esqueleto funcional**: depende de `MERCADOPAGO_ACCESS_TOKEN` válido para chamadas reais; sandbox de testes do Mercado Pago não foi exercitada neste ambiente |
 | Carteirinha QR Code | Completo (emissão automática ao contratar, para titular e dependente, geração de imagem QR) | index/show + qrcode + bloquear/desbloquear | index/show | **Completo** |

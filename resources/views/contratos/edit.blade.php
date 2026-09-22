@@ -40,6 +40,20 @@
             </div>
 
             <div>
+                <label class="block text-sm font-medium">Caução / entrada</label>
+                <input type="number" step="0.01" min="0.01" name="valor_caucao" value="{{ old('valor_caucao', $contrato->valor_caucao) }}" required class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                @error('valor_caucao')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                <p class="mt-1 text-xs text-slate-400">Só é possível alterar enquanto a caução não estiver paga.</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium">Data da primeira mensalidade</label>
+                <input type="date" name="primeiro_vencimento" value="{{ old('primeiro_vencimento', $contrato->primeiro_vencimento?->toDateString()) }}" required class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                @error('primeiro_vencimento')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                <p class="mt-1 text-xs text-slate-400">Só altera a primeira mensalidade enquanto ela estiver aberta.</p>
+            </div>
+
+            <div>
                 <label class="block text-sm font-medium">Desconto (%)</label>
                 <input type="number" step="0.01" min="0" max="100" name="desconto_percentual" value="{{ old('desconto_percentual', $contrato->desconto_percentual) }}" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
                 @error('desconto_percentual')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror

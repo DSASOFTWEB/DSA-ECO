@@ -70,6 +70,7 @@
                                 <input type="checkbox" :checked="todasMarcadas" @change="alternarTodas()" class="rounded border-gray-300">
                             </th>
                             <th class="px-4 py-3">Cliente</th>
+                            <th class="px-4 py-3">Tipo</th>
                             <th class="px-4 py-3">Competência</th>
                             <th class="px-4 py-3">Vencimento</th>
                             <th class="px-4 py-3">Valor</th>
@@ -86,6 +87,7 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{{ $mensalidade->contrato->cliente->nome }}</td>
+                                <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ $mensalidade->ehCaucao() ? 'Caução' : 'Mensalidade' }}</td>
                                 <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ $mensalidade->competencia->format('m/Y') }}</td>
                                 <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ $mensalidade->data_vencimento->format('d/m/Y') }}</td>
                                 <td class="px-4 py-3 text-slate-500 dark:text-slate-400">R$ {{ number_format($mensalidade->valor_total, 2, ',', '.') }}</td>
@@ -103,7 +105,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">Nenhuma mensalidade encontrada.</td></tr>
+                            <tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">Nenhuma cobrança encontrada.</td></tr>
                         @endforelse
                     </tbody>
                 </table></div>
@@ -115,6 +117,7 @@
                 <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/[0.03] dark:text-gray-400">
                     <tr>
                         <th class="px-4 py-3">Cliente</th>
+                        <th class="px-4 py-3">Tipo</th>
                         <th class="px-4 py-3">Competência</th>
                         <th class="px-4 py-3">Vencimento</th>
                         <th class="px-4 py-3">Valor</th>
@@ -126,6 +129,7 @@
                     @forelse ($mensalidades as $mensalidade)
                         <tr class="transition hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                             <td class="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{{ $mensalidade->contrato->cliente->nome }}</td>
+                            <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ $mensalidade->ehCaucao() ? 'Caução' : 'Mensalidade' }}</td>
                             <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ $mensalidade->competencia->format('m/Y') }}</td>
                             <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ $mensalidade->data_vencimento->format('d/m/Y') }}</td>
                             <td class="px-4 py-3 text-slate-500 dark:text-slate-400">R$ {{ number_format($mensalidade->valor_total, 2, ',', '.') }}</td>
@@ -133,7 +137,7 @@
                             <td class="px-4 py-3 text-right"><a href="{{ route('mensalidades.show', $mensalidade) }}" class="text-sky-700 hover:underline dark:text-sky-400">Ver</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">Nenhuma mensalidade encontrada.</td></tr>
+                            <tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">Nenhuma cobrança encontrada.</td></tr>
                     @endforelse
                 </tbody>
             </table></div>

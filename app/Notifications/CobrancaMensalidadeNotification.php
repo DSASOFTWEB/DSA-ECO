@@ -28,11 +28,12 @@ class CobrancaMensalidadeNotification extends Notification
         $valor = number_format((float) $this->mensalidade->valor_total, 2, ',', '.');
 
         $atrasada = $this->mensalidade->status === 'atrasado';
+        $descricao = $this->mensalidade->ehCaucao() ? 'caução de entrada' : 'mensalidade';
 
         $mensagem = $atrasada
-            ? "Olá, {$cliente->nome}! Identificamos que sua mensalidade de R$ {$valor} (venc. {$vencimento}) está em atraso. "
+            ? "Olá, {$cliente->nome}! Identificamos que sua {$descricao} de R$ {$valor} (venc. {$vencimento}) está em atraso. "
               .'Para evitar o bloqueio do acesso, regularize o quanto antes. Qualquer dúvida, estamos à disposição.'
-            : "Olá, {$cliente->nome}! Sua mensalidade de R$ {$valor} vence em {$vencimento}. Fique de olho para não perder o acesso ao parque :)";
+            : "Olá, {$cliente->nome}! Sua {$descricao} de R$ {$valor} vence em {$vencimento}. Fique de olho para não perder o acesso ao parque :)";
 
         return [
             'to' => $cliente->routeNotificationForWhatsapp(),

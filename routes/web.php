@@ -107,6 +107,8 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('contratos', ContratoController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
     Route::get('contratos/{contrato}/pdf', [ContratoController::class, 'pdf'])->name('contratos.pdf');
+    Route::get('contratos/{contrato}/prorrogar', [ContratoController::class, 'prorrogarForm'])->name('contratos.prorrogar-form');
+    Route::patch('contratos/{contrato}/prorrogar', [ContratoController::class, 'prorrogar'])->name('contratos.prorrogar');
     Route::post('contratos/{contrato}/cancelar', [ContratoController::class, 'cancelar'])->name('contratos.cancelar');
     Route::post('contratos/{contrato}/reativar', [ContratoController::class, 'reativar'])->name('contratos.reativar');
 

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('titulo', 'Mensalidade '.$mensalidade->competencia->format('m/Y'))
+@section('titulo', $mensalidade->ehCaucao() ? 'Caução de entrada' : 'Mensalidade '.$mensalidade->competencia->format('m/Y'))
 
 @section('conteudo')
     @if (session('pix'))
@@ -12,7 +12,7 @@
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 lg:col-span-2">
-            <h3 class="mb-3 text-sm font-semibold text-slate-700">{{ $mensalidade->contrato->cliente->nome }} — {{ $mensalidade->competencia->format('m/Y') }}</h3>
+            <h3 class="mb-3 text-sm font-semibold text-slate-700">{{ $mensalidade->contrato->cliente->nome }} — {{ $mensalidade->ehCaucao() ? 'Caução / entrada' : $mensalidade->competencia->format('m/Y') }}</h3>
             <dl class="grid grid-cols-2 gap-3 text-sm">
                 <div><dt class="text-slate-400">Valor original</dt><dd>R$ {{ number_format($mensalidade->valor_original, 2, ',', '.') }}</dd></div>
                 <div><dt class="text-slate-400">Desconto</dt><dd>R$ {{ number_format($mensalidade->desconto, 2, ',', '.') }}</dd></div>

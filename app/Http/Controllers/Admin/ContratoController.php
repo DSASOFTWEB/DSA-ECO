@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Exceptions\NegocioException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Contrato\CancelarContratoRequest;
+use App\Http\Requests\Contrato\ProrrogarContratoRequest;
 use App\Http\Requests\Contrato\StoreContratoRequest;
 use App\Http\Requests\Contrato\UpdateContratoRequest;
 use App\Models\Cliente;
@@ -79,7 +80,31 @@ class ContratoController extends Controller
             return back()->withInput()->with('erro', $e->getMessage());
         }
 
-        return redirect()->route('contratos.show', $contrato)->with('sucesso', 'Plano e vencimento atualizados. Mensalidades abertas foram recalculadas.');
+        return redirect()->route('contratos.show', $contrato)->with('sucesso', 'Contrato atualizado. As cobranças abertas foram recalculadas.');
+    }
+
+    public function prorrogarForm(Contrato $contrato): View
+    {
+        $this->authorize('update', $contrato);
+
+        $proximaMensalidade = $contrato->mensalidades()
+            ->where('tipo', 'mensalidade')
+            ->whereIn('status', ['pendente', 'atrasado'])
+            ->orderBy('data_vencimento')
+            ->first();
+
+        return view('contratos.prorrogar', compact('contrato', 'proximaMensalidade'));
+    }
+
+    public function prorrogar(ProrrogarContratoRequest $request, Contrato $contrato): RedirectResponse
+    {
+        try {
+            $this->contratoService->prorrogar($contrato, $request->validated()['nova_data_vencimento']);
+        } catch (NegocioException $e) {
+            return back()->withInput()->with('erro', $e->getMessage());
+        }
+
+        return redirect()->route('contratos.show', $contrato)->with('sucesso', 'Próxima mensalidade prorrogada com sucesso.');
     }
 
     public function pdf(Contrato $contrato, ContratoPdfExport $export): Response

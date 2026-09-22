@@ -15,6 +15,7 @@ class Financeiro
     public const CATEGORIAS_ENTRADA = [
         'venda' => 'Venda',
         'entrada_avulsa' => 'Entrada avulsa',
+        'caucao' => 'Caução de contrato',
         'mensalidade' => 'Mensalidade',
         'hospedagem' => 'Hospedagem',
         'conta_a_receber' => 'Conta a receber',

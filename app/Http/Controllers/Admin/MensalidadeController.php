@@ -90,9 +90,13 @@ class MensalidadeController extends Controller
         $this->authorize('view', $mensalidade);
 
         try {
+            $descricao = $mensalidade->ehCaucao()
+                ? "Caução do contrato {$mensalidade->contrato->numero_contrato} - {$mensalidade->contrato->cliente->nome}"
+                : "Mensalidade {$mensalidade->competencia->format('m/Y')} - {$mensalidade->contrato->cliente->nome}";
+
             $cobranca = $mercadoPago->criarCobrancaPix(
                 valor: (float) $mensalidade->valor_total,
-                descricao: "Mensalidade {$mensalidade->competencia->format('m/Y')} - {$mensalidade->contrato->cliente->nome}",
+                descricao: $descricao,
                 referenciaExterna: "mensalidade:{$mensalidade->id}",
                 emailPagador: $mensalidade->contrato->cliente->email ?: 'sememail@parqueaquatico.com.br',
             );

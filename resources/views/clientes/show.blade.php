@@ -117,7 +117,7 @@
                         @forelse ($historicoPagamentos as $mensalidade)
                             <tr>
                                 <td class="py-2">
-                                    <div>{{ $mensalidade->competencia->format('m/Y') }}</div>
+                                    <div>{{ $mensalidade->ehCaucao() ? 'Caução / entrada' : $mensalidade->competencia->format('m/Y') }}</div>
                                     <div class="text-xs text-slate-400">{{ $mensalidade->contrato?->plano?->nome }}</div>
                                 </td>
                                 <td class="py-2 text-slate-500">{{ $mensalidade->data_vencimento->format('d/m/Y') }}</td>

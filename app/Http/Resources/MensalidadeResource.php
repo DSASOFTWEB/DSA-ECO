@@ -11,6 +11,7 @@ class MensalidadeResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'tipo' => $this->tipo,
             'competencia' => $this->competencia->format('m/Y'),
             'valor_total' => (float) $this->valor_total,
             'data_vencimento' => $this->data_vencimento->toDateString(),

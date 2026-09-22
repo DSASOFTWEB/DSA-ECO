@@ -41,7 +41,15 @@
                         <td class="px-4 py-3 text-slate-500">R$ {{ number_format($contrato->valor_mensal, 2, ',', '.') }}</td>
                         <td class="px-4 py-3 text-slate-500">dia {{ $contrato->dia_vencimento }}</td>
                         <td class="px-4 py-3"><x-status-badge :status="$contrato->status" /></td>
-                        <td class="px-4 py-3 text-right"><a href="{{ route('contratos.show', $contrato) }}" class="text-sky-700 hover:underline">Ver</a></td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap">
+                            <a href="{{ route('contratos.show', $contrato) }}" class="text-sky-700 hover:underline">Ver</a>
+                            @if ($contrato->estaAtivo())
+                                @can('update', $contrato)
+                                    <a href="{{ route('contratos.edit', $contrato) }}" class="ml-3 text-indigo-700 hover:underline">Editar</a>
+                                    <a href="{{ route('contratos.prorrogar-form', $contrato) }}" class="ml-3 text-amber-700 hover:underline">Prorrogar</a>
+                                @endcan
+                            @endif
+                        </td>
                     </tr>
                 @empty
                     <tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">Nenhum contrato encontrado.</td></tr>

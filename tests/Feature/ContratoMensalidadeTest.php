@@ -12,8 +12,8 @@ use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
- * Cobre o núcleo financeiro: contratar um plano gera a primeira
- * mensalidade e a carteirinha automaticamente, marcar como paga atualiza
+ * Cobre o núcleo financeiro: contratar um plano gera a caução de entrada,
+ * a primeira mensalidade e a carteirinha automaticamente; marcar como paga atualiza
  * o status corretamente e cancelar o contrato cancela só as mensalidades
  * futuras — nunca as já vencidas ou já pagas.
  */
@@ -21,7 +21,7 @@ class ContratoMensalidadeTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_contratar_gera_a_primeira_mensalidade_e_a_carteirinha(): void
+    public function test_contratar_gera_caucao_primeira_mensalidade_e_carteirinha(): void
     {
         Carbon::setTestNow('2026-03-15');
 
@@ -35,6 +35,8 @@ class ContratoMensalidadeTest extends TestCase
             'plano_id' => $plano->id,
             'data_inicio' => '2026-03-15',
             'dia_vencimento' => 10,
+            'valor_caucao' => 80,
+            'agendamento_primeiro_vencimento' => '30_dias',
         ]);
 
         $this->assertSame('ativo', $contrato->status);
@@ -42,19 +44,26 @@ class ContratoMensalidadeTest extends TestCase
         $this->assertEquals(150.00, (float) $contrato->valor_mensal);
         $this->assertNotNull($contrato->numero_contrato);
 
-        $this->assertCount(1, $contrato->mensalidades);
-        $mensalidade = $contrato->mensalidades->first();
+        $this->assertEquals(80.00, (float) $contrato->valor_caucao);
+        $this->assertSame('2026-04-14', $contrato->primeiro_vencimento->toDateString());
+        $this->assertCount(2, $contrato->mensalidades);
+
+        $caucao = $contrato->mensalidades->firstWhere('tipo', 'caucao');
+        $this->assertSame('pendente', $caucao->status);
+        $this->assertEquals(80.00, (float) $caucao->valor_total);
+        $this->assertSame('2026-03-15', $caucao->data_vencimento->toDateString());
+
+        $mensalidade = $contrato->mensalidades->firstWhere('tipo', 'mensalidade');
         $this->assertSame('pendente', $mensalidade->status);
         $this->assertEquals(150.00, (float) $mensalidade->valor_total);
-        // Dia 10 já passou em 15/03 — 1ª mensalidade vence na data de início.
-        $this->assertSame('2026-03-15', $mensalidade->data_vencimento->toDateString());
+        $this->assertSame('2026-04-14', $mensalidade->data_vencimento->toDateString());
 
         $this->assertNotNull($cliente->fresh()->carteirinha, 'A carteirinha deveria ser emitida automaticamente ao contratar.');
 
         Carbon::setTestNow();
     }
 
-    public function test_contratar_com_dia_de_vencimento_futuro_mantem_o_dia(): void
+    public function test_contratar_permite_escolher_a_data_da_primeira_mensalidade(): void
     {
         Carbon::setTestNow('2026-03-05');
 
@@ -68,9 +77,13 @@ class ContratoMensalidadeTest extends TestCase
             'plano_id' => $plano->id,
             'data_inicio' => '2026-03-05',
             'dia_vencimento' => 10,
+            'valor_caucao' => 50,
+            'agendamento_primeiro_vencimento' => 'data_escolhida',
+            'primeiro_vencimento' => '2026-05-10',
         ]);
 
-        $this->assertSame('2026-03-10', $contrato->mensalidades->first()->data_vencimento->toDateString());
+        $mensalidade = $contrato->mensalidades->firstWhere('tipo', 'mensalidade');
+        $this->assertSame('2026-05-10', $mensalidade->data_vencimento->toDateString());
 
         Carbon::setTestNow();
     }
@@ -90,11 +103,16 @@ class ContratoMensalidadeTest extends TestCase
             'plano_id' => $planoA->id,
             'data_inicio' => '2026-03-05',
             'dia_vencimento' => 10,
+            'valor_caucao' => 100,
+            'agendamento_primeiro_vencimento' => 'data_escolhida',
+            'primeiro_vencimento' => '2026-04-10',
         ]);
 
         $atualizado = app(ContratoService::class)->atualizar($contrato, [
             'plano_id' => $planoB->id,
             'dia_vencimento' => 20,
+            'valor_caucao' => 120,
+            'primeiro_vencimento' => '2026-04-20',
             'desconto_percentual' => 0,
         ]);
 
@@ -102,10 +120,14 @@ class ContratoMensalidadeTest extends TestCase
         $this->assertEquals(200.00, (float) $atualizado->valor_mensal);
         $this->assertSame(20, (int) $atualizado->dia_vencimento);
 
-        $mensalidade = $atualizado->mensalidades->first();
+        $this->assertEquals(120.00, (float) $atualizado->valor_caucao);
+        $mensalidade = $atualizado->mensalidades->firstWhere('tipo', 'mensalidade');
         $this->assertEquals(200.00, (float) $mensalidade->valor_total);
-        $this->assertSame('2026-03-20', $mensalidade->data_vencimento->toDateString());
+        $this->assertSame('2026-04-20', $mensalidade->data_vencimento->toDateString());
         $this->assertSame('pendente', $mensalidade->status);
+
+        $caucao = $atualizado->mensalidades->firstWhere('tipo', 'caucao');
+        $this->assertEquals(120.00, (float) $caucao->valor_total);
 
         Carbon::setTestNow();
     }
@@ -145,7 +167,7 @@ class ContratoMensalidadeTest extends TestCase
             'dia_vencimento' => 10,
         ]);
 
-        $mensalidade = $contrato->mensalidades->first();
+        $mensalidade = $contrato->mensalidades->firstWhere('tipo', 'mensalidade');
 
         $mensalidadePaga = app(MensalidadeService::class)->marcarComoPaga(
             $mensalidade,
@@ -166,6 +188,36 @@ class ContratoMensalidadeTest extends TestCase
         // Idempotência: chamar de novo não deve duplicar o pagamento.
         app(MensalidadeService::class)->marcarComoPaga($mensalidadePaga, gateway: 'mercadopago');
         $this->assertDatabaseCount('pagamentos', 1);
+    }
+
+    public function test_prorrogar_altera_somente_a_proxima_mensalidade_aberta(): void
+    {
+        Carbon::setTestNow('2026-03-15');
+
+        $cliente = Cliente::factory()->create();
+        $plano = Plano::factory()->create(['empresa_id' => $cliente->empresa_id]);
+        $unidade = Unidade::factory()->create(['empresa_id' => $cliente->empresa_id]);
+
+        $contrato = app(ContratoService::class)->contratar([
+            'unidade_id' => $unidade->id,
+            'cliente_id' => $cliente->id,
+            'plano_id' => $plano->id,
+            'data_inicio' => '2026-03-15',
+            'dia_vencimento' => 10,
+            'valor_caucao' => 75,
+            'agendamento_primeiro_vencimento' => '30_dias',
+        ]);
+
+        app(ContratoService::class)->prorrogar($contrato, '2026-05-14');
+
+        $caucao = $contrato->mensalidades()->where('tipo', 'caucao')->first();
+        $mensalidade = $contrato->mensalidades()->where('tipo', 'mensalidade')->first();
+
+        $this->assertSame('2026-03-15', $caucao->data_vencimento->toDateString());
+        $this->assertSame('2026-05-14', $mensalidade->data_vencimento->toDateString());
+        $this->assertSame('2026-05-14', $contrato->fresh()->primeiro_vencimento->toDateString());
+
+        Carbon::setTestNow();
     }
 
     public function test_cancelar_contrato_cancela_apenas_mensalidades_futuras_pendentes(): void

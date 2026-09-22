@@ -3,7 +3,7 @@
 @section('titulo', 'Novo contrato')
 
 @section('conteudo')
-    <form method="POST" action="{{ route('contratos.store') }}" class="max-w-4xl space-y-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
+    <form method="POST" action="{{ route('contratos.store') }}" x-data="{ agendamento: @js(old('agendamento_primeiro_vencimento', '30_dias')) }" class="max-w-4xl space-y-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
         @csrf
 
         <div x-data="{
@@ -83,10 +83,36 @@
             </div>
 
             <div>
+                <label class="block text-sm font-medium text-slate-700">Caução / entrada</label>
+                <input type="number" step="0.01" min="0.01" name="valor_caucao" value="{{ old('valor_caucao') }}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                @error('valor_caucao')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                <p class="mt-1 text-xs text-slate-400">Será gerada como cobrança de entrada, com vencimento na data de início.</p>
+            </div>
+
+            <div>
                 <label class="block text-sm font-medium text-slate-700">Desconto (%)</label>
                 <input type="number" step="0.01" min="0" max="100" name="desconto_percentual" value="{{ old('desconto_percentual', 0) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
             </div>
         </div>
+
+        <fieldset class="rounded-xl border border-slate-200 p-4 dark:border-gray-700">
+            <legend class="px-2 text-sm font-semibold text-slate-700 dark:text-gray-300">Primeira mensalidade</legend>
+            <div class="mt-2 flex flex-wrap gap-5 text-sm">
+                <label class="inline-flex items-center gap-2">
+                    <input type="radio" name="agendamento_primeiro_vencimento" value="30_dias" x-model="agendamento">
+                    30 dias após o início
+                </label>
+                <label class="inline-flex items-center gap-2">
+                    <input type="radio" name="agendamento_primeiro_vencimento" value="data_escolhida" x-model="agendamento">
+                    Escolher uma data
+                </label>
+            </div>
+            <div x-show="agendamento === 'data_escolhida'" x-cloak class="mt-4 max-w-xs">
+                <label class="block text-sm font-medium text-slate-700">Data da primeira mensalidade</label>
+                <input type="date" name="primeiro_vencimento" value="{{ old('primeiro_vencimento') }}" :required="agendamento === 'data_escolhida'" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                @error('primeiro_vencimento')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+            </div>
+        </fieldset>
 
         <div class="flex justify-end gap-2">
             <a href="{{ url()->previous() }}" class="inline-flex h-11 items-center rounded-lg border border-gray-300 px-5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300">Cancelar</a>

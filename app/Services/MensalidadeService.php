@@ -242,11 +242,13 @@ class MensalidadeService
 
             // Pagamento presencial (dinheiro/cartão na recepção) precisa entrar no caixa aberto.
             if ($caixa && $usuarioId) {
+                $rotulo = $mensalidade->ehCaucao() ? 'Caução' : 'Mensalidade';
+
                 CaixaMovimentacao::create([
                     'caixa_id' => $caixa->id,
                     'tipo' => 'entrada',
-                    'categoria' => 'mensalidade',
-                    'descricao' => "Mensalidade #{$mensalidade->id} - {$mensalidade->contrato->cliente->nome}",
+                    'categoria' => $mensalidade->ehCaucao() ? 'caucao' : 'mensalidade',
+                    'descricao' => "{$rotulo} #{$mensalidade->id} - {$mensalidade->contrato->cliente->nome}",
                     'valor' => $mensalidade->valor_total,
                     'forma_pagamento' => $metodoPagamento,
                     'referencia_type' => Pagamento::class,

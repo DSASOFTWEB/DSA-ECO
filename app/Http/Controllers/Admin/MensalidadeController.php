@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Exceptions\IntegrationException;
+use App\Exceptions\NegocioException;
 use App\Http\Controllers\Controller;
 use App\Jobs\EnviarCobrancaWhatsappJob;
 use App\Models\Mensalidade;
@@ -12,6 +13,7 @@ use App\Services\MensalidadeService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class MensalidadeController extends Controller
 {
@@ -157,5 +159,65 @@ class MensalidadeController extends Controller
         }
 
         return back()->with('sucesso', "{$enviadas} cobrança(s) enviada(s) para a fila de envio.");
+    }
+
+    public function alterarVencimento(Request $request, Mensalidade $mensalidade): RedirectResponse
+    {
+        $this->authorize('alterarVencimento', $mensalidade);
+
+        $dados = $request->validate([
+            'data_vencimento' => ['required', 'date'],
+        ]);
+
+        try {
+            $this->mensalidadeService->alterarVencimento(
+                $mensalidade,
+                Carbon::parse($dados['data_vencimento'])
+            );
+        } catch (NegocioException $e) {
+            return back()->with('erro', $e->getMessage());
+        }
+
+        return back()->with('sucesso', 'Data de vencimento atualizada.');
+    }
+
+    public function alterarVencimentoLote(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()->can('contratos.editar'), 403);
+
+        $dados = $request->validate([
+            'ids' => ['required', 'string'],
+            'data_vencimento' => ['required', 'date'],
+        ]);
+
+        $ids = array_filter(array_map('intval', explode(',', $dados['ids'])));
+        $mensalidades = Mensalidade::query()->whereIn('id', $ids)->get();
+        $autorizadas = [];
+
+        foreach ($mensalidades as $mensalidade) {
+            if ($request->user()->can('alterarVencimento', $mensalidade)) {
+                $autorizadas[] = $mensalidade->id;
+            }
+        }
+
+        if ($autorizadas === []) {
+            return back()->with('erro', 'Nenhuma cobrança elegível foi selecionada.');
+        }
+
+        $resultado = $this->mensalidadeService->alterarVencimentoEmLote(
+            $autorizadas,
+            Carbon::parse($dados['data_vencimento'])
+        );
+
+        if ($resultado['alteradas'] === 0) {
+            return back()->with('erro', 'Nenhuma cobrança em aberto pôde ser atualizada.');
+        }
+
+        $msg = "{$resultado['alteradas']} vencimento(s) atualizado(s).";
+        if ($resultado['ignoradas'] > 0) {
+            $msg .= " {$resultado['ignoradas']} ignorada(s) (já pagas/canceladas).";
+        }
+
+        return back()->with('sucesso', $msg);
     }
 }

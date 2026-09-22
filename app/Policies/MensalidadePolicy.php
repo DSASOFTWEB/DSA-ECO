@@ -37,4 +37,13 @@ class MensalidadePolicy
     {
         return $user->can('financeiro.enviar_cobranca') && $user->empresa_id === $mensalidade->empresa_id;
     }
+
+    /**
+     * Alterar data de vencimento (detalhe ou lote) — mesma permissão de
+     * editar/prorrogar contrato.
+     */
+    public function alterarVencimento(User $user, Mensalidade $mensalidade): bool
+    {
+        return $user->can('contratos.editar') && $user->empresa_id === $mensalidade->empresa_id;
+    }
 }

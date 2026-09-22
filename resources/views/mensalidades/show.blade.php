@@ -22,6 +22,25 @@
                 <div><dt class="text-slate-400">Pago em</dt><dd>{{ $mensalidade->data_pagamento?->format('d/m/Y') ?? '—' }}</dd></div>
             </dl>
 
+            @if (in_array($mensalidade->status, ['pendente', 'atrasado'], true))
+                @can('alterarVencimento', $mensalidade)
+                    <div class="mt-6 border-t border-gray-100 pt-5 dark:border-gray-800">
+                        <h4 class="mb-2 text-sm font-semibold text-slate-700 dark:text-white/90">Alterar data de vencimento</h4>
+                        <form method="POST" action="{{ route('mensalidades.alterar-vencimento', $mensalidade) }}" class="flex flex-wrap items-end gap-3">
+                            @csrf
+                            @method('PATCH')
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Nova data</label>
+                                <input type="date" name="data_vencimento" value="{{ old('data_vencimento', $mensalidade->data_vencimento->toDateString()) }}" required class="h-11 rounded-lg border border-slate-300 px-3 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                                @error('data_vencimento')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                            </div>
+                            <button class="h-11 rounded-lg border border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-500/10 dark:text-amber-200">Salvar vencimento</button>
+                        </form>
+                        <p class="mt-2 text-xs text-slate-400">Se a nova data já passou, o status fica atrasado; caso contrário, pendente.</p>
+                    </div>
+                @endcan
+            @endif
+
             @if ($mensalidade->status !== 'pago')
                 <div class="mt-6 border-t border-gray-100 pt-5 dark:border-gray-800">
                     <div class="flex flex-wrap items-end gap-3">

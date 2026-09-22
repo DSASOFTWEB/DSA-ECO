@@ -221,6 +221,69 @@ class ContratoMensalidadeTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_alterar_vencimento_da_mensalidade_em_aberto(): void
+    {
+        Carbon::setTestNow('2026-03-15');
+
+        $cliente = Cliente::factory()->create();
+        $plano = Plano::factory()->create(['empresa_id' => $cliente->empresa_id]);
+        $unidade = Unidade::factory()->create(['empresa_id' => $cliente->empresa_id]);
+
+        $contrato = app(ContratoService::class)->contratar([
+            'unidade_id' => $unidade->id,
+            'cliente_id' => $cliente->id,
+            'plano_id' => $plano->id,
+            'data_inicio' => '2026-03-15',
+            'dia_vencimento' => 10,
+            'valor_caucao' => 0,
+            'agendamento_primeiro_vencimento' => 'data_escolhida',
+            'primeiro_vencimento' => '2026-04-10',
+        ]);
+
+        $mensalidade = $contrato->mensalidades()->where('tipo', 'mensalidade')->firstOrFail();
+
+        app(MensalidadeService::class)->alterarVencimento($mensalidade, Carbon::parse('2026-04-25'));
+
+        $mensalidade->refresh();
+        $this->assertSame('2026-04-25', $mensalidade->data_vencimento->toDateString());
+        $this->assertSame('pendente', $mensalidade->status);
+        $this->assertSame('2026-04-25', $contrato->fresh()->primeiro_vencimento->toDateString());
+
+        Carbon::setTestNow();
+    }
+
+    public function test_alterar_vencimento_em_lote(): void
+    {
+        Carbon::setTestNow('2026-03-15');
+
+        $cliente = Cliente::factory()->create();
+        $plano = Plano::factory()->create(['empresa_id' => $cliente->empresa_id]);
+        $unidade = Unidade::factory()->create(['empresa_id' => $cliente->empresa_id]);
+
+        $contrato = app(ContratoService::class)->contratar([
+            'unidade_id' => $unidade->id,
+            'cliente_id' => $cliente->id,
+            'plano_id' => $plano->id,
+            'data_inicio' => '2026-03-15',
+            'dia_vencimento' => 10,
+            'valor_caucao' => 50,
+            'agendamento_primeiro_vencimento' => 'data_escolhida',
+            'primeiro_vencimento' => '2026-04-10',
+        ]);
+
+        $ids = $contrato->mensalidades()->whereIn('status', ['pendente', 'atrasado'])->pluck('id')->all();
+        $resultado = app(MensalidadeService::class)->alterarVencimentoEmLote($ids, Carbon::parse('2026-05-01'));
+
+        $this->assertSame(count($ids), $resultado['alteradas']);
+        $this->assertTrue(
+            $contrato->mensalidades()->whereIn('id', $ids)->get()->every(
+                fn ($m) => $m->data_vencimento->toDateString() === '2026-05-01'
+            )
+        );
+
+        Carbon::setTestNow();
+    }
+
     public function test_cancelar_contrato_cancela_apenas_mensalidades_futuras_pendentes(): void
     {
         $cliente = Cliente::factory()->create();

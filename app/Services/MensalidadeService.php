@@ -310,22 +310,86 @@ class MensalidadeService
                 throw new NegocioException('A nova data precisa ser posterior ao vencimento atual.');
             }
 
-            $primeiraMensalidadeId = $contrato->mensalidades()
-                ->where('tipo', 'mensalidade')
-                ->oldest('id')
-                ->value('id');
+            return $this->alterarVencimento($mensalidade, $novaData, observacao: 'Vencimento prorrogado em '.now()->format('d/m/Y').'.');
+        });
+    }
+
+    /**
+     * Altera a data de vencimento de uma mensalidade/caução em aberto.
+     * Recalcula o status (pendente/atrasado) e, se for a 1ª mensalidade
+     * do contrato, mantém `primeiro_vencimento` alinhado.
+     */
+    public function alterarVencimento(Mensalidade $mensalidade, Carbon $novaData, ?string $observacao = null): Mensalidade
+    {
+        if (! in_array($mensalidade->status, ['pendente', 'atrasado'], true)) {
+            throw new NegocioException('Só é possível alterar o vencimento de cobranças em aberto (pendente ou atrasada).');
+        }
+
+        return DB::transaction(function () use ($mensalidade, $novaData, $observacao) {
+            $mensalidade = Mensalidade::query()->whereKey($mensalidade->id)->lockForUpdate()->firstOrFail();
+
+            if (! in_array($mensalidade->status, ['pendente', 'atrasado'], true)) {
+                throw new NegocioException('Só é possível alterar o vencimento de cobranças em aberto (pendente ou atrasada).');
+            }
+
+            $novaData = $novaData->copy()->startOfDay();
+            $status = $novaData->lt(now()->startOfDay()) ? 'atrasado' : 'pendente';
+            $nota = $observacao ?? ('Vencimento alterado para '.$novaData->format('d/m/Y').' em '.now()->format('d/m/Y H:i').'.');
 
             $mensalidade->update([
                 'data_vencimento' => $novaData->toDateString(),
-                'status' => 'pendente',
-                'observacoes' => trim(($mensalidade->observacoes ? $mensalidade->observacoes.' ' : '').'Vencimento prorrogado em '.now()->format('d/m/Y').'.'),
+                'status' => $status,
+                'observacoes' => trim(($mensalidade->observacoes ? $mensalidade->observacoes.' ' : '').$nota),
             ]);
 
-            if ($mensalidade->id === $primeiraMensalidadeId) {
-                $contrato->update(['primeiro_vencimento' => $novaData->toDateString()]);
+            if ($mensalidade->tipo === 'mensalidade') {
+                $primeiraMensalidadeId = Mensalidade::query()
+                    ->where('contrato_id', $mensalidade->contrato_id)
+                    ->where('tipo', 'mensalidade')
+                    ->oldest('id')
+                    ->value('id');
+
+                if ($mensalidade->id === $primeiraMensalidadeId) {
+                    Contrato::query()->whereKey($mensalidade->contrato_id)->update([
+                        'primeiro_vencimento' => $novaData->toDateString(),
+                    ]);
+                }
             }
 
             return $mensalidade->fresh();
         });
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return array{alteradas: int, ignoradas: int}
+     */
+    public function alterarVencimentoEmLote(array $ids, Carbon $novaData): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        $alteradas = 0;
+        $ignoradas = 0;
+
+        foreach ($ids as $id) {
+            $mensalidade = Mensalidade::query()->find($id);
+            if (! $mensalidade || ! in_array($mensalidade->status, ['pendente', 'atrasado'], true)) {
+                $ignoradas++;
+
+                continue;
+            }
+
+            try {
+                $this->alterarVencimento(
+                    $mensalidade,
+                    $novaData,
+                    observacao: 'Vencimento alterado em lote para '.$novaData->format('d/m/Y').' em '.now()->format('d/m/Y H:i').'.'
+                );
+                $alteradas++;
+            } catch (NegocioException) {
+                $ignoradas++;
+            }
+        }
+
+        return compact('alteradas', 'ignoradas');
     }
 }

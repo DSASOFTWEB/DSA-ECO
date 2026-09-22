@@ -116,7 +116,9 @@ Route::middleware('auth')->group(function () {
     Route::post('mensalidades/{mensalidade}/baixar', [MensalidadeController::class, 'baixarManual'])->name('mensalidades.baixar');
     Route::post('mensalidades/{mensalidade}/gerar-pix', [MensalidadeController::class, 'gerarPix'])->name('mensalidades.gerar-pix');
     Route::post('mensalidades/{mensalidade}/cobrar-whatsapp', [MensalidadeController::class, 'cobrarWhatsapp'])->name('mensalidades.cobrar-whatsapp');
+    Route::patch('mensalidades/{mensalidade}/vencimento', [MensalidadeController::class, 'alterarVencimento'])->name('mensalidades.alterar-vencimento');
     Route::post('mensalidades/cobrar-whatsapp-lote', [MensalidadeController::class, 'cobrarWhatsappLote'])->name('mensalidades.cobrar-whatsapp-lote');
+    Route::post('mensalidades/alterar-vencimento-lote', [MensalidadeController::class, 'alterarVencimentoLote'])->name('mensalidades.alterar-vencimento-lote');
 
     Route::get('financeiro', [FinanceiroController::class, 'index'])->name('financeiro.index');
     Route::post('financeiro/contas-pagar', [ContaPagarController::class, 'store'])->name('contas-pagar.store');

@@ -28,7 +28,8 @@
 
             <div>
                 <label class="block text-sm font-medium">Dia de vencimento</label>
-                <input type="number" min="1" max="28" name="dia_vencimento" value="{{ old('dia_vencimento', $contrato->dia_vencimento) }}" required class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                <input type="number" min="1" max="31" name="dia_vencimento" value="{{ old('dia_vencimento', $contrato->dia_vencimento) }}" required class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                <p class="mt-1 text-xs text-slate-400">1 a 31. Em meses sem esse dia, usa o último dia do mês.</p>
                 @error('dia_vencimento')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                 <p class="mt-1 text-xs text-slate-400">Atualiza o vencimento das mensalidades ainda abertas (pendente/atrasado).</p>
             </div>

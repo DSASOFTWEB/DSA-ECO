@@ -22,7 +22,7 @@ class UpdateContratoRequest extends FormRequest
 
         return [
             'plano_id' => ['required', Rule::exists('planos', 'id')->where('empresa_id', $empresaId)],
-            'dia_vencimento' => ['required', 'integer', 'between:1,28'],
+            'dia_vencimento' => ['required', 'integer', 'between:1,31'],
             'valor_mensal' => ['nullable', 'numeric', 'min:0'],
             'valor_caucao' => ['required', 'numeric', 'min:0'],
             'primeiro_vencimento' => ['required', 'date', 'after:data_inicio'],

@@ -122,7 +122,8 @@
 
             <div>
                 <label class="block text-sm font-medium text-slate-700">Dia de vencimento (mensalidades seguintes)</label>
-                <input type="number" min="1" max="28" name="dia_vencimento" value="{{ old('dia_vencimento', 10) }}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <input type="number" min="1" max="31" name="dia_vencimento" value="{{ old('dia_vencimento', 10) }}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <p class="mt-1 text-xs text-slate-400">1 a 31. Em meses sem esse dia, usa o último dia do mês.</p>
             </div>
 
             <div>

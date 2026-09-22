@@ -37,7 +37,7 @@ return new class extends Migration
             $table->string('numero_contrato', 30)->nullable()->unique();
             $table->date('data_inicio');
             $table->date('data_fim')->nullable();
-            $table->unsignedTinyInteger('dia_vencimento'); // 1 a 28
+            $table->unsignedTinyInteger('dia_vencimento'); // 1 a 31 (meses curtos: último dia)
             $table->decimal('valor_mensal', 15, 2);
             $table->decimal('desconto_percentual', 5, 2)->default(0);
             $table->string('status', 20)->default('ativo'); // ativo, suspenso, cancelado, encerrado
@@ -62,8 +62,8 @@ return new class extends Migration
             $table->unique(['contrato_id', 'dependente_id']);
         });
 
-        // Regra: dia_vencimento precisa estar entre 1 e 28 (evita problemas com meses de 28/29/30/31 dias)
-        DB::statement('ALTER TABLE contratos ADD CONSTRAINT contratos_dia_vencimento_check CHECK (dia_vencimento BETWEEN 1 AND 28)');
+        // Regra: dia_vencimento entre 1 e 31 (meses curtos usam o último dia disponível).
+        DB::statement('ALTER TABLE contratos ADD CONSTRAINT contratos_dia_vencimento_check CHECK (dia_vencimento BETWEEN 1 AND 31)');
     }
 
     public function down(): void

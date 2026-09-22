@@ -47,7 +47,7 @@ diferenças de dialeto SQL mereceram decisão explícita, documentadas aqui para
 for revisar o schema:
 
 1. **CHECK constraints continuam existindo e sendo aplicadas.** As 5 regras
-   (`contratos.dia_vencimento BETWEEN 1 AND 28`, `tipo IN ('entrada','saida')` em
+   (`contratos.dia_vencimento BETWEEN 1 AND 31`, `tipo IN ('entrada','saida')` em
    `acessos`/`caixa_movimentacoes`, `venda_itens.quantidade > 0`,
    `comissoes` com origem obrigatória, `carteirinhas` com titular exclusivo) usam
    sintaxe `ALTER TABLE ... ADD CONSTRAINT ... CHECK (...)` idêntica em Postgres e

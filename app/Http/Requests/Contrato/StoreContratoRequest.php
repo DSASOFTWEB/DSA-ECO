@@ -28,7 +28,7 @@ class StoreContratoRequest extends FormRequest
             'plano_id' => ['required', Rule::exists('planos', 'id')->where('empresa_id', $empresaId)],
             'vendedor_id' => ['nullable', Rule::exists('users', 'id')->where('empresa_id', $empresaId)],
             'data_inicio' => ['required', 'date'],
-            'dia_vencimento' => ['required', 'integer', 'between:1,28'],
+            'dia_vencimento' => ['required', 'integer', 'between:1,31'],
             'valor_mensal' => ['nullable', 'numeric', 'min:0'],
             'valor_caucao' => ['required', 'numeric', 'min:0'],
             'agendamento_primeiro_vencimento' => ['required', Rule::in(['30_dias', 'data_escolhida'])],

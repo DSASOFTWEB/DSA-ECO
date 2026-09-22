@@ -19,6 +19,9 @@
     >
         @csrf
         @method('PUT')
+        @can('gerenciarPapeis', $user)
+            <input type="hidden" name="sincronizar_acesso" value="1">
+        @endcan
         <div class="grid gap-5 sm:grid-cols-2">
             <div>
                 <label class="block text-sm font-medium text-slate-700">Nome</label>

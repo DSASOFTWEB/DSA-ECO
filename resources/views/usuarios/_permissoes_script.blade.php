@@ -13,6 +13,7 @@
                     return;
                 }
                 this.permissoesSelecionadas = this.permissoesSelecionadas.filter((p) => p !== nome);
+                this.removerPapeisIncompativeis();
             },
 
             moduloCompleto(perms) {
@@ -20,7 +21,16 @@
             },
 
             alternarModulo(perms, marcado) {
-                perms.forEach((p) => this.togglePermissao(p, marcado));
+                if (marcado) {
+                    perms.forEach((p) => {
+                        if (! this.permissoesSelecionadas.includes(p)) {
+                            this.permissoesSelecionadas.push(p);
+                        }
+                    });
+                    return;
+                }
+                this.permissoesSelecionadas = this.permissoesSelecionadas.filter((p) => ! perms.includes(p));
+                this.removerPapeisIncompativeis();
             },
 
             marcarTodosModulos() {
@@ -31,6 +41,14 @@
 
             limparModulos() {
                 this.permissoesSelecionadas = [];
+                this.removerPapeisIncompativeis();
+            },
+
+            removerPapeisIncompativeis() {
+                this.papeisSelecionados = this.papeisSelecionados.filter((papel) => {
+                    const pacote = this.permissoesPorPapel[papel] || [];
+                    return pacote.every((p) => this.permissoesSelecionadas.includes(p));
+                });
             },
 
             recomputarPermissoesDosPapeis() {

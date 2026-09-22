@@ -18,6 +18,7 @@
         class="max-w-5xl space-y-5 rounded-2xl border border-gray-200 bg-white p-6 text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 [&_input]:outline-none [&_input]:transition [&_input]:focus:border-brand-500 [&_input]:focus:ring-3 [&_input]:focus:ring-brand-500/10 [&_input]:dark:border-gray-700 [&_input]:dark:bg-gray-800 [&_input]:dark:text-white [&_select]:outline-none [&_select]:transition [&_select]:focus:border-brand-500 [&_select]:focus:ring-3 [&_select]:focus:ring-brand-500/10 [&_select]:dark:border-gray-700 [&_select]:dark:bg-gray-800 [&_select]:dark:text-white"
     >
         @csrf
+        <input type="hidden" name="sincronizar_acesso" value="1">
         <div class="grid gap-5 sm:grid-cols-2">
             <div>
                 <label class="block text-sm font-medium text-slate-700">Nome</label>

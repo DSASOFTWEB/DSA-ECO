@@ -77,20 +77,58 @@ class UserAuthorizationTest extends TestCase
                 'name' => $alvo->name,
                 'email' => $alvo->email,
                 'status' => 'ativo',
+                'sincronizar_acesso' => '1',
                 'roles' => ['vendedor'],
                 'permissions' => ['clientes.visualizar', 'vendas.criar', 'vendas.visualizar'],
             ])
             ->assertRedirect(route('usuarios.index'));
 
         $alvo->refresh();
-        $this->assertTrue($alvo->hasRole('vendedor'));
+        // Pacote do vendedor não está completo → perfil cai; ficam só as permissões marcadas.
+        $this->assertFalse($alvo->hasRole('vendedor'));
         $this->assertTrue($alvo->hasPermissionTo('clientes.visualizar'));
         $this->assertTrue($alvo->hasPermissionTo('vendas.criar'));
-        $this->assertFalse($alvo->hasDirectPermission('contratos.criar'));
+        $this->assertFalse($alvo->can('contratos.criar'));
         $this->assertEqualsCanonicalizing(
             ['clientes.visualizar', 'vendas.criar', 'vendas.visualizar'],
             $alvo->getDirectPermissions()->pluck('name')->all()
         );
+    }
+
+    public function test_desmarcar_pousada_remove_acesso_mesmo_com_perfil_admin(): void
+    {
+        $admin = $this->criarAdminTenant();
+        $this->seedPermissoesCompletas();
+
+        $alvo = User::factory()->create([
+            'empresa_id' => $admin->empresa_id,
+            'unidade_id' => $admin->unidade_id,
+        ]);
+        $alvo->syncRoles(['admin']);
+        $alvo->syncPermissions(\App\Support\ModulosPermissoes::todasPermissoes());
+
+        $semPousada = array_values(array_filter(
+            \App\Support\ModulosPermissoes::todasPermissoes(),
+            fn (string $p): bool => ! str_starts_with($p, 'pousada.')
+        ));
+
+        $this->actingAs($admin)
+            ->put(route('usuarios.update', $alvo), [
+                'name' => $alvo->name,
+                'email' => $alvo->email,
+                'status' => 'ativo',
+                'sincronizar_acesso' => '1',
+                'roles' => ['admin'],
+                'permissions' => $semPousada,
+            ])
+            ->assertRedirect(route('usuarios.index'));
+
+        $alvo->refresh();
+        $this->assertFalse($alvo->hasRole('admin'));
+        $this->assertFalse($alvo->can('pousada.visualizar'));
+        $this->assertFalse($alvo->can('pousada.reservar'));
+        $this->assertTrue($alvo->can('clientes.visualizar'));
+        $this->assertTrue($alvo->can('acessos.validar'));
     }
 
     private function seedPermissoesCompletas(): void

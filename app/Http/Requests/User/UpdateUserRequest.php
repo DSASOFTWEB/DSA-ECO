@@ -14,6 +14,18 @@ class UpdateUserRequest extends FormRequest
         return $this->user()->can('update', $this->route('usuario'));
     }
 
+    protected function prepareForValidation(): void
+    {
+        // Sem hidden inputs (tudo desmarcado), o browser omite permissions[] —
+        // força array vazio para a matriz ser a fonte da verdade.
+        if ($this->boolean('sincronizar_acesso')) {
+            $this->merge([
+                'permissions' => $this->input('permissions', []),
+                'roles' => $this->input('roles', []),
+            ]);
+        }
+    }
+
     public function rules(): array
     {
         $empresaId = $this->user()->empresa_id;
@@ -27,6 +39,7 @@ class UpdateUserRequest extends FormRequest
             'percentual_comissao_reativacao' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'status' => ['nullable', 'in:ativo,inativo'],
             'password' => ['nullable', 'confirmed', Password::defaults()],
+            'sincronizar_acesso' => ['nullable', 'boolean'],
             'roles' => ['nullable', 'array'],
             'roles.*' => ['string', Rule::exists('roles', 'name')->whereNotIn('name', ['super_admin'])],
             'permissions' => ['nullable', 'array'],

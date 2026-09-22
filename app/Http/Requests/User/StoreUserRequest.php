@@ -15,6 +15,16 @@ class StoreUserRequest extends FormRequest
         return $this->user()->can('create', \App\Models\User::class);
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->boolean('sincronizar_acesso')) {
+            $this->merge([
+                'permissions' => $this->input('permissions', []),
+                'roles' => $this->input('roles', []),
+            ]);
+        }
+    }
+
     public function rules(): array
     {
         $empresaId = $this->user()->empresa_id;
@@ -27,6 +37,7 @@ class StoreUserRequest extends FormRequest
             'percentual_comissao' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'percentual_comissao_reativacao' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'password' => ['required', Password::defaults()],
+            'sincronizar_acesso' => ['nullable', 'boolean'],
             'roles' => ['nullable', 'array'],
             'roles.*' => ['string', Rule::exists('roles', 'name')->whereNotIn('name', ['super_admin'])],
             'permissions' => ['nullable', 'array'],

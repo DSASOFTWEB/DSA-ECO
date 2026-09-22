@@ -49,7 +49,7 @@ class UserController extends Controller
         $dados['empresa_id'] = $request->user()->empresa_id;
 
         $user = User::create($dados);
-        $this->sincronizarAcesso($user, $roles, $permissions);
+        $this->sincronizarAcesso($user, $roles, $permissions, permissoesExplicitas: true);
 
         return redirect()->route('usuarios.index')->with('sucesso', "Usuário \"{$user->name}\" criado com sucesso.");
     }
@@ -88,13 +88,14 @@ class UserController extends Controller
             $this->authorize('gerenciarPapeis', $usuario);
 
             $roles ??= $usuario->getRoleNames()->all();
-            $permissions ??= $usuario->getAllPermissions()->pluck('name')->all();
+            $permissoesExplicitas = $permissions !== null;
+            $permissions ??= $usuario->getDirectPermissions()->pluck('name')->all();
 
             if (in_array('admin', $roles, true)) {
                 $this->authorize('atribuirAdmin', User::class);
             }
 
-            $this->sincronizarAcesso($usuario, $roles, $permissions);
+            $this->sincronizarAcesso($usuario, $roles, $permissions, $permissoesExplicitas);
         }
 
         return redirect()->route('usuarios.index')->with('sucesso', 'Usuário atualizado com sucesso.');
@@ -112,20 +113,21 @@ class UserController extends Controller
     }
 
     /**
-     * Perfis (roles) + matriz de módulos. As permissões marcadas na matriz
-     * são gravadas no usuário; se só veio perfil, aplica o pacote padrão.
+     * Perfis (roles) + matriz de módulos. A matriz é a fonte da verdade:
+     * perfil só permanece se o pacote inteiro ainda estiver marcado.
+     * Sem matriz (só perfil), aplica o pacote padrão do perfil.
      *
      * @param  list<string>  $roles
      * @param  list<string>  $permissions
      */
-    protected function sincronizarAcesso(User $user, array $roles, array $permissions): void
+    protected function sincronizarAcesso(User $user, array $roles, array $permissions, bool $permissoesExplicitas = true): void
     {
         $permissions = array_values(array_intersect(
             array_unique($permissions),
             ModulosPermissoes::todasPermissoes()
         ));
 
-        if ($permissions === [] && $roles !== []) {
+        if (! $permissoesExplicitas && $permissions === [] && $roles !== []) {
             foreach ($roles as $papel) {
                 foreach (ModulosPermissoes::permissoesPorPapel()[$papel] ?? [] as $perm) {
                     $permissions[] = $perm;
@@ -134,7 +136,17 @@ class UserController extends Controller
             $permissions = array_values(array_unique($permissions));
         }
 
+        if ($permissoesExplicitas) {
+            // Desmarcar um módulo invalida o perfil que o inclui (ex.: admin + pousada off).
+            $roles = array_values(array_filter($roles, function (string $papel) use ($permissions): bool {
+                $pacote = ModulosPermissoes::permissoesPorPapel()[$papel] ?? [];
+
+                return $pacote === [] || array_diff($pacote, $permissions) === [];
+            }));
+        }
+
         $user->syncRoles($roles);
         $user->syncPermissions($permissions);
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
     }
 }

@@ -122,30 +122,45 @@
         <nav class="flex-1 overflow-y-auto px-2 py-4" :class="(sidebarCollapsed && !sidebarPinnedHover) ? 'px-2' : 'px-3'">
             <div class="space-y-1">
                 @foreach ($menuGroups as $groupLabel => $items)
-                    @php $groupKey = \Illuminate\Support\Str::slug($groupLabel); @endphp
+                    @php
+                        $groupKey = \Illuminate\Support\Str::slug($groupLabel);
+                        $grupoDestaque = $groupLabel === 'Acesso';
+                    @endphp
                     <section class="pt-2 first:pt-0">
                         <button
                             type="button"
-                            class="mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 transition hover:bg-gray-50 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
+                            class="mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider transition
+                                {{ $grupoDestaque
+                                    ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25'
+                                    : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300' }}"
                             :class="(sidebarCollapsed && !sidebarPinnedHover) ? 'justify-center px-2' : 'justify-between'"
                             @click="toggleGroup(@js($groupKey))"
-                            title="{{ $groupLabel }}"
-                            :aria-expanded="isGroupOpen(@js($groupKey), @js($menuGroupsAtivos[$groupKey] ?? false))"
+                            title="{{ $groupLabel }}{{ $grupoDestaque ? ' (mais usado)' : '' }}"
+                            :aria-expanded="isGroupOpen(@js($groupKey), @js(($menuGroupsAtivos[$groupKey] ?? false) || $grupoDestaque))"
                         >
-                            <span x-show="!sidebarCollapsed || sidebarPinnedHover" x-cloak>{{ $groupLabel }}</span>
-                            <span x-cloak x-show="sidebarCollapsed && !sidebarPinnedHover" class="h-1 w-1 rounded-full bg-gray-300 dark:bg-gray-600"></span>
+                            <span class="inline-flex items-center gap-1.5" x-show="!sidebarCollapsed || sidebarPinnedHover" x-cloak>
+                                @if ($grupoDestaque)
+                                    <svg class="h-3.5 w-3.5 shrink-0 text-amber-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                    </svg>
+                                @endif
+                                {{ $groupLabel }}
+                            </span>
+                            <span x-cloak x-show="sidebarCollapsed && !sidebarPinnedHover" class="relative inline-flex">
+                                <span class="h-1.5 w-1.5 rounded-full {{ $grupoDestaque ? 'bg-amber-400' : 'bg-gray-300 dark:bg-gray-600' }}"></span>
+                            </span>
                             <svg
                                 x-show="!sidebarCollapsed || sidebarPinnedHover"
                                 x-cloak
-                                class="h-3.5 w-3.5 shrink-0 transition-transform"
-                                :class="isGroupOpen(@js($groupKey), @js($menuGroupsAtivos[$groupKey] ?? false)) ? 'rotate-180' : ''"
+                                class="h-3.5 w-3.5 shrink-0 transition-transform {{ $grupoDestaque ? 'text-amber-600 dark:text-amber-300' : '' }}"
+                                :class="isGroupOpen(@js($groupKey), @js(($menuGroupsAtivos[$groupKey] ?? false) || $grupoDestaque)) ? 'rotate-180' : ''"
                                 fill="none" viewBox="0 0 24 24" stroke="currentColor"
                             ><path stroke-linecap="round" stroke-width="2" d="m6 9 6 6 6-6"/></svg>
                         </button>
 
                         <div
-                            class="space-y-0.5"
-                            x-show="isGroupOpen(@js($groupKey), @js($menuGroupsAtivos[$groupKey] ?? false)) || (sidebarCollapsed && !sidebarPinnedHover)"
+                            class="space-y-0.5 {{ $grupoDestaque ? 'rounded-xl border border-amber-200/80 bg-amber-50/40 p-1 dark:border-amber-500/20 dark:bg-amber-500/5' : '' }}"
+                            x-show="isGroupOpen(@js($groupKey), @js(($menuGroupsAtivos[$groupKey] ?? false) || $grupoDestaque)) || (sidebarCollapsed && !sidebarPinnedHover)"
                         >
                             @foreach ($items as [$match, $routeName, $label, $icon])
                                 @if (\Illuminate\Support\Facades\Route::has($routeName))
@@ -158,12 +173,24 @@
                                             href="{{ route($routeName) }}"
                                             @click="sidebarOpen = false"
                                             title="{{ $label }}"
-                                            class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $active ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white' }}"
+                                            class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition
+                                                {{ $active
+                                                    ? ($grupoDestaque
+                                                        ? 'bg-amber-500 text-white shadow-sm dark:bg-amber-500 dark:text-white'
+                                                        : 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400')
+                                                    : ($grupoDestaque
+                                                        ? 'text-amber-900/80 hover:bg-amber-100 hover:text-amber-950 dark:text-amber-100/90 dark:hover:bg-amber-500/20 dark:hover:text-amber-50'
+                                                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white') }}"
                                             :class="(sidebarCollapsed && !sidebarPinnedHover) ? 'justify-center px-2' : ''"
                                             @if($active) aria-current="page" @endif
                                         >
-                                            <x-nav-icon :name="$icon" class="h-5 w-5 shrink-0" />
-                                            <span x-show="!sidebarCollapsed || sidebarPinnedHover" x-cloak>{{ $label }}</span>
+                                            <x-nav-icon :name="$icon" class="h-5 w-5 shrink-0 {{ $grupoDestaque && ! $active ? 'text-amber-600 dark:text-amber-300' : '' }}" />
+                                            <span class="min-w-0 flex-1 truncate" x-show="!sidebarCollapsed || sidebarPinnedHover" x-cloak>{{ $label }}</span>
+                                            @if ($grupoDestaque && $routeName === 'app-validador.index')
+                                                <svg x-show="!sidebarCollapsed || sidebarPinnedHover" x-cloak class="h-3.5 w-3.5 shrink-0 {{ $active ? 'text-amber-100' : 'text-amber-500' }}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                                </svg>
+                                            @endif
                                         </a>
                                     @endif
                                 @endif
@@ -248,6 +275,10 @@
                 isGroupOpen(key, hasActive) {
                     if (Object.prototype.hasOwnProperty.call(this.openGroups, key)) {
                         return !!this.openGroups[key];
+                    }
+                    // Acesso fica aberto por padrão (módulo mais usado).
+                    if (key === 'acesso') {
+                        return true;
                     }
                     return !!hasActive;
                 },

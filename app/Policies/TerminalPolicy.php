@@ -19,7 +19,7 @@ class TerminalPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasRole('admin') && $user->can('terminais.criar');
+        return $user->can('terminais.criar');
     }
 
     public function update(User $user, Terminal $terminal): bool

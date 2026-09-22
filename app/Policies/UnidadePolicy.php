@@ -19,7 +19,7 @@ class UnidadePolicy
 
     public function create(User $user): bool
     {
-        return $user->hasRole('admin') && $user->can('unidades.criar');
+        return $user->can('unidades.criar');
     }
 
     public function update(User $user, Unidade $unidade): bool

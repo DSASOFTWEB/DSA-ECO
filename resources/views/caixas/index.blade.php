@@ -17,7 +17,14 @@
                     @endforeach
                 </select>
                 @if ($terminais->isEmpty())
-                    <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">Nenhum terminal cadastrado. <a href="{{ route('terminais.create') }}" class="underline">Crie um terminal</a> antes de abrir o caixa.</p>
+                    <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                        Nenhum terminal cadastrado.
+                        @can('create', \App\Models\Terminal::class)
+                            <a href="{{ route('terminais.create') }}" class="underline">Crie um terminal</a> antes de abrir o caixa.
+                        @else
+                            Peça a um administrador para cadastrar um terminal antes de abrir o caixa.
+                        @endcan
+                    </p>
                 @endif
             </div>
             <div>

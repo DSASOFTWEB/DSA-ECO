@@ -34,6 +34,11 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 
 COPY . .
+# As pastas de runtime precisam existir ANTES do composer install: o
+# package:discover sobe providers (ex.: blade-icons) que resolvem o compilador
+# Blade, e ele falha com "Please provide a valid cache path" sem
+# storage/framework/views (Git não versiona pasta vazia).
+RUN mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache/data storage/logs bootstrap/cache
 RUN composer install \
         --no-dev \
         --optimize-autoloader \
@@ -46,8 +51,7 @@ COPY --from=assets /app/public/build ./public/build
 COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 COPY docker/php-prod.ini /usr/local/etc/php/conf.d/zz-parque-prod.ini
 
-RUN mkdir -p storage/framework/{sessions,views,cache/data} storage/logs bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache
+RUN chown -R www-data:www-data storage bootstrap/cache
 
 COPY docker/entrypoint.prod.sh /usr/local/bin/entrypoint.sh
 # Windows pode gravar CRLF; no Linux isso quebra o shebang.

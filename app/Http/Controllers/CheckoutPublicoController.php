@@ -6,11 +6,16 @@ use App\Exceptions\IntegrationException;
 use App\Exceptions\NegocioException;
 use App\Models\Acesso;
 use App\Models\Cliente;
+use App\Models\Empresa;
+use App\Models\Pagamento;
 use App\Models\TipoEntrada;
 use App\Models\Unidade;
 use App\Models\Venda;
 use App\Services\AcessoService;
 use App\Services\Integrations\MercadoPagoService;
+use App\Services\Integrations\Pix\GatewayPix;
+use App\Services\Integrations\Pix\GatewayPixResolver;
+use App\Services\QrCodeService;
 use App\Services\Relatorios\VoucherCheckinPdfExport;
 use App\Services\Relatorios\VoucherEntradaPdfExport;
 use App\Services\VendaService;
@@ -18,29 +23,35 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\URL;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Link público de autoatendimento: o próprio cliente escolhe o tipo de
- * entrada e a quantidade, paga via Pix (Mercado Pago) e, assim que o
- * pagamento é confirmado pelo webhook, os ingressos já valem e a venda cai
- * no caixa do dia da unidade — sem nenhum operador envolvido. Ver
- * App\Services\VendaService (criarVendaOnlinePendente/confirmarPagamentoOnline)
- * e App\Jobs\ProcessarWebhookMercadoPagoJob.
+ * entrada e a quantidade, paga via Pix no gateway configurado na empresa
+ * (Mercado Pago ou Itaú) e, assim que o pagamento é confirmado, os
+ * ingressos já valem e a venda cai no caixa do dia da unidade — sem nenhum
+ * operador envolvido. Mercado Pago confirma pelo webhook
+ * (App\Jobs\ProcessarWebhookMercadoPagoJob); o Itaú não tem webhook, então
+ * a consulta de status da tela do pedido pergunta ao banco.
  */
 class CheckoutPublicoController extends Controller
 {
     public function __construct(
         protected VendaService $vendaService,
         protected AcessoService $acessoService,
+        protected GatewayPixResolver $gatewayResolver,
+        protected QrCodeService $qrCodeService,
     ) {}
 
     public function index(Unidade $unidade): View
     {
         $tiposEntrada = TipoEntrada::where('empresa_id', $unidade->empresa_id)->ativos()->orderBy('valor')->get();
+        $pixDisponivel = $unidade->empresa->gatewayPixAtivo();
 
-        return view('checkout.index', compact('unidade', 'tiposEntrada'));
+        return view('checkout.index', compact('unidade', 'tiposEntrada', 'pixDisponivel'));
     }
 
     public function store(Request $request, Unidade $unidade): RedirectResponse
@@ -52,24 +63,39 @@ class CheckoutPublicoController extends Controller
 
         $tipoEntrada = TipoEntrada::where('empresa_id', $unidade->empresa_id)->ativos()->findOrFail($dados['tipo_entrada_id']);
 
+        $empresa = $unidade->empresa;
+        $gateway = $this->gatewayResolver->paraEmpresa($empresa);
+
+        if (! $gateway) {
+            return back()->withInput()->with('erro', 'A compra online com Pix está indisponível no momento. Procure a recepção do parque.');
+        }
+
         $venda = null;
 
         try {
             $venda = $this->vendaService->criarVendaOnlinePendente($unidade, $tipoEntrada, (int) $dados['quantidade']);
+            $descricao = "{$venda->itens->first()->quantidade}x {$tipoEntrada->nome} - {$unidade->nome}";
 
-            $host = parse_url(config('app.url'), PHP_URL_HOST) ?: 'example.com';
-            // Credencial da PRÓPRIA empresa da unidade quando configurada
-            // (cada parque recebe na sua conta) — cai pro .env da
-            // plataforma se a empresa não tiver configurado a sua.
-            $mercadoPago = MercadoPagoService::paraEmpresa($unidade->empresa);
-            $cobranca = $mercadoPago->criarCobrancaPix(
-                valor: (float) $venda->valor_total,
-                descricao: "{$venda->itens->first()->quantidade}x {$tipoEntrada->nome} - {$unidade->nome}",
-                referenciaExterna: "venda:{$venda->id}",
-                emailPagador: "checkout-unidade{$unidade->id}@{$host}",
-            );
+            if ($gateway->nome() === Empresa::GATEWAY_PIX_MERCADOPAGO) {
+                // external_reference "venda:{id}" é o que o webhook usa para confirmar.
+                $host = parse_url(config('app.url'), PHP_URL_HOST) ?: 'example.com';
+                $cobranca = MercadoPagoService::paraEmpresa($empresa)->criarCobrancaPix(
+                    valor: (float) $venda->valor_total,
+                    descricao: $descricao,
+                    referenciaExterna: "venda:{$venda->id}",
+                    emailPagador: "checkout-unidade{$unidade->id}@{$host}",
+                );
 
-            $this->vendaService->registrarPagamentoPixPendente($venda, isset($cobranca['id']) ? (string) $cobranca['id'] : null, $cobranca);
+                $this->vendaService->registrarPagamentoPixPendente($venda, isset($cobranca['id']) ? (string) $cobranca['id'] : null, $cobranca);
+            } else {
+                $cobranca = $gateway->criarCobranca((float) $venda->valor_total, $descricao);
+
+                $this->vendaService->registrarPagamentoPixPendente($venda, $cobranca['txid'], [
+                    'copia_e_cola' => $cobranca['copia_e_cola'],
+                    'expira_em' => now()->addSeconds((int) $cobranca['expiracao_segundos'])->toIso8601String(),
+                    'gateway' => $cobranca['payload'],
+                ], $gateway->nome());
+            }
         } catch (NegocioException $e) {
             $venda?->update(['status' => 'cancelado']);
 
@@ -90,8 +116,7 @@ class CheckoutPublicoController extends Controller
     {
         $venda->load(['unidade', 'itens.tipoEntrada', 'pagamentos']);
 
-        $pagamento = $venda->pagamentos->last();
-        $pix = $pagamento?->payload['point_of_interaction']['transaction_data'] ?? null;
+        $pix = $this->dadosPix($venda->pagamentos->last());
         $statusUrl = URL::signedRoute('checkout.status', ['venda' => $venda->id]);
         $voucherUrl = URL::signedRoute('checkout.voucher', ['venda' => $venda->id]);
 
@@ -100,7 +125,92 @@ class CheckoutPublicoController extends Controller
 
     public function status(Venda $venda): JsonResponse
     {
+        if ($venda->status === 'pendente') {
+            $this->consultarGatewaySemWebhook($venda);
+        }
+
         return response()->json(['status' => $venda->status]);
+    }
+
+    /**
+     * Normaliza o QR do pagamento para a view: o Mercado Pago já devolve a
+     * imagem; para os demais gateways a imagem é gerada do copia e cola.
+     *
+     * @return array{qr_code: string, qr_code_base64: string}|null
+     */
+    protected function dadosPix(?Pagamento $pagamento): ?array
+    {
+        if (! $pagamento) {
+            return null;
+        }
+
+        if ($pagamento->gateway === Empresa::GATEWAY_PIX_MERCADOPAGO) {
+            return $pagamento->payload['point_of_interaction']['transaction_data'] ?? null;
+        }
+
+        $copiaECola = (string) ($pagamento->payload['copia_e_cola'] ?? '');
+
+        if ($copiaECola === '') {
+            return null;
+        }
+
+        $dataUri = $this->qrCodeService->gerarDataUri($copiaECola, 260);
+
+        return [
+            'qr_code' => $copiaECola,
+            'qr_code_base64' => substr($dataUri, strlen('data:image/png;base64,')),
+        ];
+    }
+
+    /**
+     * Gateways sem webhook (Itaú): confirma o Pix consultando o banco a cada
+     * polling da tela do pedido, no máximo uma vez a cada 3 s por venda.
+     */
+    protected function consultarGatewaySemWebhook(Venda $venda): void
+    {
+        $pagamento = $venda->pagamentos()->latest('id')->first();
+
+        if (! $pagamento || $pagamento->status !== 'pendente' || ! $pagamento->gateway_payment_id
+            || $pagamento->gateway === Empresa::GATEWAY_PIX_MERCADOPAGO) {
+            return;
+        }
+
+        if (! Cache::add("checkout-pix-consulta:{$venda->id}", true, 3)) {
+            return;
+        }
+
+        $gateway = $this->gatewayResolver->porNome($venda->empresa, $pagamento->gateway);
+
+        if (! $gateway) {
+            return;
+        }
+
+        try {
+            $consulta = $gateway->consultarCobranca($pagamento->gateway_payment_id);
+        } catch (IntegrationException $e) {
+            report($e);
+
+            return;
+        }
+
+        if ($consulta['status'] === GatewayPix::STATUS_PAGA) {
+            $this->vendaService->confirmarPagamentoOnline(
+                $venda,
+                $consulta['e2eid'] ?: $pagamento->gateway_payment_id,
+                array_merge($pagamento->payload ?? [], ['gateway' => $consulta['payload']]),
+            );
+            $venda->refresh();
+
+            return;
+        }
+
+        $expiraEm = $pagamento->payload['expira_em'] ?? null;
+        $expirou = $expiraEm && Carbon::parse($expiraEm)->addMinute()->isPast();
+
+        if ($consulta['status'] === GatewayPix::STATUS_CANCELADA || $expirou) {
+            $venda->update(['status' => 'cancelado']);
+            $pagamento->update(['status' => 'recusado']);
+        }
     }
 
     public function voucher(Venda $venda, VoucherEntradaPdfExport $export): Response

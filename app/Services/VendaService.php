@@ -170,12 +170,12 @@ class VendaService
      * venda online pendente, para que a tela de pagamento possa ser
      * recarregada/reaberta sem precisar gerar uma cobrança nova.
      */
-    public function registrarPagamentoPixPendente(Venda $venda, ?string $gatewayPaymentId, array $payload): Pagamento
+    public function registrarPagamentoPixPendente(Venda $venda, ?string $gatewayPaymentId, array $payload, string $gateway = 'mercadopago'): Pagamento
     {
         return Pagamento::create([
             'empresa_id' => $venda->empresa_id,
             'venda_id' => $venda->id,
-            'gateway' => 'mercadopago',
+            'gateway' => $gateway,
             'gateway_payment_id' => $gatewayPaymentId,
             'valor' => $venda->valor_total,
             'status' => 'pendente',

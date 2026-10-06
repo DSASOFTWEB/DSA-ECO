@@ -251,6 +251,12 @@ dinâmico; a venda só é registrada quando o gateway confirma o pagamento. Se o
 estiver fora do ar, a tela oferece "Registrar como Pix manual" (somente após conferir o
 recebimento no app do banco).
 
+A compra online (`/comprar/{unidade}`) usa o mesmo gateway: com Mercado Pago a venda é
+confirmada pelo webhook; com Itaú (sem webhook) a tela do pedido consulta o banco a cada
+poucos segundos e libera os ingressos quando o Pix cai (cobrança cancelada/vencida cancela o
+pedido). Com **Nenhum**, a compra com Pix fica indisponível no link público — só o check-in
+de cliente com plano continua funcionando.
+
 ### Fila e agendamento (produção)
 
 ```bash

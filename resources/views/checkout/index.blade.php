@@ -49,7 +49,14 @@
                 @endforeach
             </div>
 
+            @unless ($pixDisponivel)
+                <div x-show="!ehPlano" x-cloak class="mt-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-snug text-amber-800">
+                    A compra de ingressos com Pix está indisponível no momento. Procure a recepção do parque.
+                </div>
+            @endunless
+
             {{-- Ingresso avulso pago via Pix --}}
+            @if ($pixDisponivel)
             <form method="POST" action="{{ route('checkout.store', $unidade) }}" x-show="!ehPlano" x-cloak>
                 @csrf
                 <input type="hidden" name="tipo_entrada_id" :value="tipoId">
@@ -72,6 +79,7 @@
                     Gerar QR Code Pix
                 </button>
             </form>
+            @endif
 
             {{-- Cliente com plano: identifica e libera a entrada, sem cobrança --}}
             <form method="POST" action="{{ route('checkout.verificar-plano', $unidade) }}" x-show="ehPlano" x-cloak>

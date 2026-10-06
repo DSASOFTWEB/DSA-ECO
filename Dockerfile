@@ -41,16 +41,18 @@ WORKDIR /var/www/html
 # Copia o projeto inteiro (respeitando .dockerignore) e instala as
 # dependências PHP — com dev, pelo motivo explicado no topo do arquivo.
 COPY . .
+# As pastas de runtime precisam existir ANTES do composer install: o
+# package:discover sobe providers (ex.: blade-icons) que resolvem o compilador
+# Blade, e ele falha com "Please provide a valid cache path" sem
+# storage/framework/views (Git não versiona pasta vazia).
+RUN mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache/data storage/logs bootstrap/cache
 RUN composer install --optimize-autoloader --no-interaction --no-progress
 # Assets já compilados pelo estágio "assets" (Tailwind/Vite)
 COPY --from=assets /app/public/build ./public/build
 # Apache: DocumentRoot para /public (raiz do Laravel) + AllowOverride para o
 # .htaccess de rotas do Laravel funcionar
 COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
-# Garante que as pastas de runtime existem (Git não versiona pasta vazia) e
-# ajusta permissão — evita "View path not found" no view:cache/config:cache.
-RUN mkdir -p storage/framework/{sessions,views,cache/data} storage/logs bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache
+RUN chown -R www-data:www-data storage bootstrap/cache
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 EXPOSE 80

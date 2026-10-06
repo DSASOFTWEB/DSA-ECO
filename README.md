@@ -115,6 +115,38 @@ Para configurar Evolution API/Mercado Pago no Docker, edite as variáveis
 correspondentes direto no `.env.docker` (não no `.env.example`) e rode
 `docker compose up -d --build` de novo.
 
+### Aplicar alterações do código no Docker
+
+O código **é copiado para dentro da imagem no build** (não há volume montando a
+pasta do projeto), então editar um arquivo no editor não muda nada no container
+até reconstruir. Sempre que alterar PHP, Blade, rotas, migrations, CSS/JS ou o
+`composer.json`, rode na pasta do projeto:
+
+```bash
+docker compose up -d --build
+```
+
+Isso reconstrói a imagem (com `composer install` e `npm run build`), recria os
+containers `app`, `queue` e `scheduler` e, na subida, o entrypoint roda
+`php artisan migrate --force` e refaz os caches de rota/view sozinho — não precisa
+rodar migration à mão. **Banco e uploads são preservados** (volumes nomeados).
+
+- Conferir se subiu: `docker compose ps` e `docker compose logs -f app`
+  (procure pela linha das migrations e pelo Apache iniciando).
+- Se o navegador ainda mostrar a tela antiga: `Ctrl+F5` (cache de CSS/JS).
+- Pacote novo no `composer.json`: o mesmo comando resolve (o build roda
+  `composer install` a partir do `composer.lock`).
+- **Nunca** use `docker compose down -v` para "atualizar": o `-v` apaga o banco.
+
+Atalho para testar um arquivo isolado sem rebuild (só em desenvolvimento; some no
+próximo build se o arquivo não estiver salvo no projeto):
+
+```bash
+docker compose cp caminho/do/arquivo.php app:/var/www/html/caminho/do/arquivo.php
+docker compose exec app php artisan view:clear
+docker compose exec app php artisan route:clear
+```
+
 ### Se algo falhar na primeira subida
 
 - `docker compose ps` mostra o status de cada container — se `parque_db` não chegar a
@@ -187,6 +219,37 @@ continuam funcionando estruturalmente (rotas, jobs, filas, telas), mas as chamad
 HTTP reais falharão — o que é esperado em ambiente sem credenciais válidas. O
 `Services/Integrations/Concerns/RealizaRequisicoesComRetry.php` já trata timeout,
 retry com backoff e log de erro para essas falhas.
+
+### Tela de configuração da empresa (`/empresa`)
+
+A configuração fica dividida em abas (Alpine), todas dentro de um único formulário — o botão **Salvar alterações** grava tudo de uma vez:
+
+- **Geral:** logo e dados cadastrais.
+- **Fiscal:** dados do emitente (IE, IM, CNAE, regime), NF-e / NFC-e / NFS-e e certificado A1.
+- **Financeiro:** gateway Pix (Mercado Pago / Itaú) e manutenção financeira.
+- **Gerencial:** WhatsApp (Evolution API), impressão do cupom e mesas/comandas do Food.
+
+A aba aberta vem de `?aba=geral|fiscal|financeiro|gerencial`; depois de salvar, volta para a aba em que o usuário estava, e se houver erro de validação abre a primeira aba com erro (que mostra um contador). Os ícones usam [Blade Lucide Icons](https://github.com/mallardduck/blade-lucide-icons) (`<x-lucide-nome class="h-4 w-4" />`).
+
+### Gateway Pix por empresa (Mercado Pago ou Itaú)
+
+Cada empresa escolhe o gateway em **Dados da empresa → Gateway de pagamento (cobrança
+Pix)**, num único seletor:
+
+- **Nenhum** — Pix conferido manualmente no PDV (comportamento antigo).
+- **Mercado Pago** — Access Token, Public Key e Webhook Secret da conta da empresa (se o
+  token ficar em branco, usa o `MERCADOPAGO_*` da plataforma). Essas credenciais também
+  servem à compra online e às mensalidades, e continuam salvas mesmo se outro gateway for
+  escolhido. Com o webhook cadastrado, o pagamento do PDV é confirmado mesmo se a tela
+  for fechada.
+- **Itaú** — Client ID, Client Secret, chave Pix recebedora, certificado `.crt` e chave
+  privada `.key` sem senha, emitidos no portal do Itaú.
+
+A validade do QR Code (minutos) vale para qualquer gateway. Com tudo preenchido, o selo
+"Ativo" aparece e, no PDV, finalizar em **Pix** abre a tela de recebimento com o QR Code
+dinâmico; a venda só é registrada quando o gateway confirma o pagamento. Se o gateway
+estiver fora do ar, a tela oferece "Registrar como Pix manual" (somente após conferir o
+recebimento no app do banco).
 
 ### Fila e agendamento (produção)
 

@@ -6,8 +6,9 @@ use App\Exceptions\NegocioException;
 use App\Models\Empresa;
 use App\Services\Fiscal\CertificadoA1Service;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class EmpresaService
@@ -22,6 +23,8 @@ class EmpresaService
             'mercadopago_access_token', 'mercadopago_public_key', 'mercadopago_webhook_secret',
             'evolution_base_url', 'evolution_api_key', 'evolution_instance',
             'impressao_modo', 'impressao_colunas', 'impressao_agente_url', 'impressao_auto_imprimir',
+            'gateway_pix_provedor', 'gateway_pix_expiracao_minutos', 'itau_client_id', 'itau_client_secret', 'itau_chave_pix',
+            'itau_certificado', 'itau_chave_privada',
         ];
 
         $camposFiscaisSecretos = [
@@ -122,11 +125,38 @@ class EmpresaService
             'auto_imprimir' => (bool) ($integracoes['impressao_auto_imprimir'] ?? false),
         ];
 
+        $arquivosItau = $this->lerParCertificadoItau(
+            $empresa,
+            $integracoes['itau_certificado'] ?? null,
+            $integracoes['itau_chave_privada'] ?? null,
+        );
+
+        if (array_key_exists('gateway_pix_provedor', $integracoes)) {
+            $itauAtual = $configuracoes['gateway_pix']['itau'] ?? [];
+            unset($itauAtual['expiracao_minutos']);
+            $segredo = $integracoes['itau_client_secret'] ?? null;
+            $expiracaoAtual = $empresa->configuracaoGatewayPix()['expiracao_minutos'];
+
+            $configuracoes['gateway_pix'] = [
+                'provedor' => $integracoes['gateway_pix_provedor'],
+                'expiracao_minutos' => (int) ($integracoes['gateway_pix_expiracao_minutos'] ?? $expiracaoAtual) ?: 10,
+                'itau' => $this->mesclarSemApagar($itauAtual, [
+                    'client_id' => $integracoes['itau_client_id'] ?? null,
+                    'chave_pix' => $integracoes['itau_chave_pix'] ?? null,
+                    'client_secret' => filled($segredo) ? Crypt::encryptString($segredo) : null,
+                ]),
+            ];
+        }
+
         $dados['configuracoes'] = $configuracoes;
         $dados = array_merge($dados, $fiscais);
 
-        DB::transaction(function () use ($empresa, $dados): void {
+        DB::transaction(function () use ($empresa, $dados, $arquivosItau): void {
             $empresa->update($dados);
+
+            foreach ($arquivosItau as $caminho => $conteudo) {
+                Storage::disk('local')->put($caminho, $conteudo);
+            }
 
             if (isset($dados['certificado_arquivo'])) {
                 $gravado = Storage::disk('local')->put(
@@ -158,6 +188,55 @@ class EmpresaService
         });
 
         return $empresa->fresh();
+    }
+
+    /**
+     * Confere que o certificado e a chave privada do Itaú formam um par
+     * (quando só um dos dois é reenviado, compara com o outro já salvo).
+     *
+     * @return array<string, string> caminho no disco local => conteúdo PEM
+     */
+    protected function lerParCertificadoItau(Empresa $empresa, mixed $certificado, mixed $chave): array
+    {
+        $certificado = $certificado instanceof UploadedFile ? (string) $certificado->get() : null;
+        $chave = $chave instanceof UploadedFile ? (string) $chave->get() : null;
+
+        if ($certificado === null && $chave === null) {
+            return [];
+        }
+
+        $disco = Storage::disk('local');
+        $certParaConferir = $certificado ?? ($disco->exists($empresa->itauCertificadoCaminho()) ? $disco->get($empresa->itauCertificadoCaminho()) : null);
+        $chaveParaConferir = $chave ?? ($disco->exists($empresa->itauChavePrivadaCaminho()) ? $disco->get($empresa->itauChavePrivadaCaminho()) : null);
+
+        if ($certParaConferir === null || $chaveParaConferir === null) {
+            throw ValidationException::withMessages([
+                'itau_certificado' => 'Envie o certificado (.crt) e a chave privada (.key) juntos.',
+            ]);
+        }
+
+        if (@openssl_x509_read($certParaConferir) === false) {
+            throw ValidationException::withMessages([
+                'itau_certificado' => 'O certificado do Itaú não é um PEM válido.',
+            ]);
+        }
+
+        if (@openssl_pkey_get_private($chaveParaConferir) === false) {
+            throw ValidationException::withMessages([
+                'itau_chave_privada' => 'A chave privada não é um PEM válido (ou está protegida por senha).',
+            ]);
+        }
+
+        if (! @openssl_x509_check_private_key($certParaConferir, $chaveParaConferir)) {
+            throw ValidationException::withMessages([
+                'itau_chave_privada' => 'A chave privada não corresponde ao certificado enviado.',
+            ]);
+        }
+
+        return array_filter([
+            $empresa->itauCertificadoCaminho() => $certificado,
+            $empresa->itauChavePrivadaCaminho() => $chave,
+        ], fn ($conteudo) => $conteudo !== null);
     }
 
     /**

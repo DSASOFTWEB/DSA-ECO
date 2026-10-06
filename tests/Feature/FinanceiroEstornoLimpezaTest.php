@@ -70,7 +70,7 @@ class FinanceiroEstornoLimpezaTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('empresa.limpar-financeiro'), ['confirmacao' => 'LIMPAR'])
-            ->assertRedirect(route('empresa.edit'));
+            ->assertRedirect(route('empresa.edit', ['aba' => 'financeiro']));
 
         $this->assertSame(0, ContaReceber::query()->count());
         $this->assertSame(2, ContaReceber::withTrashed()->count());

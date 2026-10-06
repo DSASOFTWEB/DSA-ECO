@@ -5,6 +5,7 @@ namespace App\Services\Integrations;
 use App\Exceptions\IntegrationException;
 use App\Models\Empresa;
 use App\Services\Integrations\Concerns\RealizaRequisicoesComRetry;
+use Carbon\CarbonInterface;
 
 /**
  * Integração com a API do Mercado Pago (Pix / Checkout Pro / consulta de
@@ -57,7 +58,7 @@ class MercadoPagoService
      *
      * @throws IntegrationException
      */
-    public function criarCobrancaPix(float $valor, string $descricao, string $referenciaExterna, string $emailPagador): array
+    public function criarCobrancaPix(float $valor, string $descricao, string $referenciaExterna, string $emailPagador, ?CarbonInterface $expiraEm = null): array
     {
         $this->garantirConfigurado();
 
@@ -66,7 +67,7 @@ class MercadoPagoService
         return $this->comRetry(
             servico: 'mercadopago',
             operacao: "criarCobrancaPix:{$referenciaExterna}",
-            requisicao: function () use ($client, $valor, $descricao, $referenciaExterna, $emailPagador) {
+            requisicao: function () use ($client, $valor, $descricao, $referenciaExterna, $emailPagador, $expiraEm) {
                 $resposta = $client->post("{$this->baseUrl}/v1/payments", [
                     'headers' => [
                         'Authorization' => "Bearer {$this->accessToken}",
@@ -74,13 +75,14 @@ class MercadoPagoService
                         // Evita cobrança duplicada em caso de retry desta própria chamada.
                         'X-Idempotency-Key' => $referenciaExterna,
                     ],
-                    'json' => [
+                    'json' => array_filter([
                         'transaction_amount' => round($valor, 2),
                         'description' => $descricao,
                         'payment_method_id' => 'pix',
                         'external_reference' => $referenciaExterna,
                         'payer' => ['email' => $emailPagador],
-                    ],
+                        'date_of_expiration' => $expiraEm?->format('Y-m-d\TH:i:s.vP'),
+                    ], fn ($valor) => $valor !== null),
                 ]);
 
                 return json_decode((string) $resposta->getBody(), true) ?? [];
@@ -102,6 +104,34 @@ class MercadoPagoService
             requisicao: function () use ($client, $paymentId) {
                 $resposta = $client->get("{$this->baseUrl}/v1/payments/{$paymentId}", [
                     'headers' => ['Authorization' => "Bearer {$this->accessToken}"],
+                ]);
+
+                return json_decode((string) $resposta->getBody(), true) ?? [];
+            },
+            maxTentativas: $this->maxTentativas,
+            delayMs: $this->delayMs,
+        );
+    }
+
+    /**
+     * Cancela um pagamento ainda pendente (QR Code Pix não pago).
+     */
+    public function cancelarPagamento(string $paymentId): array
+    {
+        $this->garantirConfigurado();
+
+        $client = $this->client($this->timeout);
+
+        return $this->comRetry(
+            servico: 'mercadopago',
+            operacao: "cancelarPagamento:{$paymentId}",
+            requisicao: function () use ($client, $paymentId) {
+                $resposta = $client->put("{$this->baseUrl}/v1/payments/{$paymentId}", [
+                    'headers' => [
+                        'Authorization' => "Bearer {$this->accessToken}",
+                        'Content-Type' => 'application/json',
+                    ],
+                    'json' => ['status' => 'cancelled'],
                 ]);
 
                 return json_decode((string) $resposta->getBody(), true) ?? [];

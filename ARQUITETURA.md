@@ -211,6 +211,23 @@ Ambas as integrações seguem o mesmo padrão em `app/Services/Integrations/`:
   idempotência) e delega o processamento a `App\Jobs\ProcessarWebhookMercadoPagoJob`
   (fila) — o endpoint apenas confirma recebimento rápido (200) e devolve o processamento
   pesado para background, como o Mercado Pago espera de um webhook.
+- **Gateway Pix do PDV** (`App\Services\Integrations\Pix`): interface `GatewayPix`
+  (criar/consultar/cancelar cob imediata BACEN) com duas implementações:
+  `MercadoPagoPixGateway` (reaproveita `MercadoPagoService` e as credenciais de
+  `configuracoes->mercadopago`; referência externa `pdv:{uuid}`, tratada pelo
+  `ProcessarWebhookMercadoPagoJob` para confirmar a venda sem depender da tela aberta) e
+  `ItauPixGateway` sobre o pacote `mastria/api-itau` (OAuth2 client_credentials + mTLS em
+  `sts.itau.com.br` e `secure.gateway.api.itau/pix_recebimentos/v2`). O
+  `GatewayPixResolver` escolhe o provedor selecionado na empresa para cobranças novas
+  (`configuracoes->gateway_pix`: provedor, validade do QR, client_id/chave Pix do Itaú;
+  `client_secret` cifrado com a APP_KEY; certificado/chave em
+  `storage/app/gateways/itau/empresa-{id}.crt|.key`, validados como par no upload) e,
+  via `porNome()`, o gateway que gerou cada cobrança existente, mesmo após troca de provedor.
+  `App\Services\PdvPixService` gera a cobrança com o total calculado no servidor, grava em
+  `cobrancas_pix` (carrinho validado em `dados_venda`) e só cria a venda quando o banco
+  confirma — idempotente com `lockForUpdate`, chamado pelo polling da tela do PDV
+  (`vendas.pix.store|status|cancelar`). Sem webhook do Itaú por enquanto: no Itaú a
+  confirmação depende de a tela do PDV continuar aberta consultando o status.
 
 ## 8. Financeiro
 

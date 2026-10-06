@@ -5,6 +5,7 @@ namespace App\Http\Requests\Empresa;
 use App\Models\Empresa;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class UpdateEmpresaRequest extends FormRequest
 {
@@ -47,6 +48,15 @@ class UpdateEmpresaRequest extends FormRequest
             'evolution_api_key' => ['nullable', 'string', 'max:255'],
             'evolution_instance' => ['nullable', 'string', 'max:100'],
 
+            // Gateway Pix do PDV — mesma regra: segredo/arquivo em branco mantém o salvo.
+            'gateway_pix_provedor' => ['required', Rule::in(array_keys(Empresa::provedoresGatewayPix()))],
+            'itau_client_id' => ['nullable', 'string', 'max:120'],
+            'itau_client_secret' => ['nullable', 'string', 'max:255'],
+            'itau_chave_pix' => ['nullable', 'string', 'max:77'],
+            'gateway_pix_expiracao_minutos' => ['nullable', 'integer', 'min:1', 'max:60'],
+            'itau_certificado' => ['nullable', 'file', 'extensions:crt,pem,cer', 'max:64'],
+            'itau_chave_privada' => ['nullable', 'file', 'extensions:key,pem', 'max:64'],
+
             // Impressão do cupom PDV
             'impressao_modo' => ['required', 'in:dom,escpos,ambos'],
             'impressao_colunas' => ['required', 'integer', 'in:32,40,42,48'],
@@ -87,9 +97,46 @@ class UpdateEmpresaRequest extends FormRequest
         ];
     }
 
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $empresa = Empresa::find($this->user()->empresa_id);
+
+            if ($this->input('gateway_pix_provedor') === Empresa::GATEWAY_PIX_MERCADOPAGO) {
+                if (! filled($this->input('mercadopago_access_token')) && ! $empresa?->temMercadoPagoUtilizavel()) {
+                    $validator->errors()->add('mercadopago_access_token', 'Informe o Access Token do Mercado Pago para usar o Pix no PDV.');
+                }
+
+                return;
+            }
+
+            if ($this->input('gateway_pix_provedor') !== Empresa::GATEWAY_PIX_ITAU) {
+                return;
+            }
+
+            $atual = $empresa?->configuracaoGatewayPix()['itau'] ?? [];
+
+            $faltando = [
+                'itau_client_id' => ! filled($this->input('itau_client_id')) && ! filled($atual['client_id'] ?? null),
+                'itau_client_secret' => ! filled($this->input('itau_client_secret')) && ! filled($atual['client_secret'] ?? null),
+                'itau_chave_pix' => ! filled($this->input('itau_chave_pix')) && ! filled($atual['chave_pix'] ?? null),
+            ];
+
+            foreach (array_filter($faltando) as $campo => $_) {
+                $validator->errors()->add($campo, 'Obrigatório para ativar o Pix Itaú.');
+            }
+
+            $temCertificado = (bool) ($atual['tem_certificado'] ?? false);
+            if (! $temCertificado && (! $this->hasFile('itau_certificado') || ! $this->hasFile('itau_chave_privada'))) {
+                $validator->errors()->add('itau_certificado', 'Envie o certificado (.crt) e a chave privada (.key) emitidos pelo Itaú.');
+            }
+        });
+    }
+
     protected function prepareForValidation(): void
     {
         $this->merge([
+            'gateway_pix_provedor' => $this->input('gateway_pix_provedor', Empresa::GATEWAY_PIX_NENHUM),
             'impressao_auto_imprimir' => $this->boolean('impressao_auto_imprimir'),
             'nfse_nacional_habilitado' => $this->boolean('nfse_nacional_habilitado'),
             'nfse_auth_mode' => $this->input('nfse_auth_mode', Empresa::NFSE_AUTH_CERTIFICADO),

@@ -11,10 +11,8 @@
                     <span class="text-xs text-gray-400">Sem foto</span>
                 @endif
             </div>
-            <div>
-                <input type="file" name="foto" accept=".jpg,.jpeg,.png,.webp" class="block text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-500 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-brand-600">
-                <p class="mt-1 text-xs text-slate-400">JPG, PNG ou WEBP · até 2MB. Aparece na carteirinha digital.</p>
-                @error('foto')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+            <div class="w-full max-w-md">
+                <x-file-input name="foto" accept=".jpg,.jpeg,.png,.webp" icon="image" help="JPG, PNG ou WEBP · até 2MB. Aparece na carteirinha digital." />
             </div>
         </div>
     </div>

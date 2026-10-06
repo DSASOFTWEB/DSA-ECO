@@ -5,7 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 
 class Empresa extends Model
@@ -27,6 +29,12 @@ class Empresa extends Model
     public const NFSE_AUTH_CERTIFICADO = 'certificado';
 
     public const NFSE_AUTH_USUARIO_SENHA = 'usuario_senha';
+
+    public const GATEWAY_PIX_NENHUM = 'nenhum';
+
+    public const GATEWAY_PIX_ITAU = 'itau';
+
+    public const GATEWAY_PIX_MERCADOPAGO = 'mercadopago';
 
     protected $fillable = [
         'nome', 'razao_social', 'cnpj',         'ie', 'im', 'cnae', 'regime_tributario', 'aut_xml', 'codigo_municipio_ibge', 'codigo_servico_hospedagem_lc116', 'codigo_tributacao_municipal_hospedagem', 'aliquota_iss_hospedagem',
@@ -251,6 +259,111 @@ class Empresa extends Model
             'api_key' => (string) Arr::get($this->configuracoes, 'evolution.api_key', ''),
             'instance' => (string) Arr::get($this->configuracoes, 'evolution.instance', ''),
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function provedoresGatewayPix(): array
+    {
+        return [
+            self::GATEWAY_PIX_NENHUM => 'Nenhum (Pix conferido manualmente)',
+            self::GATEWAY_PIX_MERCADOPAGO => 'Mercado Pago — Pix (QR Code dinâmico)',
+            self::GATEWAY_PIX_ITAU => 'Itaú — Pix Recebimentos (QR Code dinâmico)',
+        ];
+    }
+
+    /**
+     * Gateway Pix usado na tela de recebimento do PDV. Guardado em
+     * configuracoes->gateway_pix; o client_secret do Itaú fica cifrado com a
+     * APP_KEY e o certificado/chave mTLS ficam no disco local (fora do banco).
+     * As credenciais do Mercado Pago continuam em configuracoes->mercadopago
+     * (ver credenciaisMercadoPago), pois também servem ao checkout online e
+     * às mensalidades.
+     *
+     * @return array{provedor: string, expiracao_minutos: int, itau: array{client_id: string, client_secret: string, chave_pix: string, expiracao_minutos: int, tem_certificado: bool}}
+     */
+    public function configuracaoGatewayPix(): array
+    {
+        $provedor = (string) Arr::get($this->configuracoes, 'gateway_pix.provedor', self::GATEWAY_PIX_NENHUM);
+        if (! array_key_exists($provedor, self::provedoresGatewayPix())) {
+            $provedor = self::GATEWAY_PIX_NENHUM;
+        }
+
+        $segredoCifrado = (string) Arr::get($this->configuracoes, 'gateway_pix.itau.client_secret', '');
+        try {
+            $segredo = $segredoCifrado !== '' ? Crypt::decryptString($segredoCifrado) : '';
+        } catch (DecryptException) {
+            $segredo = '';
+        }
+
+        $expiracao = (int) Arr::get(
+            $this->configuracoes,
+            'gateway_pix.expiracao_minutos',
+            Arr::get($this->configuracoes, 'gateway_pix.itau.expiracao_minutos', 10)
+        ) ?: 10;
+
+        return [
+            'provedor' => $provedor,
+            'expiracao_minutos' => $expiracao,
+            'itau' => [
+                'client_id' => (string) Arr::get($this->configuracoes, 'gateway_pix.itau.client_id', ''),
+                'client_secret' => $segredo,
+                'chave_pix' => (string) Arr::get($this->configuracoes, 'gateway_pix.itau.chave_pix', ''),
+                'expiracao_minutos' => $expiracao,
+                'tem_certificado' => $this->temCertificadoItau(),
+            ],
+        ];
+    }
+
+    /**
+     * Access token efetivo do Mercado Pago: o da empresa ou, se vazio, o da
+     * plataforma (.env) — mesma regra de MercadoPagoService::paraEmpresa.
+     */
+    public function temMercadoPagoUtilizavel(): bool
+    {
+        return $this->credenciaisMercadoPago()['access_token'] !== ''
+            || (string) config('mercadopago.access_token', '') !== '';
+    }
+
+    /**
+     * Gateway configurado E com todas as credenciais preenchidas — só então
+     * o PDV troca o Pix manual pela tela de QR Code dinâmico.
+     */
+    public function gatewayPixAtivo(): bool
+    {
+        $config = $this->configuracaoGatewayPix();
+
+        if ($config['provedor'] === self::GATEWAY_PIX_MERCADOPAGO) {
+            return $this->temMercadoPagoUtilizavel();
+        }
+
+        if ($config['provedor'] !== self::GATEWAY_PIX_ITAU) {
+            return false;
+        }
+
+        $itau = $config['itau'];
+
+        return $itau['client_id'] !== ''
+            && $itau['client_secret'] !== ''
+            && $itau['chave_pix'] !== ''
+            && $itau['tem_certificado'];
+    }
+
+    public function itauCertificadoCaminho(): string
+    {
+        return "gateways/itau/empresa-{$this->getKey()}.crt";
+    }
+
+    public function itauChavePrivadaCaminho(): string
+    {
+        return "gateways/itau/empresa-{$this->getKey()}.key";
+    }
+
+    public function temCertificadoItau(): bool
+    {
+        return Storage::disk('local')->exists($this->itauCertificadoCaminho())
+            && Storage::disk('local')->exists($this->itauChavePrivadaCaminho());
     }
 
     /**

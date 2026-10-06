@@ -2,11 +2,15 @@
 
 namespace App\Jobs;
 
+use App\Models\CobrancaPix;
+use App\Models\Empresa;
 use App\Models\Mensalidade;
 use App\Models\Venda;
 use App\Models\WebhookMercadoPago;
 use App\Services\Integrations\MercadoPagoService;
+use App\Services\Integrations\Pix\MercadoPagoPixGateway;
 use App\Services\MensalidadeService;
+use App\Services\PdvPixService;
 use App\Services\VendaService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -90,6 +94,16 @@ class ProcessarWebhookMercadoPagoJob implements ShouldQueue
 
                     if ($venda) {
                         $vendaService->confirmarPagamentoOnline($venda, (string) $webhook->gateway_id, $pagamentoRemoto);
+                    }
+                } elseif ($tipo === MercadoPagoPixGateway::PREFIXO_REFERENCIA) {
+                    $cobranca = CobrancaPix::withoutGlobalScopes()
+                        ->where('empresa_id', $webhook->empresa_id)
+                        ->where('gateway', Empresa::GATEWAY_PIX_MERCADOPAGO)
+                        ->where('txid', (string) $webhook->gateway_id)
+                        ->first();
+
+                    if ($cobranca) {
+                        app(PdvPixService::class)->atualizar($cobranca);
                     }
                 }
 

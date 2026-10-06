@@ -31,6 +31,7 @@ use App\Http\Controllers\Admin\TransferenciaCaixaController;
 use App\Http\Controllers\Admin\UnidadeController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\ValidacaoVoucherController;
+use App\Http\Controllers\Admin\PdvPixController;
 use App\Http\Controllers\Admin\VendaController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -161,6 +162,9 @@ Route::middleware('auth')->group(function () {
     Route::resource('produtos', ProdutoController::class);
     Route::post('produtos/{produto}/ajustar-estoque', [ProdutoController::class, 'ajustarEstoque'])->name('produtos.ajustar-estoque');
 
+    Route::post('vendas/pix', [PdvPixController::class, 'store'])->name('vendas.pix.store');
+    Route::get('vendas/pix/{cobrancaPix}/status', [PdvPixController::class, 'status'])->name('vendas.pix.status');
+    Route::post('vendas/pix/{cobrancaPix}/cancelar', [PdvPixController::class, 'cancelar'])->name('vendas.pix.cancelar');
     Route::resource('vendas', VendaController::class)->only(['index', 'create', 'store', 'show']);
     Route::get('vendas/{venda}/comprovante', [VendaController::class, 'comprovante'])->name('vendas.comprovante');
     Route::get('vendas/{venda}/comprovante.escpos', [VendaController::class, 'comprovanteEscpos'])->name('vendas.comprovante.escpos');

@@ -116,6 +116,17 @@
 .pdv-modal__actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
 .pdv-btn { border-radius:8px; border:1px solid var(--pdv-border); background:#fff; padding:8px 12px; font-weight:600; }
 .pdv-btn--primary { background:var(--pdv-blue); border-color:var(--pdv-blue); color:#fff; }
+.pdv-pix { max-width:440px; }
+.pdv-pix__estado { display:flex; flex-direction:column; align-items:center; gap:8px; padding:24px 8px; text-align:center; color:var(--pdv-muted); }
+.pdv-pix__estado--ok strong { color:var(--pdv-green); font-size:16px; }
+.pdv-pix__qr { display:flex; flex-direction:column; align-items:center; gap:10px; margin-top:10px; }
+.pdv-pix__qr img { border:1px solid var(--pdv-border); border-radius:8px; }
+.pdv-pix__copia { display:flex; gap:6px; width:100%; }
+.pdv-pix__copia input { font-family:ui-monospace,monospace; font-size:11px; }
+.pdv-pix__aguardando { display:flex; align-items:center; gap:6px; color:#0f766e; font-weight:600; font-size:12px; }
+.pdv-pix__aguardando .pdv-dot { animation:pdv-pulse 1.2s infinite; }
+.pdv-pix__erro { margin-top:8px; border-radius:8px; background:#fef2f2; color:#991b1b; padding:10px; font-size:12px; font-weight:600; }
+@keyframes pdv-pulse { 0%,100% { opacity:1; } 50% { opacity:.25; } }
 .pdv-gate { max-width:480px; margin:10vh auto; background:#fff; border:1px solid var(--pdv-border); border-radius:12px; padding:24px; text-align:center; }
 @media (max-width:1100px) {
     .pdv-body { grid-template-columns:1fr; overflow:auto; }
@@ -353,7 +364,7 @@
                                     <span>DINHEIRO</span><small>Troco</small>
                                 </button>
                                 <button type="button" class="pdv-pgto-esp pgto-pix" :class="{ 'pdv-pgto-esp--ativa': formaPagamento === 'pix' }" @click="selecionarForma('pix')">
-                                    <span>PIX</span><small>Instantâneo</small>
+                                    <span>PIX</span><small>{{ $pixGatewayAtivo ? 'QR Code no caixa' : 'Instantâneo' }}</small>
                                 </button>
                                 <button type="button" class="pdv-pgto-esp pgto-cred" :class="{ 'pdv-pgto-esp--ativa': formaPagamento === 'cartao_credito' }" @click="selecionarForma('cartao_credito')">
                                     <span>CRÉDITO</span><small>Cartão</small>
@@ -490,6 +501,76 @@
                 </div>
             </div>
 
+            {{-- Modal recebimento Pix (gateway da empresa) --}}
+            <div class="pdv-modal" x-show="dlgPix" x-cloak>
+                <div class="pdv-modal__card pdv-pix">
+                    <h3>Recebimento Pix</h3>
+
+                    <template x-if="pixCarregando">
+                        <div class="pdv-pix__estado">
+                            <svg class="h-8 w-8 animate-spin text-teal-700" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                            <span>Gerando QR Code no banco...</span>
+                        </div>
+                    </template>
+
+                    <template x-if="! pixCarregando && pixFalha">
+                        <div>
+                            <p class="pdv-pix__erro" x-text="pixFalha"></p>
+                            <div class="pdv-modal__actions">
+                                <button type="button" class="pdv-btn" @click="fecharPix()">Voltar</button>
+                                <button type="button" class="pdv-btn" @click="registrarPixManual()" title="Use só se o pagamento foi conferido no app do banco">Registrar como Pix manual</button>
+                                <button type="button" class="pdv-btn pdv-btn--primary" @click="iniciarPixGateway()">Tentar novamente</button>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template x-if="! pixCarregando && pix">
+                        <div>
+                            <div class="pdv-resumo__linha"><span>Valor</span><strong class="text-lg" x-text="formatar(pix.valor)"></strong></div>
+
+                            <template x-if="pix.status === 'pendente'">
+                                <div class="pdv-pix__qr">
+                                    <img :src="pix.qr_code" alt="QR Code Pix" width="240" height="240">
+                                    <div class="pdv-pix__copia">
+                                        <input type="text" readonly class="pdv-pgto__input" :value="pix.copia_e_cola" @focus="$event.target.select()">
+                                        <button type="button" class="pdv-btn" @click="copiarPix()" x-text="pixCopiado ? 'Copiado!' : 'Copiar'"></button>
+                                    </div>
+                                    <p class="pdv-pix__aguardando">
+                                        <span class="pdv-dot"></span>
+                                        Aguardando pagamento<span x-show="pixRestante" x-text="' · expira em ' + pixRestante"></span>
+                                    </p>
+                                </div>
+                            </template>
+
+                            <template x-if="pix.status === 'paga'">
+                                <div class="pdv-pix__estado pdv-pix__estado--ok">
+                                    <strong>Pagamento confirmado!</strong>
+                                    <span x-text="pix.erro ? pix.erro : 'Registrando a venda...'"></span>
+                                </div>
+                            </template>
+
+                            <template x-if="pix.status === 'cancelada' || pix.status === 'expirada'">
+                                <p class="pdv-pix__erro" x-text="pix.status === 'expirada' ? 'O QR Code expirou sem pagamento. Gere um novo para continuar.' : 'Cobrança cancelada.'"></p>
+                            </template>
+
+                            <p x-show="pix.aviso" class="mt-2 text-xs text-amber-700" x-text="pix.aviso" x-cloak></p>
+
+                            <div class="pdv-modal__actions">
+                                <template x-if="pix.status === 'pendente'">
+                                    <button type="button" class="pdv-btn" :disabled="pixCancelando" @click="cancelarPix()">Cancelar cobrança</button>
+                                </template>
+                                <template x-if="pix.status === 'cancelada' || pix.status === 'expirada'">
+                                    <button type="button" class="pdv-btn" @click="fecharPix()">Voltar à venda</button>
+                                </template>
+                                <template x-if="pix.status === 'cancelada' || pix.status === 'expirada'">
+                                    <button type="button" class="pdv-btn pdv-btn--primary" @click="iniciarPixGateway()">Gerar novo QR Code</button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
             <form id="form-venda" method="POST" action="{{ route('vendas.store') }}" class="hidden">
                 @csrf
                 <input type="hidden" name="caixa_id" value="{{ $caixaAberto->id }}">
@@ -535,6 +616,15 @@
                         dlgDesconto: false,
                         dlgDescontoItem: false,
                         dlgTroco: false,
+                        pixGatewayAtivo: @json($pixGatewayAtivo),
+                        dlgPix: false,
+                        pix: null,
+                        pixCarregando: false,
+                        pixFalha: '',
+                        pixCancelando: false,
+                        pixCopiado: false,
+                        pixRestante: '',
+                        pixTimer: null,
 
                         init() {
                             this.tickAgora();
@@ -773,6 +863,111 @@
                                 this.$nextTick(() => this.$refs.campoTroco?.focus());
                                 return;
                             }
+                            if (this.formaPagamento === 'pix' && this.pixGatewayAtivo) {
+                                this.iniciarPixGateway();
+                                return;
+                            }
+                            this.enviarFormulario();
+                        },
+
+                        async iniciarPixGateway() {
+                            this.pararPolling();
+                            this.dlgPix = true;
+                            this.pix = null;
+                            this.pixFalha = '';
+                            this.pixCarregando = true;
+                            await this.$nextTick();
+                            try {
+                                const resposta = await fetch(@js(route('vendas.pix.store')), {
+                                    method: 'POST',
+                                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                                    body: new FormData(document.getElementById('form-venda')),
+                                });
+                                const dados = await resposta.json().catch(() => ({}));
+                                if (! resposta.ok) {
+                                    this.pixFalha = dados.message || 'Não foi possível gerar o QR Code Pix.';
+                                    return;
+                                }
+                                this.pix = dados;
+                                this.iniciarPolling();
+                            } catch (e) {
+                                this.pixFalha = 'Sem comunicação com o servidor. Verifique a conexão e tente novamente.';
+                            } finally {
+                                this.pixCarregando = false;
+                            }
+                        },
+
+                        iniciarPolling() {
+                            this.atualizarContagem();
+                            this.pixTimer = setInterval(() => {
+                                this.atualizarContagem();
+                                this.consultarPix();
+                            }, 3000);
+                        },
+
+                        pararPolling() {
+                            if (this.pixTimer) clearInterval(this.pixTimer);
+                            this.pixTimer = null;
+                        },
+
+                        atualizarContagem() {
+                            if (! this.pix?.expira_em) { this.pixRestante = ''; return; }
+                            const seg = Math.max(0, Math.floor((new Date(this.pix.expira_em) - new Date()) / 1000));
+                            this.pixRestante = Math.floor(seg / 60) + ':' + String(seg % 60).padStart(2, '0');
+                        },
+
+                        async consultarPix() {
+                            if (! this.pix?.status_url) return;
+                            try {
+                                const resposta = await fetch(this.pix.status_url, { headers: { 'Accept': 'application/json' } });
+                                if (! resposta.ok) return;
+                                this.aplicarStatusPix(await resposta.json());
+                            } catch (e) { /* tenta de novo no próximo ciclo */ }
+                        },
+
+                        aplicarStatusPix(dados) {
+                            this.pix = { ...this.pix, ...dados, aviso: dados.aviso || '' };
+                            if (dados.redirect) {
+                                this.pararPolling();
+                                window.location.href = dados.redirect;
+                                return;
+                            }
+                            if (['cancelada', 'expirada'].includes(dados.status)) this.pararPolling();
+                        },
+
+                        async cancelarPix() {
+                            if (! this.pix?.cancelar_url || ! confirm('Cancelar esta cobrança Pix?')) return;
+                            this.pixCancelando = true;
+                            try {
+                                const resposta = await fetch(this.pix.cancelar_url, {
+                                    method: 'POST',
+                                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': @js(csrf_token()) },
+                                });
+                                const dados = await resposta.json().catch(() => ({}));
+                                if (! resposta.ok) { alert(dados.message || 'Não foi possível cancelar a cobrança.'); return; }
+                                this.aplicarStatusPix(dados);
+                            } finally {
+                                this.pixCancelando = false;
+                            }
+                        },
+
+                        copiarPix() {
+                            navigator.clipboard?.writeText(this.pix?.copia_e_cola || '').then(() => {
+                                this.pixCopiado = true;
+                                setTimeout(() => { this.pixCopiado = false; }, 1500);
+                            });
+                        },
+
+                        fecharPix() {
+                            this.pararPolling();
+                            this.dlgPix = false;
+                            this.pix = null;
+                            this.pixFalha = '';
+                        },
+
+                        registrarPixManual() {
+                            if (! confirm('Registrar a venda como Pix manual? Confira antes o recebimento no app do banco.')) return;
+                            this.fecharPix();
                             this.enviarFormulario();
                         },
 
@@ -785,6 +980,10 @@
                         onKeydown(evento) {
                             const alvo = evento.target;
                             const emCampoTexto = ['INPUT', 'TEXTAREA', 'SELECT'].includes(alvo.tagName);
+                            if (this.dlgPix) {
+                                if (['F2', 'F4', 'F6', 'F7', 'Escape'].includes(evento.key)) evento.preventDefault();
+                                return;
+                            }
                             if (evento.key === 'F2') { evento.preventDefault(); this.iniciarVenda(); return; }
                             if (evento.key === 'F4') { evento.preventDefault(); this.finalizar(); return; }
                             if (evento.key === 'F6') { evento.preventDefault(); this.aplicarDescontoNoSelecionado(); return; }

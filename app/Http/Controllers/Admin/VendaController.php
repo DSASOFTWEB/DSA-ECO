@@ -6,6 +6,7 @@ use App\Exceptions\NegocioException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Venda\StoreVendaRequest;
 use App\Models\Caixa;
+use App\Models\Empresa;
 use App\Models\Produto;
 use App\Models\TipoEntrada;
 use App\Models\User;
@@ -70,7 +71,9 @@ class VendaController extends Controller
             'preco' => (float) $tipo->valor,
         ])->values();
 
-        return view('vendas.create', compact('produtos', 'tiposEntrada', 'caixaAberto', 'produtosJson', 'tiposEntradaJson', 'caixasDisponiveis'));
+        $pixGatewayAtivo = (bool) Empresa::find($user->empresa_id)?->gatewayPixAtivo();
+
+        return view('vendas.create', compact('produtos', 'tiposEntrada', 'caixaAberto', 'produtosJson', 'tiposEntradaJson', 'caixasDisponiveis', 'pixGatewayAtivo'));
     }
 
     public function store(StoreVendaRequest $request): RedirectResponse

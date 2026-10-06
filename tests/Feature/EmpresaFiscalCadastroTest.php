@@ -147,7 +147,7 @@ class EmpresaFiscalCadastroTest extends TestCase
 
         $this->actingAs($user)
             ->delete(route('empresa.certificado.destroy'))
-            ->assertRedirect(route('empresa.edit'))
+            ->assertRedirect(route('empresa.edit', ['aba' => 'fiscal']))
             ->assertSessionHas('sucesso');
 
         $empresa->refresh();

@@ -3,9 +3,62 @@
 @section('titulo', 'Dados da empresa')
 
 @section('conteudo')
-    <form id="empresa-form" method="POST" action="{{ route('empresa.update') }}" enctype="multipart/form-data" class="max-w-5xl space-y-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
+    @php
+        $abas = [
+            'geral' => ['rotulo' => 'Geral', 'icone' => 'building-2', 'campos' => ['nome', 'razao_social', 'cnpj', 'email', 'telefone', 'endereco', 'logo']],
+            'fiscal' => ['rotulo' => 'Fiscal', 'icone' => 'receipt-text', 'campos' => [
+                'ie', 'im', 'cnae', 'regime_tributario', 'aut_xml', 'codigo_municipio_ibge', 'codigo_servico_hospedagem_lc116',
+                'codigo_tributacao_municipal_hospedagem', 'aliquota_iss_hospedagem', 'ambiente_nfe', 'csc', 'csc_id',
+                'numero_serie_nfe', 'numero_serie_nfce', 'numero_serie_nfse', 'numero_ultima_nfe_producao',
+                'numero_ultima_nfe_homologacao', 'numero_ultima_nfce_producao', 'numero_ultima_nfce_homologacao',
+                'numero_ultima_nfse', 'nfse_provider', 'nfse_auth_mode', 'nfse_nacional_habilitado', 'token_nfse',
+                'nfse_ws_user', 'nfse_ws_senha', 'nfse_ws_chave_acesso', 'token_ibpt', 'bluesoft_token',
+                'certificado', 'certificado_senha', 'observacao_padrao_nfe', 'observacao_padrao_nfce',
+            ]],
+            'financeiro' => ['rotulo' => 'Financeiro', 'icone' => 'wallet', 'campos' => [
+                'gateway_pix_provedor', 'gateway_pix_expiracao_minutos', 'mercadopago_access_token', 'mercadopago_public_key',
+                'mercadopago_webhook_secret', 'itau_client_id', 'itau_client_secret', 'itau_chave_pix', 'itau_certificado',
+                'itau_chave_privada', 'confirmacao',
+            ]],
+            'gerencial' => ['rotulo' => 'Gerencial', 'icone' => 'sliders-horizontal', 'campos' => [
+                'evolution_base_url', 'evolution_api_key', 'evolution_instance', 'impressao_modo', 'impressao_colunas',
+                'impressao_agente_url', 'impressao_auto_imprimir', 'numero_inicial', 'numero_final', 'capacidade',
+            ]],
+        ];
+
+        $errosPorAba = collect($abas)->map(fn ($aba) => collect($aba['campos'])->filter(fn ($campo) => $errors->has($campo))->count());
+        $abaInicial = $errosPorAba->filter()->keys()->first()
+            ?? collect([old('_aba'), request('aba')])->first(fn ($aba) => isset($abas[$aba]))
+            ?? (request()->hasAny(['unidade_id', 'tipo']) ? 'gerencial' : 'geral');
+    @endphp
+
+    <div class="max-w-5xl" x-data="{ aba: @js($abaInicial) }">
+    <nav class="mb-6 flex gap-1 overflow-x-auto rounded-2xl border border-gray-200 bg-white p-1.5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]" role="tablist">
+        @foreach ($abas as $chave => $aba)
+            <button type="button" role="tab" @click="aba = @js($chave)"
+                    :aria-selected="aba === @js($chave)"
+                    :class="aba === @js($chave)
+                        ? 'bg-brand-500 text-white shadow-theme-xs'
+                        : 'text-slate-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-white/5'"
+                    class="inline-flex min-w-[8rem] flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition">
+                <x-dynamic-component :component="'lucide-'.$aba['icone']" class="h-4 w-4" />
+                <span>{{ $aba['rotulo'] }}</span>
+                @if ($errosPorAba[$chave] > 0)
+                    <span class="rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold leading-5 text-white">{{ $errosPorAba[$chave] }}</span>
+                @endif
+            </button>
+        @endforeach
+    </nav>
+
+    <form id="empresa-form" method="POST" action="{{ route('empresa.update') }}" enctype="multipart/form-data" class="space-y-6">
         @csrf
         @method('PUT')
+        <input type="hidden" name="_aba" :value="aba">
+
+        <section x-show="aba === 'geral'" class="space-y-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
+        <h2 class="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-white/90">
+            <x-lucide-building-2 class="h-4 w-4 text-brand-500" /> Dados cadastrais
+        </h2>
 
         <div>
             <label class="mb-2 block text-sm font-medium text-slate-700">Logo</label>
@@ -17,10 +70,8 @@
                         <span class="text-xs text-gray-400">Sem logo</span>
                     @endif
                 </div>
-                <div>
-                    <input type="file" name="logo" accept=".jpg,.jpeg,.png,.webp" class="block text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-500 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-brand-600">
-                    <p class="mt-1 text-xs text-slate-400">JPG, PNG ou WEBP · até 2MB. Aparece nos contratos, vouchers de entrada e relatórios em PDF.</p>
-                    @error('logo')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                <div class="w-full max-w-md">
+                    <x-file-input name="logo" accept=".jpg,.jpeg,.png,.webp" icon="image" help="JPG, PNG ou WEBP · até 2MB. Aparece nos contratos, vouchers de entrada e relatórios em PDF." />
                 </div>
             </div>
         </div>
@@ -48,35 +99,6 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700">Inscrição estadual (IE)</label>
-                <input type="text" name="ie" id="empresa-ie" value="{{ old('ie', $empresa->ie) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-slate-700">Inscrição municipal (IM)</label>
-                <input type="text" name="im" value="{{ old('im', $empresa->im) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-slate-700">CNAE</label>
-                <input type="text" name="cnae" id="empresa-cnae" value="{{ old('cnae', $empresa->cnae) }}" maxlength="7" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-slate-700">Regime tributário</label>
-                <select name="regime_tributario" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                    @foreach (\App\Models\Empresa::regimesTributarios() as $valor => $rotulo)
-                        <option value="{{ $valor }}" @selected(old('regime_tributario', $empresa->regime_tributario ?? 'simples') === $valor)>{{ $rotulo }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-slate-700">Autorizador XML (CNPJ)</label>
-                <input type="text" name="aut_xml" value="{{ old('aut_xml', $empresa->aut_xml) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Opcional">
-            </div>
-
-            <div>
                 <label class="block text-sm font-medium text-slate-700">E-mail</label>
                 <input type="email" name="email" id="empresa-email" value="{{ old('email', $empresa->email) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
             </div>
@@ -92,36 +114,14 @@
                 <p class="mt-1 text-xs text-slate-400">Aparece no cabeçalho dos contratos.</p>
             </div>
         </div>
+        </section>
 
         @php $mp = $empresa->credenciaisMercadoPago(); $evo = $empresa->credenciaisEvolution(); @endphp
 
-        <div class="border-t border-gray-100 pt-6 dark:border-gray-800">
-            <h2 class="text-sm font-semibold text-slate-700">Mercado Pago (cobrança Pix)</h2>
-            <p class="mt-1 text-xs text-slate-400">
-                Usado pra gerar o QR Code Pix na compra online e no checkout. Se deixar em branco, o sistema usa a
-                conta padrão da plataforma. Cadastre esta URL de notificação no painel do Mercado Pago (Suas
-                integrações → Webhooks): <code class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] dark:bg-gray-800">{{ route('webhooks.mercadopago') }}</code>
-            </p>
-            <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 [&_input]:min-h-11 [&_input]:border-gray-300 [&_input]:bg-transparent [&_input]:text-gray-800 [&_input]:outline-none [&_input]:transition [&_input]:focus:border-brand-500 [&_input]:focus:ring-3 [&_input]:focus:ring-brand-500/10 dark:[&_input]:border-gray-700 dark:[&_input]:text-white/90">
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-slate-700">Access Token</label>
-                    <input type="password" name="mercadopago_access_token" value="{{ old('mercadopago_access_token') }}" autocomplete="off" placeholder="{{ $mp['access_token'] ? '••••••••••• (já configurado — deixe em branco pra manter)' : 'APP_USR-...' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                    @error('mercadopago_access_token')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Public Key</label>
-                    <input type="text" name="mercadopago_public_key" value="{{ old('mercadopago_public_key', $mp['public_key']) }}" autocomplete="off" placeholder="APP_USR-..." class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Webhook Secret</label>
-                    <input type="password" name="mercadopago_webhook_secret" value="{{ old('mercadopago_webhook_secret') }}" autocomplete="off" placeholder="{{ $mp['webhook_secret'] ? '••••••••••• (já configurado — deixe em branco pra manter)' : 'Chave secreta do webhook' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                    <p class="mt-1 text-xs text-slate-400">Painel do Mercado Pago → Webhooks → "Assinatura secreta".</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="border-t border-gray-100 pt-6 dark:border-gray-800">
-            <h2 class="text-sm font-semibold text-slate-700">Evolution API (WhatsApp)</h2>
+        <section x-show="aba === 'gerencial'" x-cloak class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
+            <h2 class="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-white/90">
+                <x-lucide-message-circle class="h-4 w-4 text-brand-500" /> Evolution API (WhatsApp)
+            </h2>
             <p class="mt-1 text-xs text-slate-400">
                 Usado pra régua de cobrança de mensalidade por WhatsApp. Se deixar em branco, o sistema usa a
                 instância padrão da plataforma. Cadastre esta URL de webhook na instância:
@@ -142,12 +142,137 @@
                     <input type="text" name="evolution_instance" value="{{ old('evolution_instance', $evo['instance']) }}" placeholder="ex: parque-aquatico" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                 </div>
             </div>
-        </div>
+        </section>
+
+        @php $gw = $empresa->configuracaoGatewayPix(); @endphp
+
+        <section x-show="aba === 'financeiro'" x-cloak class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7" x-data="{ provedor: @js(old('gateway_pix_provedor', $gw['provedor'])) }">
+            <div class="flex flex-wrap items-center gap-2">
+                <h2 class="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-white/90">
+                    <x-lucide-qr-code class="h-4 w-4 text-brand-500" /> Gateway de pagamento (cobrança Pix)
+                </h2>
+                @if ($empresa->gatewayPixAtivo())
+                    <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Ativo</span>
+                @elseif ($gw['provedor'] !== \App\Models\Empresa::GATEWAY_PIX_NENHUM)
+                    <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Configuração incompleta</span>
+                @endif
+            </div>
+            <p class="mt-1 text-xs text-slate-400">
+                Escolha qual gateway gera o QR Code Pix. Com ele ativo, ao finalizar uma venda em <strong>Pix</strong> o
+                PDV abre a tela de recebimento com o QR Code dinâmico e só registra a venda quando o pagamento for confirmado.
+            </p>
+            <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 [&_input]:min-h-11 [&_input]:border-gray-300 [&_input]:bg-transparent [&_input]:text-gray-800 [&_input]:outline-none [&_input]:transition [&_input]:focus:border-brand-500 [&_input]:focus:ring-3 [&_input]:focus:ring-brand-500/10 dark:[&_input]:border-gray-700 dark:[&_input]:text-white/90">
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-slate-700">Provedor</label>
+                    <select name="gateway_pix_provedor" x-model="provedor" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        @foreach (\App\Models\Empresa::provedoresGatewayPix() as $valor => $rotulo)
+                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                        @endforeach
+                    </select>
+                    @error('gateway_pix_provedor')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </div>
+
+                <div x-show="provedor !== 'nenhum'" x-cloak>
+                    <label class="block text-sm font-medium text-slate-700">Validade do QR Code (minutos)</label>
+                    <input type="number" min="1" max="60" name="gateway_pix_expiracao_minutos" value="{{ old('gateway_pix_expiracao_minutos', $gw['expiracao_minutos']) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    @error('gateway_pix_expiracao_minutos')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </div>
+
+                <template x-if="provedor === 'mercadopago'">
+                    <div class="contents">
+                        <p class="text-xs text-slate-400 sm:col-span-2">
+                            Estas credenciais também geram o Pix da compra online e das mensalidades. Se o Access Token ficar em
+                            branco, o sistema usa a conta padrão da plataforma. Cadastre esta URL de notificação no painel do
+                            Mercado Pago (Suas integrações → Webhooks):
+                            <code class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] dark:bg-gray-800">{{ route('webhooks.mercadopago') }}</code>
+                        </p>
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-medium text-slate-700">Access Token</label>
+                            <input type="password" name="mercadopago_access_token" value="{{ old('mercadopago_access_token') }}" autocomplete="off" placeholder="{{ $mp['access_token'] ? '••••••••••• (já configurado — deixe em branco pra manter)' : 'APP_USR-...' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            @error('mercadopago_access_token')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Public Key</label>
+                            <input type="text" name="mercadopago_public_key" value="{{ old('mercadopago_public_key', $mp['public_key']) }}" autocomplete="off" placeholder="APP_USR-..." class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Webhook Secret</label>
+                            <input type="password" name="mercadopago_webhook_secret" value="{{ old('mercadopago_webhook_secret') }}" autocomplete="off" placeholder="{{ $mp['webhook_secret'] ? '••••••••••• (já configurado — deixe em branco pra manter)' : 'Chave secreta do webhook' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            <p class="mt-1 text-xs text-slate-400">Painel do Mercado Pago → Webhooks → "Assinatura secreta".</p>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="provedor === 'itau'">
+                    <div class="contents">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Client ID</label>
+                            <input type="text" name="itau_client_id" value="{{ old('itau_client_id', $gw['itau']['client_id']) }}" autocomplete="off" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            @error('itau_client_id')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Client Secret</label>
+                            <input type="password" name="itau_client_secret" value="" autocomplete="new-password" placeholder="{{ $gw['itau']['client_secret'] !== '' ? '••••••••••• (já configurado — deixe em branco pra manter)' : 'Segredo da aplicação no Itaú' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            @error('itau_client_secret')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Chave Pix recebedora</label>
+                            <input type="text" name="itau_chave_pix" value="{{ old('itau_chave_pix', $gw['itau']['chave_pix']) }}" placeholder="CNPJ, e-mail, telefone ou chave aleatória" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            @error('itau_chave_pix')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                        <x-file-input name="itau_certificado" label="Certificado (.crt)" accept=".crt,.pem,.cer" icon="file-check" />
+                        <x-file-input name="itau_chave_privada" label="Chave privada (.key)" accept=".key,.pem" icon="file-check" />
+                        <p class="text-xs sm:col-span-2 {{ $gw['itau']['tem_certificado'] ? 'text-emerald-600' : 'text-slate-400' }}">
+                            @if ($gw['itau']['tem_certificado'])
+                                Certificado e chave já cadastrados — envie novos arquivos só para renovar.
+                            @else
+                                Use o certificado dinâmico emitido no portal do Itaú (CSR enviado em sts.itau.com.br). A chave privada não pode ter senha.
+                            @endif
+                        </p>
+                    </div>
+                </template>
+            </div>
+        </section>
 
         @php $imp = $empresa->configuracaoImpressao(); @endphp
 
-        <div class="border-t border-gray-100 pt-6 dark:border-gray-800">
-            <h2 class="text-sm font-semibold text-slate-700">Fiscal — NF-e / NFC-e / NFS-e</h2>
+        <section x-show="aba === 'fiscal'" x-cloak class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
+            <h2 class="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-white/90">
+                <x-lucide-landmark class="h-4 w-4 text-brand-500" /> Dados do emitente
+            </h2>
+            <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-3 [&_input]:min-h-11 [&_input]:border-gray-300 [&_input]:bg-transparent [&_input]:text-gray-800 [&_input]:outline-none [&_input]:transition [&_input]:focus:border-brand-500 [&_input]:focus:ring-3 [&_input]:focus:ring-brand-500/10 dark:[&_input]:border-gray-700 dark:[&_input]:text-white/90">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Inscrição estadual (IE)</label>
+                    <input type="text" name="ie" id="empresa-ie" value="{{ old('ie', $empresa->ie) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Inscrição municipal (IM)</label>
+                    <input type="text" name="im" value="{{ old('im', $empresa->im) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">CNAE</label>
+                    <input type="text" name="cnae" id="empresa-cnae" value="{{ old('cnae', $empresa->cnae) }}" maxlength="7" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    @error('cnae')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-slate-700">Regime tributário</label>
+                    <select name="regime_tributario" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        @foreach (\App\Models\Empresa::regimesTributarios() as $valor => $rotulo)
+                            <option value="{{ $valor }}" @selected(old('regime_tributario', $empresa->regime_tributario ?? 'simples') === $valor)>{{ $rotulo }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Autorizador XML (CNPJ)</label>
+                    <input type="text" name="aut_xml" value="{{ old('aut_xml', $empresa->aut_xml) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Opcional">
+                </div>
+            </div>
+        </section>
+
+        <section x-show="aba === 'fiscal'" x-cloak class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
+            <h2 class="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-white/90">
+                <x-lucide-file-text class="h-4 w-4 text-brand-500" /> NF-e / NFC-e / NFS-e
+            </h2>
             <p class="mt-1 text-xs text-slate-400">
                 Na NFS-e, o bloco <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">&lt;serv&gt;</code> usa:
                 <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">cLocPrestacao</code>,
@@ -362,10 +487,12 @@
                     <input type="text" name="observacao_padrao_nfce" value="{{ old('observacao_padrao_nfce', $empresa->observacao_padrao_nfce) }}" maxlength="500" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                 </div>
             </div>
-        </div>
+        </section>
 
-        <div class="border-t border-gray-100 pt-6 dark:border-gray-800">
-            <h2 class="text-sm font-semibold text-slate-700">Certificado digital A1</h2>
+        <section x-show="aba === 'fiscal'" x-cloak class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
+            <h2 class="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-white/90">
+                <x-lucide-shield-check class="h-4 w-4 text-brand-500" /> Certificado digital A1
+            </h2>
             <p class="mt-1 text-xs text-slate-400">
                 Arquivo <strong>.pfx / .p12 / .bin</strong> armazenado no banco e no storage privado persistente. Senha gravada criptografada.
                 @if ($empresa->temCertificadoDigital())
@@ -377,21 +504,19 @@
                 @endif
             </p>
             <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Arquivo do certificado</label>
-                    <input type="file" name="certificado" accept=".pfx,.p12,.bin,application/x-pkcs12" class="mt-1 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-500 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white">
-                    @error('certificado')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
-                </div>
+                <x-file-input name="certificado" label="Arquivo do certificado" accept=".pfx,.p12,.bin,application/x-pkcs12" icon="shield-check" />
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Senha do certificado</label>
                     <input type="password" name="certificado_senha" value="{{ old('certificado_senha') }}" autocomplete="new-password" placeholder="{{ $empresa->temCertificadoDigital() ? '•••••••• (deixe em branco pra manter)' : 'Senha do .pfx' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                     @error('certificado_senha')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                 </div>
             </div>
-        </div>
+        </section>
 
-        <div class="border-t border-gray-100 pt-6 dark:border-gray-800">
-            <h2 class="text-sm font-semibold text-slate-700">Impressão do cupom (PDV)</h2>
+        <section x-show="aba === 'gerencial'" x-cloak class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
+            <h2 class="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-white/90">
+                <x-lucide-printer class="h-4 w-4 text-brand-500" /> Impressão do cupom (PDV)
+            </h2>
             <p class="mt-1 text-xs text-slate-400">
                 Define como o comprovante de venda é impresso após finalizar no PDV.
                 <strong>DOM 80mm</strong> usa a impressora do navegador; <strong>ESC/POS</strong> envia bytes
@@ -437,16 +562,21 @@
                     </label>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <div class="flex justify-end">
-            <button class="h-11 rounded-lg bg-brand-500 px-5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">Salvar alterações</button>
+        <div class="sticky bottom-0 z-10 -mx-1 flex items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white/95 px-5 py-3 shadow-theme-xs backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
+            <p class="text-xs text-slate-400">O botão salva todas as abas de uma vez.</p>
+            <button class="inline-flex h-11 items-center gap-2 rounded-lg bg-brand-500 px-5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+                <x-lucide-save class="h-4 w-4" /> Salvar alterações
+            </button>
         </div>
     </form>
 
-    <section class="mt-8 max-w-5xl space-y-4 rounded-2xl border border-rose-200 bg-rose-50/60 p-5 shadow-sm dark:border-rose-900/50 dark:bg-rose-950/30 sm:p-7">
+    <section x-show="aba === 'financeiro'" x-cloak class="mt-6 space-y-4 rounded-2xl border border-rose-200 bg-rose-50/60 p-5 shadow-sm dark:border-rose-900/50 dark:bg-rose-950/30 sm:p-7">
         <div>
-            <h2 class="text-sm font-semibold text-rose-800 dark:text-rose-300">Manutenção financeira</h2>
+            <h2 class="flex items-center gap-2 text-sm font-semibold text-rose-800 dark:text-rose-300">
+                <x-lucide-trash-2 class="h-4 w-4" /> Manutenção financeira
+            </h2>
             <p class="mt-1 text-xs text-rose-700/80 dark:text-rose-300/70">
                 Remove contas a pagar e a receber avulsas desta empresa. Não apaga mensalidades, vendas, PDV nem histórico de caixa já fechado.
                 Contas baixadas são estornadas automaticamente quando o caixa ainda estiver aberto.
@@ -489,13 +619,16 @@
 
     @can('create', App\Models\PontoAtendimento::class)
     @if($unidades->isNotEmpty())
-    <section class="mt-8 max-w-3xl space-y-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
+    <section x-show="aba === 'gerencial'" x-cloak class="mt-6 space-y-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-7">
         <div>
-            <h2 class="text-sm font-semibold text-slate-700 dark:text-white/90">Mesas e comandas (Food)</h2>
+            <h2 class="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-white/90">
+                <x-lucide-utensils class="h-4 w-4 text-brand-500" /> Mesas e comandas (Food)
+            </h2>
             <p class="mt-1 text-xs text-slate-400">Cadastro em faixa por unidade. O mapa operacional fica em Mesas e Comandas.</p>
         </div>
 
         <form method="GET" action="{{ route('empresa.edit') }}" class="flex flex-wrap items-end gap-3">
+            <input type="hidden" name="aba" value="gerencial">
             <label class="text-sm font-medium text-slate-700 dark:text-white/80">Unidade
                 <select name="unidade_id" class="form-control mt-1" onchange="this.form.submit()">
                     @foreach($unidades as $unidade)
@@ -576,6 +709,7 @@
     </section>
     @endif
     @endcan
+    </div>
 @endsection
 
 @push('scripts')

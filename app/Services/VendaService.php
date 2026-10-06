@@ -38,8 +38,9 @@ class VendaService
      * do cliente" além de "registrar a venda".
      *
      * @param  array{cliente_id?:int, observacao?:string, itens: array<array{produto_id?:int, tipo_entrada_id?:int, quantidade:int, desconto?:float}>, forma_pagamento:string}  $dados
+     * @param  array{gateway?:string, gateway_payment_id?:string, payload?:array}  $pagamentoGateway  Pix já confirmado pelo gateway da empresa
      */
-    public function criar(array $dados, User $vendedor, Caixa $caixa): Venda
+    public function criar(array $dados, User $vendedor, Caixa $caixa, array $pagamentoGateway = []): Venda
     {
         if (empty($dados['itens'])) {
             throw new NegocioException('A venda precisa de ao menos um item.');
@@ -49,7 +50,7 @@ class VendaService
             throw new NegocioException('Não é possível registrar uma venda sem um caixa aberto.');
         }
 
-        return DB::transaction(function () use ($dados, $vendedor, $caixa) {
+        return DB::transaction(function () use ($dados, $vendedor, $caixa, $pagamentoGateway) {
             $itensDetalhados = $this->detalharItens($dados['itens']);
             $valorBruto = collect($itensDetalhados)->sum('subtotal_bruto');
             $descontoTotal = collect($itensDetalhados)->sum('desconto');
@@ -90,7 +91,10 @@ class VendaService
             $pagamento = Pagamento::create([
                 'empresa_id' => $vendedor->empresa_id,
                 'venda_id' => $venda->id,
-                'gateway' => $dados['forma_pagamento'] === 'pix' ? 'mercadopago' : $dados['forma_pagamento'],
+                'gateway' => $pagamentoGateway['gateway']
+                    ?? ($dados['forma_pagamento'] === 'pix' ? 'mercadopago' : $dados['forma_pagamento']),
+                'gateway_payment_id' => $pagamentoGateway['gateway_payment_id'] ?? null,
+                'payload' => $pagamentoGateway['payload'] ?? null,
                 'valor' => $valorTotal,
                 'status' => 'aprovado',
                 'metodo_pagamento' => $dados['forma_pagamento'],
@@ -308,6 +312,21 @@ class VendaService
 
             return $venda;
         });
+    }
+
+    /**
+     * Total da venda calculado com os preços do servidor, sem gravar nada —
+     * é o valor cobrado no Pix dinâmico antes de a venda existir.
+     */
+    public function calcularTotal(array $itens): float
+    {
+        if (empty($itens)) {
+            throw new NegocioException('A venda precisa de ao menos um item.');
+        }
+
+        $detalhados = collect($this->detalharItens($itens));
+
+        return round(max(0, $detalhados->sum('subtotal_bruto') - $detalhados->sum('desconto')), 2);
     }
 
     protected function detalharItens(array $itens): array

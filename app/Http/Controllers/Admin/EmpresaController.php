@@ -83,7 +83,11 @@ class EmpresaController extends Controller
             $request->file('certificado'),
         );
 
-        return redirect()->route('empresa.edit')->with('sucesso', 'Dados da empresa atualizados com sucesso.');
+        $aba = in_array($request->input('_aba'), ['geral', 'fiscal', 'financeiro', 'gerencial'], true)
+            ? $request->input('_aba')
+            : null;
+
+        return redirect()->route('empresa.edit', array_filter(['aba' => $aba]))->with('sucesso', 'Dados da empresa atualizados com sucesso.');
     }
 
     /**
@@ -105,12 +109,12 @@ class EmpresaController extends Controller
 
         $msg = "Financeiro limpo: {$resultado['receber']} conta(s) a receber e {$resultado['pagar']} conta(s) a pagar removidas.";
         if ($resultado['avisos'] !== []) {
-            return redirect()->route('empresa.edit')
+            return redirect()->route('empresa.edit', ['aba' => 'financeiro'])
                 ->with('sucesso', $msg)
                 ->with('erro', 'Alguns lançamentos de caixa não puderam ser estornados (caixa fechado): '.implode(' ', $resultado['avisos']));
         }
 
-        return redirect()->route('empresa.edit')->with('sucesso', $msg);
+        return redirect()->route('empresa.edit', ['aba' => 'financeiro'])->with('sucesso', $msg);
     }
 
     public function downloadCertificado(): StreamedResponse|Response
@@ -139,6 +143,6 @@ class EmpresaController extends Controller
         $empresa = Empresa::findOrFail(request()->user()->empresa_id);
         $this->empresaService->removerCertificado($empresa);
 
-        return redirect()->route('empresa.edit')->with('sucesso', 'Certificado digital removido com sucesso.');
+        return redirect()->route('empresa.edit', ['aba' => 'fiscal'])->with('sucesso', 'Certificado digital removido com sucesso.');
     }
 }

@@ -11,6 +11,7 @@ use App\Support\ModulosPermissoes;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
@@ -29,7 +30,7 @@ class UserController extends Controller
         $this->authorize('create', User::class);
 
         $unidades = Unidade::ativas()->get();
-        $roles = Role::where('name', '!=', 'super_admin')->orderBy('name')->get();
+        $roles = $this->perfisAtribuiveis();
 
         return view('usuarios.create', compact('unidades', 'roles'));
     }
@@ -61,7 +62,7 @@ class UserController extends Controller
         $this->authorize('update', $usuario);
 
         $unidades = Unidade::ativas()->get();
-        $roles = Role::where('name', '!=', 'super_admin')->orderBy('name')->get();
+        $roles = $this->perfisAtribuiveis();
 
         return view('usuarios.edit', ['user' => $usuario, 'unidades' => $unidades, 'roles' => $roles]);
     }
@@ -113,6 +114,17 @@ class UserController extends Controller
     }
 
     /**
+     * "Administrador" só aparece para quem pode concedê-lo (UserPolicy::atribuirAdmin).
+     */
+    protected function perfisAtribuiveis()
+    {
+        return Role::where('name', '!=', 'super_admin')
+            ->when(! request()->user()->can('atribuirAdmin', User::class), fn ($q) => $q->where('name', '!=', 'admin'))
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
      * Perfis (roles) + matriz de módulos. A matriz é a fonte da verdade:
      * perfil só permanece se o pacote inteiro ainda estiver marcado.
      * Sem matriz (só perfil), aplica o pacote padrão do perfil.
@@ -126,6 +138,13 @@ class UserController extends Controller
             array_unique($permissions),
             ModulosPermissoes::todasPermissoes()
         ));
+
+        // Módulo novo no catálogo ainda não semeado neste banco (produção não roda
+        // seeder sozinha): syncPermissions lançaria PermissionDoesNotExist (500).
+        $existentes = Permission::where('guard_name', 'web')->whereIn('name', $permissions)->pluck('name')->all();
+        foreach (array_diff($permissions, $existentes) as $nome) {
+            Permission::findOrCreate($nome, 'web');
+        }
 
         if (! $permissoesExplicitas && $permissions === [] && $roles !== []) {
             foreach ($roles as $papel) {

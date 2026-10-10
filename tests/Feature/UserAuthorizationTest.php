@@ -131,6 +131,60 @@ class UserAuthorizationTest extends TestCase
         $this->assertTrue($alvo->can('acessos.validar'));
     }
 
+    public function test_criar_usuario_nao_quebra_quando_permissao_do_catalogo_falta_no_banco(): void
+    {
+        $admin = $this->criarAdminTenant();
+        $this->seedPermissoesCompletas();
+        Permission::where('name', 'pousada.comodato')->delete();
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
+        $this->actingAs($admin)
+            ->post(route('usuarios.store'), [
+                'name' => 'Novo Recepcionista',
+                'email' => 'novo@example.com',
+                'password' => 'Senha@12345',
+                'sincronizar_acesso' => '1',
+                'roles' => ['recepcao'],
+                'permissions' => \App\Support\ModulosPermissoes::permissoesPorPapel()['recepcao'],
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('usuarios.index'));
+
+        $novo = User::where('email', 'novo@example.com')->firstOrFail();
+        $this->assertTrue($novo->hasPermissionTo('pousada.comodato'));
+    }
+
+    public function test_quem_nao_e_admin_recebe_aviso_ao_marcar_perfil_administrador(): void
+    {
+        $admin = $this->criarAdminTenant();
+        $this->seedPermissoesCompletas();
+        $gerente = User::factory()->create([
+            'empresa_id' => $admin->empresa_id,
+            'unidade_id' => $admin->unidade_id,
+        ]);
+        $gerente->syncRoles(['gerente']);
+
+        $this->actingAs($gerente)
+            ->from(route('usuarios.create'))
+            ->post(route('usuarios.store'), [
+                'name' => 'Tentativa Admin',
+                'email' => 'tentativa@example.com',
+                'password' => 'Senha@12345',
+                'sincronizar_acesso' => '1',
+                'roles' => ['admin'],
+                'permissions' => \App\Support\ModulosPermissoes::todasPermissoes(),
+            ])
+            ->assertRedirect(route('usuarios.create'))
+            ->assertSessionHasErrors('roles');
+
+        $this->assertDatabaseMissing('users', ['email' => 'tentativa@example.com']);
+
+        $this->get(route('usuarios.create'))
+            ->assertOk()
+            ->assertSee("togglePapel('gerente'", false)
+            ->assertDontSee("togglePapel('admin'", false);
+    }
+
     private function seedPermissoesCompletas(): void
     {
         foreach (\App\Support\ModulosPermissoes::todasPermissoes() as $nome) {

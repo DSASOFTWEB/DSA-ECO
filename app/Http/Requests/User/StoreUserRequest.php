@@ -53,6 +53,9 @@ class StoreUserRequest extends FormRequest
             if ((! is_array($roles) || $roles === []) && (! is_array($permissions) || $permissions === [])) {
                 $validator->errors()->add('permissions', 'Selecione ao menos um perfil ou um módulo de acesso.');
             }
+            if (is_array($roles) && in_array('admin', $roles, true) && ! $this->user()->can('atribuirAdmin', \App\Models\User::class)) {
+                $validator->errors()->add('roles', 'Somente um administrador pode conceder o perfil Administrador.');
+            }
         });
     }
 }

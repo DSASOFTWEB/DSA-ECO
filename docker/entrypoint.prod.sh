@@ -27,6 +27,12 @@ if [ "$1" = "apache2-foreground" ]; then
     echo "[entrypoint.prod] Rodando migrations..."
     php artisan migrate --force
 
+    # Catálogo de permissões/perfis (idempotente, sem dados de demonstração):
+    # módulos novos do ModulosPermissoes passam a existir e entram nos pacotes
+    # dos perfis padrão — sem isso, salvar usuário com módulo novo dava 500.
+    echo "[entrypoint.prod] Sincronizando permissões e perfis..."
+    php artisan db:seed --class=RolesAndPermissionsSeeder --force
+
     php artisan storage:link --force
 
     echo "[entrypoint.prod] Cacheando config/rotas/views..."

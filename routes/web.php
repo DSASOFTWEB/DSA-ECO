@@ -21,6 +21,9 @@ use App\Http\Controllers\Admin\HospedagemController;
 use App\Http\Controllers\Admin\MensalidadeController;
 use App\Http\Controllers\Admin\MovimentacaoController;
 use App\Http\Controllers\Admin\PlanoController;
+use App\Http\Controllers\Admin\CategoriaProdutoController;
+use App\Http\Controllers\Admin\FornecedorController;
+use App\Http\Controllers\Admin\MarcaController;
 use App\Http\Controllers\Admin\ProdutoController;
 use App\Http\Controllers\Admin\QuartoController;
 use App\Http\Controllers\Admin\RelatorioController;
@@ -161,6 +164,14 @@ Route::middleware('auth')->group(function () {
     Route::post('produtos/sincronizar-ncm', [ProdutoController::class, 'sincronizarNcm'])->name('produtos.sincronizar-ncm');
     Route::resource('produtos', ProdutoController::class);
     Route::post('produtos/{produto}/ajustar-estoque', [ProdutoController::class, 'ajustarEstoque'])->name('produtos.ajustar-estoque');
+
+    // "parameters" explícito nos 3 abaixo: mesma cautela já usada em
+    // outros recursos em português nesta rota (terminais, hospedagens) —
+    // o inflector do Laravel não lida bem com plural em português e pode
+    // gerar um parâmetro de binding errado silenciosamente.
+    Route::resource('categorias-produtos', CategoriaProdutoController::class, ['parameters' => ['categorias-produtos' => 'categoriaProduto']])->except(['show']);
+    Route::resource('marcas', MarcaController::class)->except(['show']);
+    Route::resource('fornecedores', FornecedorController::class, ['parameters' => ['fornecedores' => 'fornecedor']])->except(['show']);
 
     Route::post('vendas/pix', [PdvPixController::class, 'store'])->name('vendas.pix.store');
     Route::get('vendas/pix/{cobrancaPix}/status', [PdvPixController::class, 'status'])->name('vendas.pix.status');

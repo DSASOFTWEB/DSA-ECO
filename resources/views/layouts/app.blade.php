@@ -31,6 +31,9 @@
             'Cadastros' => [
                 ['clientes', 'clientes.index', 'Clientes', 'users'],
                 ['produtos', 'produtos.index', 'Estoque', 'box'],
+                ['categorias-produtos', 'categorias-produtos.index', 'Categorias de Produto', 'tag'],
+                ['marcas', 'marcas.index', 'Marcas', 'award'],
+                ['fornecedores', 'fornecedores.index', 'Fornecedores', 'truck'],
                 ['planos', 'planos.index', 'Planos', 'tag'],
                 ['terminais', 'terminais.index', 'Terminais', 'terminal'],
                 ['unidades', 'unidades.index', 'Unidades', 'building'],

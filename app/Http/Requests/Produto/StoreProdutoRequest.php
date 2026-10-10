@@ -33,6 +33,8 @@ class StoreProdutoRequest extends FormRequest
         return array_merge([
             'unidade_id' => ['nullable', Rule::exists('unidades', 'id')->where('empresa_id', $this->user()->empresa_id)],
             'categoria_id' => ['nullable', Rule::exists('categorias_produtos', 'id')->where('empresa_id', $this->user()->empresa_id)],
+            'marca_id' => ['nullable', Rule::exists('marcas', 'id')->where('empresa_id', $this->user()->empresa_id)],
+            'fornecedor_id' => ['nullable', Rule::exists('fornecedores', 'id')->where('empresa_id', $this->user()->empresa_id)],
             'nome' => ['required', 'string', 'max:255'],
             // Espelha o índice único (empresa_id, sku) da migration: no MySQL ele
             // não distingue produtos soft-deleted (ver comentário na migration),

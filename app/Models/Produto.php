@@ -20,7 +20,7 @@ class Produto extends Model
     public const TIPO_SERVICO = 'servico';
 
     protected $fillable = [
-        'empresa_id', 'unidade_id', 'categoria_id', 'nome', 'tipo_item', 'sku', 'ean',
+        'empresa_id', 'unidade_id', 'categoria_id', 'marca_id', 'fornecedor_id', 'nome', 'tipo_item', 'sku', 'ean',
         'unidade_comercial', 'descricao', 'imagem_url',
         'preco_custo', 'preco_venda', 'controla_estoque', 'estoque_atual',
         'estoque_minimo', 'ativo',
@@ -66,6 +66,16 @@ class Produto extends Model
     public function categoria(): BelongsTo
     {
         return $this->belongsTo(CategoriaProduto::class, 'categoria_id');
+    }
+
+    public function marca(): BelongsTo
+    {
+        return $this->belongsTo(Marca::class);
+    }
+
+    public function fornecedor(): BelongsTo
+    {
+        return $this->belongsTo(Fornecedor::class);
     }
 
     public function movimentacoesEstoque(): HasMany

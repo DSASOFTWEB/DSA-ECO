@@ -8,6 +8,8 @@ use App\Http\Requests\Produto\StoreProdutoRequest;
 use App\Http\Requests\Produto\UpdateProdutoRequest;
 use App\Models\CategoriaProduto;
 use App\Models\Empresa;
+use App\Models\Fornecedor;
+use App\Models\Marca;
 use App\Models\Ncm;
 use App\Models\Produto;
 use App\Services\EstoqueService;
@@ -36,7 +38,9 @@ class ProdutoController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $categorias = CategoriaProduto::orderBy('nome')->get();
+        $categorias = CategoriaProduto::with('categoriaPai')->orderBy('nome')->get();
+        $marcas = Marca::orderBy('nome')->get();
+        $fornecedores = Fornecedor::orderBy('nome')->get();
         $empresa = Empresa::find(auth()->user()->empresa_id);
         $totalNcms = Ncm::count();
 
@@ -49,7 +53,7 @@ class ProdutoController extends Controller
             }
         }
 
-        return view('produtos.index', compact('produtos', 'categorias', 'empresa', 'totalNcms', 'produtoEditando'));
+        return view('produtos.index', compact('produtos', 'categorias', 'marcas', 'fornecedores', 'empresa', 'totalNcms', 'produtoEditando'));
     }
 
     public function create(): RedirectResponse

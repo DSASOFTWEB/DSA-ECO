@@ -32,6 +32,8 @@
         'swap' => 'M7 8h13l-4-4m4 4-4 4M17 16H4l4-4m-4 4 4 4',
         'grid' => 'M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z',
         'coffee' => 'M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Zm13 2h1.5a2.5 2.5 0 0 1 0 5H17M8 2v2m3-2v2m3-2v2',
+        'award' => 'M12 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm-3.5 9-1.5 9 5-3 5 3-1.5-9',
+        'truck' => 'M2 6h11v10H2V6Zm11 4h4l3 3v3h-7v-6ZM5.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm12 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z',
     ];
 @endphp
 <svg {{ $attributes }} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="{{ $paths[$name] ?? $paths['home'] }}" /></svg>

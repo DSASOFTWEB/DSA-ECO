@@ -1,6 +1,18 @@
 @php
     $p = $produto ?? null;
     $tipoItem = old('tipo_item', $p?->tipo_item ?? 'produto');
+
+    // Lista achatada mas em ordem hierárquica: cada categoria raiz seguida
+    // imediatamente das próprias subcategorias (prefixadas com "— "), pra
+    // um <select> simples já dar pra enxergar a hierarquia sem precisar de
+    // <optgroup> aninhado (que não suporta 2 níveis).
+    $categoriasOrdenadas = collect();
+    foreach ($categorias->whereNull('categoria_pai_id')->sortBy('nome') as $raiz) {
+        $categoriasOrdenadas->push($raiz);
+        foreach ($categorias->where('categoria_pai_id', $raiz->id)->sortBy('nome') as $sub) {
+            $categoriasOrdenadas->push($sub);
+        }
+    }
 @endphp
 
 <div
@@ -14,6 +26,9 @@
         unidade: @js(old('unidade_comercial', $p?->unidade_comercial ?? 'UN')),
         cosmosUrl: @js(route('produtos.consultar-ean')),
         ncmAutocompleteUrl: @js(route('produtos.ncm-autocomplete')),
+        categoriaRapidaUrl: @js(route('categorias-produtos.store')),
+        marcaRapidaUrl: @js(route('marcas.store')),
+        fornecedorRapidaUrl: @js(route('fornecedores.store')),
     })"
 >
     {{-- Identificação --}}
@@ -40,13 +55,54 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700">Categoria</label>
-                <select name="categoria_id" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <label class="flex items-center justify-between text-sm font-medium text-slate-700">
+                    Categoria
+                    <button type="button" @click="abrirRapido('categoria')" class="text-xs font-normal text-brand-600 hover:underline">+ Nova</button>
+                </label>
+                <select name="categoria_id" x-ref="categoria_id" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                     <option value="">—</option>
-                    @foreach ($categorias as $categoria)
-                        <option value="{{ $categoria->id }}" @selected(old('categoria_id', $p?->categoria_id) == $categoria->id)>{{ $categoria->nome }}</option>
+                    @foreach ($categoriasOrdenadas as $categoria)
+                        <option value="{{ $categoria->id }}" @selected(old('categoria_id', $p?->categoria_id) == $categoria->id)>{{ $categoria->categoria_pai_id ? '— ' : '' }}{{ $categoria->nome }}</option>
                     @endforeach
                 </select>
+                <div x-show="rapido.campo === 'categoria'" x-cloak class="mt-2 flex gap-2 rounded-lg border border-dashed border-slate-300 p-2 dark:border-gray-700">
+                    <input type="text" x-model="rapido.nome" placeholder="Nome da nova categoria" class="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
+                    <button type="button" @click="criarRapido()" :disabled="rapido.enviando" class="shrink-0 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">Criar</button>
+                </div>
+            </div>
+
+            <div>
+                <label class="flex items-center justify-between text-sm font-medium text-slate-700">
+                    Marca
+                    <button type="button" @click="abrirRapido('marca')" class="text-xs font-normal text-brand-600 hover:underline">+ Nova</button>
+                </label>
+                <select name="marca_id" x-ref="marca_id" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">—</option>
+                    @foreach ($marcas as $marca)
+                        <option value="{{ $marca->id }}" @selected(old('marca_id', $p?->marca_id) == $marca->id)>{{ $marca->nome }}</option>
+                    @endforeach
+                </select>
+                <div x-show="rapido.campo === 'marca'" x-cloak class="mt-2 flex gap-2 rounded-lg border border-dashed border-slate-300 p-2 dark:border-gray-700">
+                    <input type="text" x-model="rapido.nome" placeholder="Nome da nova marca" class="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
+                    <button type="button" @click="criarRapido()" :disabled="rapido.enviando" class="shrink-0 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">Criar</button>
+                </div>
+            </div>
+
+            <div>
+                <label class="flex items-center justify-between text-sm font-medium text-slate-700">
+                    Fornecedor
+                    <button type="button" @click="abrirRapido('fornecedor')" class="text-xs font-normal text-brand-600 hover:underline">+ Novo</button>
+                </label>
+                <select name="fornecedor_id" x-ref="fornecedor_id" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">—</option>
+                    @foreach ($fornecedores as $fornecedor)
+                        <option value="{{ $fornecedor->id }}" @selected(old('fornecedor_id', $p?->fornecedor_id) == $fornecedor->id)>{{ $fornecedor->nome }}</option>
+                    @endforeach
+                </select>
+                <div x-show="rapido.campo === 'fornecedor'" x-cloak class="mt-2 flex gap-2 rounded-lg border border-dashed border-slate-300 p-2 dark:border-gray-700">
+                    <input type="text" x-model="rapido.nome" placeholder="Nome do novo fornecedor" class="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
+                    <button type="button" @click="criarRapido()" :disabled="rapido.enviando" class="shrink-0 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">Criar</button>
+                </div>
             </div>
 
             <div>
@@ -344,8 +400,66 @@ function produtoFiscalForm(cfg) {
         unidade: cfg.unidade || 'UN',
         cosmosUrl: cfg.cosmosUrl,
         ncmAutocompleteUrl: cfg.ncmAutocompleteUrl,
+        categoriaRapidaUrl: cfg.categoriaRapidaUrl,
+        marcaRapidaUrl: cfg.marcaRapidaUrl,
+        fornecedorRapidaUrl: cfg.fornecedorRapidaUrl,
         consultando: false,
         cosmosMsg: '',
+        rapido: { campo: null, nome: '', enviando: false },
+        abrirRapido(campo) {
+            this.rapido.campo = this.rapido.campo === campo ? null : campo;
+            this.rapido.nome = '';
+        },
+        urlRapida(campo) {
+            return { categoria: this.categoriaRapidaUrl, marca: this.marcaRapidaUrl, fornecedor: this.fornecedorRapidaUrl }[campo];
+        },
+        /**
+         * Cria categoria/marca/fornecedor sem sair do formulário de produto
+         * (POST com Accept: application/json — o controller responde
+         * {id, nome} em vez de redirecionar) e já deixa selecionado no
+         * <select> correspondente.
+         */
+        async criarOpcao(campo, nome) {
+            nome = String(nome || '').trim();
+            if (!nome) return null;
+            const url = this.urlRapida(campo);
+            if (!url) return null;
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ nome }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    alert(data.message || (data.errors ? Object.values(data.errors).flat().join('\n') : 'Não foi possível criar.'));
+                    return null;
+                }
+                const select = this.$refs[campo + '_id'];
+                const option = document.createElement('option');
+                option.value = data.id;
+                option.textContent = data.nome;
+                select.appendChild(option);
+                select.value = data.id;
+                return data;
+            } catch (e) {
+                alert('Falha de rede ao criar.');
+                return null;
+            }
+        },
+        async criarRapido() {
+            this.rapido.enviando = true;
+            await this.criarOpcao(this.rapido.campo, this.rapido.nome);
+            this.rapido.enviando = false;
+            this.rapido.campo = null;
+            this.rapido.nome = '';
+        },
         async buscarNcm() {
             const busca = String(this.ncm || '').trim();
             this.ncmSugestoes = [];
@@ -391,12 +505,29 @@ function produtoFiscalForm(cfg) {
                 if (data.imagem_url) this.imagemUrl = data.imagem_url;
                 if (data.unidade_comercial) this.unidade = data.unidade_comercial;
                 if (data.ean) this.ean = data.ean;
+                if (data.marca) await this.aplicarMarcaCosmos(data.marca);
                 this.cosmosMsg = data.marca ? `Encontrado (${data.marca}).` : 'Produto encontrado no Cosmos.';
             } catch (e) {
                 this.cosmosMsg = 'Falha de rede ao consultar o Cosmos.';
             } finally {
                 this.consultando = false;
             }
+        },
+        /**
+         * A consulta Cosmos devolve o NOME da marca (texto), não um id —
+         * procura uma marca já cadastrada com esse nome (ignora
+         * maiúsc./acento) e seleciona; se não existir ainda, cria na hora
+         * (silenciosamente, sem abrir o painel de "+ Nova") e já seleciona.
+         */
+        async aplicarMarcaCosmos(nomeMarca) {
+            const select = this.$refs.marca_id;
+            const alvo = String(nomeMarca).trim().toLowerCase();
+            const existente = Array.from(select.options).find(o => o.textContent.trim().toLowerCase() === alvo);
+            if (existente) {
+                select.value = existente.value;
+                return;
+            }
+            await this.criarOpcao('marca', nomeMarca);
         },
     };
 }

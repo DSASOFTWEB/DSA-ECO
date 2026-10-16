@@ -33,6 +33,10 @@ if [ "$1" = "apache2-foreground" ]; then
     echo "[entrypoint.prod] Sincronizando permissões e perfis..."
     php artisan db:seed --class=RolesAndPermissionsSeeder --force
 
+    # Restaura certificados Pix Itaú do banco → disco (sobrevive ao rebuild).
+    echo "[entrypoint.prod] Sincronizando certificados Pix Itaú..."
+    php artisan pix:itau-manutencao-certificados || true
+
     php artisan storage:link --force
 
     echo "[entrypoint.prod] Cacheando config/rotas/views..."

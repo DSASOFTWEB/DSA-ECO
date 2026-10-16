@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\NegocioException;
 use App\Models\Empresa;
 use App\Services\Fiscal\CertificadoA1Service;
+use App\Services\Integrations\Pix\ItauCertificadoService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,10 @@ use Illuminate\Validation\ValidationException;
 
 class EmpresaService
 {
-    public function __construct(protected CertificadoA1Service $certificadoA1) {}
+    public function __construct(
+        protected CertificadoA1Service $certificadoA1,
+        protected ItauCertificadoService $itauCertificado,
+    ) {}
 
     public function atualizar(Empresa $empresa, array $dados, ?UploadedFile $logo = null, ?UploadedFile $certificado = null): Empresa
     {
@@ -23,8 +27,8 @@ class EmpresaService
             'mercadopago_access_token', 'mercadopago_public_key', 'mercadopago_webhook_secret',
             'evolution_base_url', 'evolution_api_key', 'evolution_instance',
             'impressao_modo', 'impressao_colunas', 'impressao_agente_url', 'impressao_auto_imprimir',
-            'gateway_pix_provedor', 'gateway_pix_expiracao_minutos', 'itau_client_id', 'itau_client_secret', 'itau_chave_pix',
-            'itau_certificado', 'itau_chave_privada',
+            'gateway_pix_provedor', 'gateway_pix_expiracao_minutos', 'itau_client_id', 'itau_client_secret',
+            'itau_chave_pix', 'itau_tipo_chave', 'itau_certificado', 'itau_chave_privada',
         ];
 
         $camposFiscaisSecretos = [
@@ -125,7 +129,7 @@ class EmpresaService
             'auto_imprimir' => (bool) ($integracoes['impressao_auto_imprimir'] ?? false),
         ];
 
-        $arquivosItau = $this->lerParCertificadoItau(
+        $parItau = $this->lerParCertificadoItau(
             $empresa,
             $integracoes['itau_certificado'] ?? null,
             $integracoes['itau_chave_privada'] ?? null,
@@ -137,26 +141,43 @@ class EmpresaService
             $segredo = $integracoes['itau_client_secret'] ?? null;
             $expiracaoAtual = $empresa->configuracaoGatewayPix()['expiracao_minutos'];
 
+            $tipoChave = $integracoes['itau_tipo_chave'] ?? null;
+            $chavePix = $integracoes['itau_chave_pix'] ?? null;
+            if (filled($chavePix)) {
+                $tipoChave = filled($tipoChave) ? $tipoChave : $this->itauCertificado->detectarTipo($chavePix);
+                $chavePix = $this->itauCertificado->normalizarChave($chavePix, $tipoChave);
+            }
+
+            $itau = $this->mesclarSemApagar($itauAtual, [
+                'client_id' => $integracoes['itau_client_id'] ?? null,
+                'chave_pix' => $chavePix,
+                'tipo_chave' => $tipoChave,
+                'client_secret' => filled($segredo) ? Crypt::encryptString($segredo) : null,
+            ]);
+
+            if ($parItau !== []) {
+                $itau = array_merge($itau, $this->itauCertificado->gravarPar(
+                    $empresa,
+                    $parItau['certificado'],
+                    $parItau['chave_privada'],
+                ));
+            }
+
             $configuracoes['gateway_pix'] = [
                 'provedor' => $integracoes['gateway_pix_provedor'],
                 'expiracao_minutos' => (int) ($integracoes['gateway_pix_expiracao_minutos'] ?? $expiracaoAtual) ?: 10,
-                'itau' => $this->mesclarSemApagar($itauAtual, [
-                    'client_id' => $integracoes['itau_client_id'] ?? null,
-                    'chave_pix' => $integracoes['itau_chave_pix'] ?? null,
-                    'client_secret' => filled($segredo) ? Crypt::encryptString($segredo) : null,
-                ]),
+                'itau' => $itau,
             ];
         }
 
         $dados['configuracoes'] = $configuracoes;
         $dados = array_merge($dados, $fiscais);
 
-        DB::transaction(function () use ($empresa, $dados, $arquivosItau): void {
+        DB::transaction(function () use ($empresa, $dados): void {
             $empresa->update($dados);
 
-            foreach ($arquivosItau as $caminho => $conteudo) {
-                Storage::disk('local')->put($caminho, $conteudo);
-            }
+            // Garante cópia em disco mesmo se só havia PEM no banco (deploy).
+            $this->itauCertificado->garantirArquivos($empresa->fresh());
 
             if (isset($dados['certificado_arquivo'])) {
                 $gravado = Storage::disk('local')->put(
@@ -192,9 +213,10 @@ class EmpresaService
 
     /**
      * Confere que o certificado e a chave privada do Itaú formam um par
-     * (quando só um dos dois é reenviado, compara com o outro já salvo).
+     * (quando só um dos dois é reenviado, compara com o outro já salvo no
+     * banco ou no disco).
      *
-     * @return array<string, string> caminho no disco local => conteúdo PEM
+     * @return array{certificado: string, chave_privada: string}|array{}
      */
     protected function lerParCertificadoItau(Empresa $empresa, mixed $certificado, mixed $chave): array
     {
@@ -205,9 +227,15 @@ class EmpresaService
             return [];
         }
 
+        $salvo = $this->itauCertificado->lerDoBanco($empresa);
         $disco = Storage::disk('local');
-        $certParaConferir = $certificado ?? ($disco->exists($empresa->itauCertificadoCaminho()) ? $disco->get($empresa->itauCertificadoCaminho()) : null);
-        $chaveParaConferir = $chave ?? ($disco->exists($empresa->itauChavePrivadaCaminho()) ? $disco->get($empresa->itauChavePrivadaCaminho()) : null);
+        $certSalvo = $salvo['certificado']
+            ?? ($disco->exists($empresa->itauCertificadoCaminho()) ? $disco->get($empresa->itauCertificadoCaminho()) : null);
+        $chaveSalva = $salvo['chave_privada']
+            ?? ($disco->exists($empresa->itauChavePrivadaCaminho()) ? $disco->get($empresa->itauChavePrivadaCaminho()) : null);
+
+        $certParaConferir = $certificado ?? $certSalvo;
+        $chaveParaConferir = $chave ?? $chaveSalva;
 
         if ($certParaConferir === null || $chaveParaConferir === null) {
             throw ValidationException::withMessages([
@@ -233,10 +261,11 @@ class EmpresaService
             ]);
         }
 
-        return array_filter([
-            $empresa->itauCertificadoCaminho() => $certificado,
-            $empresa->itauChavePrivadaCaminho() => $chave,
-        ], fn ($conteudo) => $conteudo !== null);
+        // Só regrava quando veio arquivo novo (ou o par completo).
+        return [
+            'certificado' => $certificado ?? $certParaConferir,
+            'chave_privada' => $chave ?? $chaveParaConferir,
+        ];
     }
 
     /**

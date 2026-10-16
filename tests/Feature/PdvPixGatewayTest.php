@@ -148,7 +148,8 @@ class PdvPixGatewayTest extends TestCase
                 'gateway_pix_provedor' => 'itau',
                 'itau_client_id' => 'client-123',
                 'itau_client_secret' => 'segredo-super',
-                'itau_chave_pix' => '12345678000199',
+                'itau_tipo_chave' => 'cnpj',
+                'itau_chave_pix' => '12.345.678/0001-99',
                 'gateway_pix_expiracao_minutos' => 15,
                 'itau_certificado' => UploadedFile::fake()->createWithContent('itau.crt', $certificado),
                 'itau_chave_privada' => UploadedFile::fake()->createWithContent('itau.key', $chave),
@@ -161,17 +162,29 @@ class PdvPixGatewayTest extends TestCase
         $this->assertNotSame('segredo-super', $bruto);
         $this->assertSame('segredo-super', Crypt::decryptString($bruto));
         $this->assertSame(15, $empresa->configuracaoGatewayPix()['expiracao_minutos']);
+        $this->assertSame('cnpj', $empresa->configuracaoGatewayPix()['itau']['tipo_chave']);
+        $this->assertSame('12345678000199', $empresa->configuracaoGatewayPix()['itau']['chave_pix']);
         $this->assertTrue($empresa->gatewayPixAtivo());
+        $this->assertNotEmpty($empresa->configuracoes['gateway_pix']['itau']['certificado_pem'] ?? null);
+        $this->assertSame($certificado, Crypt::decryptString($empresa->configuracoes['gateway_pix']['itau']['certificado_pem']));
+
+        // Simula deploy que apagou o volume: restaura do banco.
+        Storage::disk('local')->delete([$empresa->itauCertificadoCaminho(), $empresa->itauChavePrivadaCaminho()]);
+        $this->artisan('pix:itau-manutencao-certificados')->assertSuccessful();
+        $this->assertTrue(Storage::disk('local')->exists($empresa->itauCertificadoCaminho()));
+        $this->assertSame($certificado, Storage::disk('local')->get($empresa->itauCertificadoCaminho()));
 
         // Reenviar sem segredo/arquivos mantém o que já estava salvo.
         $this->put(route('empresa.update'), $this->dadosEmpresa([
             'gateway_pix_provedor' => 'itau',
+            'itau_tipo_chave' => 'email',
             'itau_chave_pix' => 'pix@empresa.com',
         ]))->assertSessionHasNoErrors();
 
         $empresa->refresh();
         $this->assertSame('segredo-super', $empresa->configuracaoGatewayPix()['itau']['client_secret']);
         $this->assertSame('pix@empresa.com', $empresa->configuracaoGatewayPix()['itau']['chave_pix']);
+        $this->assertSame('email', $empresa->configuracaoGatewayPix()['itau']['tipo_chave']);
         $this->assertTrue($empresa->gatewayPixAtivo());
     }
 

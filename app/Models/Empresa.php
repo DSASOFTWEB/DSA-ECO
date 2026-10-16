@@ -275,13 +275,14 @@ class Empresa extends Model
 
     /**
      * Gateway Pix usado na tela de recebimento do PDV. Guardado em
-     * configuracoes->gateway_pix; o client_secret do Itaú fica cifrado com a
-     * APP_KEY e o certificado/chave mTLS ficam no disco local (fora do banco).
+     * configuracoes->gateway_pix; o client_secret e o par mTLS do Itaú ficam
+     * cifrados com a APP_KEY no banco, com cópia dos PEM em storage/app
+     * (a SDK lê do disco; o banco evita perda no deploy).
      * As credenciais do Mercado Pago continuam em configuracoes->mercadopago
      * (ver credenciaisMercadoPago), pois também servem ao checkout online e
      * às mensalidades.
      *
-     * @return array{provedor: string, expiracao_minutos: int, itau: array{client_id: string, client_secret: string, chave_pix: string, expiracao_minutos: int, tem_certificado: bool}}
+     * @return array{provedor: string, expiracao_minutos: int, itau: array{client_id: string, client_secret: string, chave_pix: string, tipo_chave: string, expiracao_minutos: int, tem_certificado: bool, certificado_validade: ?\Illuminate\Support\Carbon, certificado_assunto: ?string}}
      */
     public function configuracaoGatewayPix(): array
     {
@@ -303,15 +304,36 @@ class Empresa extends Model
             Arr::get($this->configuracoes, 'gateway_pix.itau.expiracao_minutos', 10)
         ) ?: 10;
 
+        $chavePix = (string) Arr::get($this->configuracoes, 'gateway_pix.itau.chave_pix', '');
+        $tipoChave = (string) Arr::get($this->configuracoes, 'gateway_pix.itau.tipo_chave', '');
+        if ($tipoChave === '' || ! array_key_exists($tipoChave, \App\Services\Integrations\Pix\ItauCertificadoService::TIPOS_CHAVE)) {
+            $tipoChave = $chavePix !== ''
+                ? app(\App\Services\Integrations\Pix\ItauCertificadoService::class)->detectarTipo($chavePix)
+                : 'cnpj';
+        }
+
+        $validadeRaw = Arr::get($this->configuracoes, 'gateway_pix.itau.certificado_validade');
+        $validade = null;
+        if (filled($validadeRaw)) {
+            try {
+                $validade = \Illuminate\Support\Carbon::parse($validadeRaw);
+            } catch (\Throwable) {
+                $validade = null;
+            }
+        }
+
         return [
             'provedor' => $provedor,
             'expiracao_minutos' => $expiracao,
             'itau' => [
                 'client_id' => (string) Arr::get($this->configuracoes, 'gateway_pix.itau.client_id', ''),
                 'client_secret' => $segredo,
-                'chave_pix' => (string) Arr::get($this->configuracoes, 'gateway_pix.itau.chave_pix', ''),
+                'chave_pix' => $chavePix,
+                'tipo_chave' => $tipoChave,
                 'expiracao_minutos' => $expiracao,
                 'tem_certificado' => $this->temCertificadoItau(),
+                'certificado_validade' => $validade,
+                'certificado_assunto' => Arr::get($this->configuracoes, 'gateway_pix.itau.certificado_assunto'),
             ],
         ];
     }
@@ -362,8 +384,7 @@ class Empresa extends Model
 
     public function temCertificadoItau(): bool
     {
-        return Storage::disk('local')->exists($this->itauCertificadoCaminho())
-            && Storage::disk('local')->exists($this->itauChavePrivadaCaminho());
+        return app(\App\Services\Integrations\Pix\ItauCertificadoService::class)->temCertificado($this);
     }
 
     /**

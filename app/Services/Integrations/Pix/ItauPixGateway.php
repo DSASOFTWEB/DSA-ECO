@@ -30,20 +30,26 @@ class ItauPixGateway implements GatewayPix
     public function criarCobranca(float $valor, string $descricao): array
     {
         $config = $this->config();
-        $expiracao = $this->empresa->configuracaoGatewayPix()['expiracao_minutos'] * 60;
+        $certificados = app(ItauCertificadoService::class);
+        if (! $certificados->garantirArquivos($this->empresa)) {
+            throw new IntegrationException('Certificado mTLS do Itaú não encontrado no banco nem no disco.', self::SERVICO);
+        }
 
-        $chavePix = $this->normalizarChavePix($config['chave_pix']);
+        $expiracao = $this->empresa->configuracaoGatewayPix()['expiracao_minutos'] * 60;
+        $tipoChave = (string) ($config['tipo_chave'] ?? '');
+        $chavePix = $certificados->normalizarChave($config['chave_pix'], $tipoChave !== '' ? $tipoChave : null);
 
         Log::info('Itaú Pix: solicitando cobrança', [
             'empresa_id' => $this->empresa->getKey(),
             'valor' => number_format($valor, 2, '.', ''),
             'expiracao_segundos' => $expiracao,
             'chave_pix_mascara' => $this->mascara($chavePix),
-            'chave_pix_tipo' => $this->tipoChavePix($chavePix),
+            'chave_pix_tipo' => $tipoChave !== '' ? $tipoChave : $certificados->detectarTipo($chavePix),
             'client_id_mascara' => $this->mascara($config['client_id']),
             'tem_certificado' => $config['tem_certificado'],
             'certificado_existe' => Storage::disk('local')->exists($this->empresa->itauCertificadoCaminho()),
             'chave_privada_existe' => Storage::disk('local')->exists($this->empresa->itauChavePrivadaCaminho()),
+            'certificado_validade' => $config['certificado_validade']?->toDateString(),
         ]);
 
         $pix = (new Pix($chavePix, number_format($valor, 2, '.', '')))
@@ -125,10 +131,14 @@ class ItauPixGateway implements GatewayPix
     }
 
     /**
-     * @return array{client_id: string, client_secret: string, chave_pix: string, expiracao_minutos: int, tem_certificado: bool}
+     * @return array{client_id: string, client_secret: string, chave_pix: string, tipo_chave: string, expiracao_minutos: int, tem_certificado: bool, certificado_validade: ?\Illuminate\Support\Carbon, certificado_assunto: ?string}
      */
     protected function config(): array
     {
+        // Restaura PEM do banco → disco antes de validar (pós-deploy).
+        app(ItauCertificadoService::class)->garantirArquivos($this->empresa);
+        $this->empresa->refresh();
+
         $itau = $this->empresa->configuracaoGatewayPix()['itau'];
 
         if ($itau['client_id'] === '' || $itau['client_secret'] === '' || $itau['chave_pix'] === '' || ! $itau['tem_certificado']) {
@@ -211,43 +221,6 @@ class ItauPixGateway implements GatewayPix
         }
 
         return $resumo !== [] ? $resumo : ['chaves' => array_keys($limpo)];
-    }
-
-    /**
-     * CPF/CNPJ na API Pix devem ir só com dígitos. E-mail, telefone e chave
-     * aleatória (EVP) seguem como estão cadastrados no Itaú.
-     */
-    protected function normalizarChavePix(string $chave): string
-    {
-        $chave = trim($chave);
-        $soDigitos = preg_replace('/\D+/', '', $chave) ?? '';
-
-        if (in_array(strlen($soDigitos), [11, 14], true) && preg_match('/^[\d.\-\/]+$/', $chave)) {
-            return $soDigitos;
-        }
-
-        return $chave;
-    }
-
-    protected function tipoChavePix(string $chave): string
-    {
-        if (filter_var($chave, FILTER_VALIDATE_EMAIL)) {
-            return 'email';
-        }
-        if (preg_match('/^\d{11}$/', $chave)) {
-            return 'cpf';
-        }
-        if (preg_match('/^\d{14}$/', $chave)) {
-            return 'cnpj';
-        }
-        if (preg_match('/^\+?\d{10,14}$/', $chave)) {
-            return 'telefone';
-        }
-        if (preg_match('/^[0-9a-f-]{32,36}$/i', $chave)) {
-            return 'aleatoria';
-        }
-
-        return 'desconhecido';
     }
 
     protected function mascara(string $valor): string

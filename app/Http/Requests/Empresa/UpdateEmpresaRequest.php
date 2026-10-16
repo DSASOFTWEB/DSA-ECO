@@ -53,6 +53,7 @@ class UpdateEmpresaRequest extends FormRequest
             'itau_client_id' => ['nullable', 'string', 'max:120'],
             'itau_client_secret' => ['nullable', 'string', 'max:255'],
             'itau_chave_pix' => ['nullable', 'string', 'max:77'],
+            'itau_tipo_chave' => ['nullable', 'string', Rule::in(array_keys(\App\Services\Integrations\Pix\ItauCertificadoService::TIPOS_CHAVE))],
             'gateway_pix_expiracao_minutos' => ['nullable', 'integer', 'min:1', 'max:60'],
             'itau_certificado' => ['nullable', 'file', 'extensions:crt,pem,cer', 'max:64'],
             'itau_chave_privada' => ['nullable', 'file', 'extensions:key,pem', 'max:64'],

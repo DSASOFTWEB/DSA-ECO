@@ -51,3 +51,11 @@ Schedule::command('financeiro:aplicar-atrasos')
     ->dailyAt('01:20')
     ->withoutOverlapping()
     ->onOneServer();
+
+// Pix Itaú: restaura .crt/.key do banco → disco, limpa token OAuth e
+// alerta se o certificado dinâmico estiver perto de vencer (renovação
+// manual no portal Itaú — o banco não perde o PEM no rebuild).
+Schedule::command('pix:itau-manutencao-certificados')
+    ->monthlyOn(1, '03:00')
+    ->withoutOverlapping()
+    ->onOneServer();

@@ -17,8 +17,8 @@
             ]],
             'financeiro' => ['rotulo' => 'Financeiro', 'icone' => 'wallet', 'campos' => [
                 'gateway_pix_provedor', 'gateway_pix_expiracao_minutos', 'mercadopago_access_token', 'mercadopago_public_key',
-                'mercadopago_webhook_secret', 'itau_client_id', 'itau_client_secret', 'itau_chave_pix', 'itau_certificado',
-                'itau_chave_privada', 'confirmacao',
+                'mercadopago_webhook_secret', 'itau_client_id', 'itau_client_secret', 'itau_chave_pix', 'itau_tipo_chave',
+                'itau_certificado', 'itau_chave_privada', 'confirmacao',
             ]],
             'gerencial' => ['rotulo' => 'Gerencial', 'icone' => 'sliders-horizontal', 'campos' => [
                 'evolution_base_url', 'evolution_api_key', 'evolution_instance', 'impressao_modo', 'impressao_colunas',
@@ -216,19 +216,72 @@
                             @error('itau_client_secret')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                         </div>
                         <div>
+                            <label class="block text-sm font-medium text-slate-700">Tipo da chave Pix</label>
+                            <select name="itau_tipo_chave" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                @foreach (\App\Services\Integrations\Pix\ItauCertificadoService::TIPOS_CHAVE as $valor => $rotulo)
+                                    <option value="{{ $valor }}" @selected(old('itau_tipo_chave', $gw['itau']['tipo_chave']) === $valor)>{{ $rotulo }}</option>
+                                @endforeach
+                            </select>
+                            @error('itau_tipo_chave')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
                             <label class="block text-sm font-medium text-slate-700">Chave Pix recebedora</label>
-                            <input type="text" name="itau_chave_pix" value="{{ old('itau_chave_pix', $gw['itau']['chave_pix']) }}" placeholder="CNPJ, e-mail, telefone ou chave aleatória" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            <input type="text" name="itau_chave_pix" value="{{ old('itau_chave_pix', $gw['itau']['chave_pix']) }}" placeholder="Mesma chave cadastrada no Bankline Itaú" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            <p class="mt-1 text-xs text-slate-400">Precisa ser chave do Itaú desta conta (não de outro banco). CNPJ/CPF só números.</p>
                             @error('itau_chave_pix')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                         </div>
-                        <x-file-input name="itau_certificado" label="Certificado (.crt)" accept=".crt,.pem,.cer" icon="file-check" />
-                        <x-file-input name="itau_chave_privada" label="Chave privada (.key)" accept=".key,.pem" icon="file-check" />
-                        <p class="text-xs sm:col-span-2 {{ $gw['itau']['tem_certificado'] ? 'text-emerald-600' : 'text-slate-400' }}">
-                            @if ($gw['itau']['tem_certificado'])
-                                Certificado e chave já cadastrados — envie novos arquivos só para renovar.
-                            @else
-                                Use o certificado dinâmico emitido no portal do Itaú (CSR enviado em sts.itau.com.br). A chave privada não pode ter senha.
-                            @endif
-                        </p>
+
+                        <div class="sm:col-span-2 rounded-xl border {{ $gw['itau']['tem_certificado'] ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70' }} p-4">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <p class="text-sm font-semibold {{ $gw['itau']['tem_certificado'] ? 'text-emerald-800' : 'text-amber-800' }}">
+                                        @if ($gw['itau']['tem_certificado'])
+                                            Certificado mTLS ativo (salvo no banco e no arquivo)
+                                        @else
+                                            Certificado mTLS ainda não cadastrado
+                                        @endif
+                                    </p>
+                                    @if ($gw['itau']['tem_certificado'])
+                                        <p class="mt-1 text-xs text-emerald-700">
+                                            @if ($gw['itau']['certificado_assunto'])
+                                                Assunto: {{ $gw['itau']['certificado_assunto'] }} ·
+                                            @endif
+                                            @if ($gw['itau']['certificado_validade'])
+                                                Válido até {{ $gw['itau']['certificado_validade']->format('d/m/Y') }}
+                                                @if ($gw['itau']['certificado_validade']->isPast())
+                                                    <span class="font-semibold text-rose-600">(expirado — renove no portal Itaú)</span>
+                                                @elseif ($gw['itau']['certificado_validade']->lteDiffInDays(now()) <= 30)
+                                                    <span class="font-semibold text-amber-700">(vence em breve)</span>
+                                                @endif
+                                            @else
+                                                Validade não lida — envie o .crt de novo para registrar.
+                                            @endif
+                                        </p>
+                                        <p class="mt-1 text-xs text-emerald-700/80">Os campos abaixo ficam vazios de propósito: o navegador nunca mostra arquivo já enviado. Não precisa reenviar ao salvar.</p>
+                                    @else
+                                        <p class="mt-1 text-xs text-amber-700">Use o certificado dinâmico do portal Itaú (CSR em sts.itau.com.br). A chave privada não pode ter senha.</p>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="mt-3 grid gap-4 sm:grid-cols-2">
+                                <x-file-input
+                                    name="itau_certificado"
+                                    :label="$gw['itau']['tem_certificado'] ? 'Substituir certificado (.crt)' : 'Certificado (.crt)'"
+                                    accept=".crt,.pem,.cer"
+                                    icon="file-check"
+                                    :placeholder="$gw['itau']['tem_certificado'] ? 'Mantém o atual — escolha só para renovar' : 'Nenhum arquivo selecionado'"
+                                />
+                                <x-file-input
+                                    name="itau_chave_privada"
+                                    :label="$gw['itau']['tem_certificado'] ? 'Substituir chave privada (.key)' : 'Chave privada (.key)'"
+                                    accept=".key,.pem"
+                                    icon="file-check"
+                                    :placeholder="$gw['itau']['tem_certificado'] ? 'Mantém a atual — escolha só para renovar' : 'Nenhum arquivo selecionado'"
+                                />
+                            </div>
+                            @error('itau_certificado')<p class="mt-2 text-xs text-rose-600">{{ $message }}</p>@enderror
+                            @error('itau_chave_privada')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
                     </div>
                 </template>
             </div>

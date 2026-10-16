@@ -205,6 +205,7 @@ Configure no `.env` (valores de exemplo documentados em `.env.example`):
 
 ```
 # Evolution API (envio de cobrança/notificação por WhatsApp)
+
 EVOLUTION_API_URL=
 EVOLUTION_API_KEY=
 EVOLUTION_INSTANCE=
@@ -242,8 +243,13 @@ Pix)**, num único seletor:
   servem à compra online e às mensalidades, e continuam salvas mesmo se outro gateway for
   escolhido. Com o webhook cadastrado, o pagamento do PDV é confirmado mesmo se a tela
   for fechada.
-- **Itaú** — Client ID, Client Secret, chave Pix recebedora, certificado `.crt` e chave
-  privada `.key` sem senha, emitidos no portal do Itaú.
+- **Itaú** — Client ID, Client Secret, **tipo da chave** (CNPJ/CPF/e-mail/telefone/EVP),
+  chave Pix recebedora, certificado `.crt` e chave privada `.key` sem senha, emitidos no
+  portal do Itaú. O par mTLS fica **cifrado no banco e em arquivo** (`storage/app`); no
+  deploy o entrypoint e o cron mensal `pix:itau-manutencao-certificados` restauram os
+  arquivos a partir do banco e alertam se a validade estiver perto do fim. A renovação
+  do certificado dinâmico em si continua no portal Itaú (CSR) — o sistema não apaga o
+  PEM já salvo quando você só altera outros campos.
 
 A validade do QR Code (minutos) vale para qualquer gateway. Com tudo preenchido, o selo
 "Ativo" aparece e, no PDV, finalizar em **Pix** abre a tela de recebimento com o QR Code

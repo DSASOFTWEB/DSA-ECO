@@ -250,7 +250,7 @@
                                                 Válido até {{ $gw['itau']['certificado_validade']->format('d/m/Y') }}
                                                 @if ($gw['itau']['certificado_validade']->isPast())
                                                     <span class="font-semibold text-rose-600">(expirado — renove no portal Itaú)</span>
-                                                @elseif ($gw['itau']['certificado_validade']->lteDiffInDays(now()) <= 30)
+                                                @elseif ($gw['itau']['certificado_validade']->lte(now()->addDays(30)))
                                                     <span class="font-semibold text-amber-700">(vence em breve)</span>
                                                 @endif
                                             @else

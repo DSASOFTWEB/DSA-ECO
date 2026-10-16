@@ -32,6 +32,17 @@ class ItauPixGateway implements GatewayPix
         $config = $this->config();
         $expiracao = $this->empresa->configuracaoGatewayPix()['expiracao_minutos'] * 60;
 
+        Log::info('Itaú Pix: solicitando cobrança', [
+            'empresa_id' => $this->empresa->getKey(),
+            'valor' => number_format($valor, 2, '.', ''),
+            'expiracao_segundos' => $expiracao,
+            'chave_pix_mascara' => $this->mascara($config['chave_pix']),
+            'client_id_mascara' => $this->mascara($config['client_id']),
+            'tem_certificado' => $config['tem_certificado'],
+            'certificado_existe' => Storage::disk('local')->exists($this->empresa->itauCertificadoCaminho()),
+            'chave_privada_existe' => Storage::disk('local')->exists($this->empresa->itauChavePrivadaCaminho()),
+        ]);
+
         $pix = (new Pix($config['chave_pix'], number_format($valor, 2, '.', '')))
             ->setExpiracao($expiracao);
 
@@ -42,8 +53,24 @@ class ItauPixGateway implements GatewayPix
         $copiaECola = (string) ($json['pixCopiaECola'] ?? '');
 
         if ($txid === '' || $copiaECola === '') {
-            throw new IntegrationException('O Itaú não devolveu o QR Code da cobrança Pix.', self::SERVICO);
+            Log::error('Itaú Pix: resposta sem txid/pixCopiaECola', [
+                'empresa_id' => $this->empresa->getKey(),
+                'chaves' => array_keys($this->semRuido($json)),
+                'status' => $json['status'] ?? null,
+            ]);
+
+            throw new IntegrationException(
+                'O Itaú não devolveu o QR Code da cobrança Pix.',
+                self::SERVICO,
+                $this->resumoErro($json),
+            );
         }
+
+        Log::info('Itaú Pix: cobrança criada', [
+            'empresa_id' => $this->empresa->getKey(),
+            'txid' => $txid,
+            'status' => $json['status'] ?? null,
+        ]);
 
         return [
             'txid' => $txid,
@@ -115,24 +142,32 @@ class ItauPixGateway implements GatewayPix
     protected function jsonOuFalha(BaseResponse $resposta, string $operacao): array
     {
         $json = $resposta->getJson() ?? [];
-        $falhou = $resposta->getMensagem() !== null
+        $mensagemSdk = $resposta->getMensagem();
+        $falhou = $mensagemSdk !== null
             || isset($json['detail'], $json['title'])
             || isset($json['error'])
             || $json === [];
 
         if ($falhou) {
+            $resumo = $this->resumoErro($json);
+            if ($mensagemSdk !== null) {
+                $resumo['mensagem_sdk'] = $mensagemSdk;
+            }
+
             Log::warning('Falha na API Pix do Itaú', [
                 'empresa_id' => $this->empresa->getKey(),
                 'operacao' => $operacao,
-                'title' => $json['title'] ?? null,
-                'detail' => $json['detail'] ?? $resposta->getMensagem(),
+                'resposta' => $resumo,
+                'json_vazio' => $json === [],
+                'chaves' => array_keys($this->semRuido($json)),
             ]);
 
-            $detalhe = $json['detail'] ?? $json['title'] ?? null;
+            $detalhe = $resumo['detail'] ?? $resumo['title'] ?? $resumo['error_description'] ?? $resumo['mensagem_sdk'] ?? null;
 
             throw new IntegrationException(
                 "Não foi possível {$operacao} no Itaú".($detalhe ? ": {$detalhe}" : '.'),
                 self::SERVICO,
+                $resumo,
             );
         }
 
@@ -145,5 +180,45 @@ class ItauPixGateway implements GatewayPix
     protected function semRuido(array $json): array
     {
         return array_filter($json, fn ($chave) => ! is_int($chave), ARRAY_FILTER_USE_KEY);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function resumoErro(array $json): array
+    {
+        $limpo = $this->semRuido($json);
+        $chaves = ['title', 'detail', 'error', 'error_description', 'status', 'type', 'code', 'mensagem', 'message', 'violacoes'];
+        $resumo = [];
+
+        foreach ($chaves as $chave) {
+            if (array_key_exists($chave, $limpo)) {
+                $resumo[$chave] = $limpo[$chave];
+            }
+        }
+
+        // A SDK costuma anexar status HTTP numérico como chave 0 / status_code.
+        foreach ($json as $chave => $valor) {
+            if (is_array($valor) && isset($valor['status_code'])) {
+                $resumo['status_code'] = $valor['status_code'];
+            }
+            if ($chave === 'status_code' || (is_int($chave) && is_numeric($valor))) {
+                $resumo['status_code'] = $resumo['status_code'] ?? $valor;
+            }
+        }
+
+        return $resumo !== [] ? $resumo : ['chaves' => array_keys($limpo)];
+    }
+
+    protected function mascara(string $valor): string
+    {
+        $valor = trim($valor);
+        $len = strlen($valor);
+
+        if ($len <= 8) {
+            return str_repeat('*', $len);
+        }
+
+        return substr($valor, 0, 4).str_repeat('*', max(4, $len - 8)).substr($valor, -4);
     }
 }

@@ -25,6 +25,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -76,6 +77,16 @@ class CheckoutPublicoController extends Controller
             $venda = $this->vendaService->criarVendaOnlinePendente($unidade, $tipoEntrada, (int) $dados['quantidade']);
             $descricao = "{$venda->itens->first()->quantidade}x {$tipoEntrada->nome} - {$unidade->nome}";
 
+            Log::info('Checkout Pix: iniciando cobrança', [
+                'empresa_id' => $empresa->id,
+                'unidade_id' => $unidade->id,
+                'venda_id' => $venda->id,
+                'gateway' => $gateway->nome(),
+                'valor' => (float) $venda->valor_total,
+                'quantidade' => (int) $dados['quantidade'],
+                'tipo_entrada_id' => $tipoEntrada->id,
+            ]);
+
             if ($gateway->nome() === Empresa::GATEWAY_PIX_MERCADOPAGO) {
                 // external_reference "venda:{id}" é o que o webhook usa para confirmar.
                 $host = parse_url(config('app.url'), PHP_URL_HOST) ?: 'example.com';
@@ -96,14 +107,45 @@ class CheckoutPublicoController extends Controller
                     'gateway' => $cobranca['payload'],
                 ], $gateway->nome());
             }
+
+            Log::info('Checkout Pix: cobrança gerada', [
+                'empresa_id' => $empresa->id,
+                'venda_id' => $venda->id,
+                'gateway' => $gateway->nome(),
+                'txid' => $cobranca['txid'] ?? $cobranca['id'] ?? null,
+            ]);
         } catch (NegocioException $e) {
             $venda?->update(['status' => 'cancelado']);
 
             return back()->withInput()->with('erro', $e->getMessage());
         } catch (IntegrationException $e) {
+            Log::error('Checkout Pix: falha de integração', [
+                'empresa_id' => $empresa->id,
+                'unidade_id' => $unidade->id,
+                'venda_id' => $venda?->id,
+                'gateway' => $gateway->nome(),
+                'servico' => $e->servico,
+                'mensagem' => $e->getMessage(),
+                // Sem segredos: só chaves/títulos da resposta do gateway.
+                'resposta' => $this->resumoRespostaGateway($e->respostaBruta),
+            ]);
             report($e);
             // A cobrança Pix não foi gerada — não faz sentido deixar este
             // pedido pendente parado para sempre na lista de vendas.
+            $venda?->update(['status' => 'cancelado']);
+
+            return back()->withInput()->with('erro', 'Não foi possível gerar o Pix agora. Tente novamente em instantes.');
+        } catch (\Throwable $e) {
+            Log::error('Checkout Pix: erro inesperado ao gerar cobrança', [
+                'empresa_id' => $empresa->id,
+                'unidade_id' => $unidade->id,
+                'venda_id' => $venda?->id,
+                'gateway' => $gateway->nome(),
+                'exception' => $e::class,
+                'mensagem' => $e->getMessage(),
+                'arquivo' => $e->getFile().':'.$e->getLine(),
+            ]);
+            report($e);
             $venda?->update(['status' => 'cancelado']);
 
             return back()->withInput()->with('erro', 'Não foi possível gerar o Pix agora. Tente novamente em instantes.');
@@ -130,6 +172,28 @@ class CheckoutPublicoController extends Controller
         }
 
         return response()->json(['status' => $venda->status]);
+    }
+
+    /**
+     * Extrai só campos úteis da resposta do gateway (sem tokens/segredos).
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function resumoRespostaGateway(?array $resposta): ?array
+    {
+        if ($resposta === null || $resposta === []) {
+            return null;
+        }
+
+        $chaves = ['title', 'detail', 'error', 'error_description', 'status', 'status_code', 'type', 'code', 'mensagem', 'message'];
+        $resumo = [];
+        foreach ($chaves as $chave) {
+            if (array_key_exists($chave, $resposta) && ! is_array($resposta[$chave])) {
+                $resumo[$chave] = $resposta[$chave];
+            }
+        }
+
+        return $resumo !== [] ? $resumo : ['chaves' => array_keys($resposta)];
     }
 
     /**
@@ -188,6 +252,15 @@ class CheckoutPublicoController extends Controller
         try {
             $consulta = $gateway->consultarCobranca($pagamento->gateway_payment_id);
         } catch (IntegrationException $e) {
+            Log::warning('Checkout Pix: falha ao consultar cobrança', [
+                'empresa_id' => $venda->empresa_id,
+                'venda_id' => $venda->id,
+                'gateway' => $pagamento->gateway,
+                'txid' => $pagamento->gateway_payment_id,
+                'servico' => $e->servico,
+                'mensagem' => $e->getMessage(),
+                'resposta' => $this->resumoRespostaGateway($e->respostaBruta),
+            ]);
             report($e);
 
             return;

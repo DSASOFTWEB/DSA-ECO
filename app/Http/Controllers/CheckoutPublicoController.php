@@ -77,7 +77,9 @@ class CheckoutPublicoController extends Controller
             $venda = $this->vendaService->criarVendaOnlinePendente($unidade, $tipoEntrada, (int) $dados['quantidade']);
             $descricao = "{$venda->itens->first()->quantidade}x {$tipoEntrada->nome} - {$unidade->nome}";
 
-            Log::info('Checkout Pix: iniciando cobrança', [
+            // error (não info): em produção LOG_LEVEL costuma ser error e o
+            // docker compose logs só mostra o que cai no arquivo/stderr.
+            Log::error('Checkout Pix: iniciando cobrança', [
                 'empresa_id' => $empresa->id,
                 'unidade_id' => $unidade->id,
                 'venda_id' => $venda->id,
@@ -108,7 +110,7 @@ class CheckoutPublicoController extends Controller
                 ], $gateway->nome());
             }
 
-            Log::info('Checkout Pix: cobrança gerada', [
+            Log::error('Checkout Pix: cobrança gerada', [
                 'empresa_id' => $empresa->id,
                 'venda_id' => $venda->id,
                 'gateway' => $gateway->nome(),
@@ -252,7 +254,7 @@ class CheckoutPublicoController extends Controller
         try {
             $consulta = $gateway->consultarCobranca($pagamento->gateway_payment_id);
         } catch (IntegrationException $e) {
-            Log::warning('Checkout Pix: falha ao consultar cobrança', [
+            Log::error('Checkout Pix: falha ao consultar cobrança', [
                 'empresa_id' => $venda->empresa_id,
                 'venda_id' => $venda->id,
                 'gateway' => $pagamento->gateway,

@@ -154,7 +154,7 @@ class ItauPixGateway implements GatewayPix
                 $resumo['mensagem_sdk'] = $mensagemSdk;
             }
 
-            Log::warning('Falha na API Pix do Itaú', [
+            Log::error('Falha na API Pix do Itaú', [
                 'empresa_id' => $this->empresa->getKey(),
                 'operacao' => $operacao,
                 'resposta' => $resumo,

@@ -31,21 +31,21 @@
         </svg>
     </div>
 
-    <main class="relative z-10 mx-auto flex h-dvh max-w-lg flex-col px-3 py-2.5">
-        <div class="mb-2 flex shrink-0 items-center justify-center gap-2">
+    <main class="relative z-10 mx-auto flex h-dvh max-w-2xl flex-col px-3 py-3 sm:py-5">
+        <div class="mb-3 flex shrink-0 items-center justify-center gap-2.5">
             @if (($unidade ?? null)?->empresa?->logoUrl())
-                <img src="{{ $unidade->empresa->logoUrl() }}" alt="{{ $unidade->empresa->nome }}" class="h-8 max-w-[160px] object-contain drop-shadow">
+                <img src="{{ $unidade->empresa->logoUrl() }}" alt="{{ $unidade->empresa->nome }}" class="h-10 max-w-[180px] object-contain drop-shadow">
             @else
                 <span class="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/20 text-white backdrop-blur">
                     <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-width="1.8" d="M3 16.5c2.5-2 4.5-2 7 0s4.5 2 7 0 3.5-2 4-1.5M4 12c2-1.5 4-1.5 6 0s4 1.5 6 0 3.5-1.5 4-1M6 7.5h12"/></svg>
                 </span>
             @endif
-            <span class="text-sm font-bold text-white drop-shadow-sm">{{ ($unidade ?? null)?->nome ?? config('app.name', 'Parque Aquático') }}</span>
+            <span class="text-base font-extrabold tracking-wide text-white drop-shadow">{{ ($unidade ?? null)?->nome ?? config('app.name', 'Parque Aquático') }}</span>
         </div>
 
         <div class="shrink-0">@include('partials.flash')</div>
 
-        <div class="sem-barra-rolagem min-h-0 flex-1 overflow-y-auto rounded-3xl border border-white/40 bg-white/95 p-4 shadow-xl backdrop-blur">
+        <div class="sem-barra-rolagem min-h-0 overflow-y-auto rounded-3xl border border-white/50 bg-white p-4 shadow-2xl sm:p-6">
             @yield('conteudo')
         </div>
     </main>

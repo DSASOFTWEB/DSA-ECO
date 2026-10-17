@@ -47,6 +47,7 @@
             ],
             'Financeiro' => [
                 ['caixas', 'caixas.index', 'Caixa', 'wallet'],
+                ['formas-pagamento', 'formas-pagamento.index', 'Formas de Pagamento', 'card'],
                 ['comissoes', 'comissoes.index', 'Comissões', 'chart'],
                 ['financeiro', 'financeiro.index', 'Financeiro', 'cash'],
                 ['movimentacoes', 'movimentacoes.index', 'Movimentações', 'list'],
@@ -169,7 +170,7 @@
                                 @if (\Illuminate\Support\Facades\Route::has($routeName))
                                     @php
                                         $active = request()->routeIs($match) || request()->routeIs($match.'.*') || request()->routeIs($routeName);
-                                        $precisaPermissao = in_array($routeName, ['empresa.edit', 'cidades.index'], true);
+                                        $precisaPermissao = in_array($routeName, ['empresa.edit', 'cidades.index', 'formas-pagamento.index'], true);
                                     @endphp
                                     @if (! $precisaPermissao || auth()->user()?->can('empresa.gerenciar'))
                                         <a

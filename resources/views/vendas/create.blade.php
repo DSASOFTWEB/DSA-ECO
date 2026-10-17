@@ -94,6 +94,7 @@
 .pdv-pgto-esp { display:flex; flex-direction:column; align-items:flex-start; gap:2px; border:2px solid transparent; border-radius:8px; padding:10px; font-weight:700; color:#fff; text-align:left; }
 .pdv-pgto-esp small { opacity:.85; font-weight:600; }
 .pdv-pgto-esp--ativa { outline:2px solid #0f172a; outline-offset:1px; }
+.pgto-outro { background:#475569; }
 .pgto-din { background:#15803d; } .pgto-pix { background:#0f766e; } .pgto-cred { background:#1d4ed8; } .pgto-deb { background:#7c3aed; }
 .pdv-pgto__totais { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
 .pdv-pgto__cel { background:#fff; border:1px solid var(--pdv-border); border-radius:8px; padding:8px; }
@@ -360,18 +361,16 @@
                         <div class="pdv-card">
                             <div class="pdv-card__label">FORMA DE PAGAMENTO</div>
                             <div class="pdv-pgto__especies">
-                                <button type="button" class="pdv-pgto-esp pgto-din" :class="{ 'pdv-pgto-esp--ativa': formaPagamento === 'dinheiro' }" @click="selecionarForma('dinheiro')">
-                                    <span>DINHEIRO</span><small>Troco</small>
-                                </button>
-                                <button type="button" class="pdv-pgto-esp pgto-pix" :class="{ 'pdv-pgto-esp--ativa': formaPagamento === 'pix' }" @click="selecionarForma('pix')">
-                                    <span>PIX</span><small>{{ $pixGatewayAtivo ? 'QR Code no caixa' : 'Instantâneo' }}</small>
-                                </button>
-                                <button type="button" class="pdv-pgto-esp pgto-cred" :class="{ 'pdv-pgto-esp--ativa': formaPagamento === 'cartao_credito' }" @click="selecionarForma('cartao_credito')">
-                                    <span>CRÉDITO</span><small>Cartão</small>
-                                </button>
-                                <button type="button" class="pdv-pgto-esp pgto-deb" :class="{ 'pdv-pgto-esp--ativa': formaPagamento === 'cartao_debito' }" @click="selecionarForma('cartao_debito')">
-                                    <span>DÉBITO</span><small>Cartão</small>
-                                </button>
+                                @php
+                                    $classesForma = ['dinheiro' => 'pgto-din', 'pix' => 'pgto-pix', 'cartao_credito' => 'pgto-cred', 'cartao_debito' => 'pgto-deb'];
+                                    $legendasForma = ['dinheiro' => 'Troco', 'cartao_credito' => 'Cartão', 'cartao_debito' => 'Cartão', 'transferencia' => 'Banco'];
+                                @endphp
+                                @foreach ($formasPagamento as $forma)
+                                    <button type="button" class="pdv-pgto-esp {{ $classesForma[$forma->tipo] ?? 'pgto-outro' }}" :class="{ 'pdv-pgto-esp--ativa': formaPagamentoId === {{ $forma->id }} }" @click="selecionarForma({{ $forma->id }})">
+                                        <span>{{ mb_strtoupper($forma->nome) }}</span>
+                                        <small>{{ $forma->tipo === 'pix' ? ($forma->ehPixIntegrado() ? 'QR Code no caixa' : 'Manual') : ($legendasForma[$forma->tipo] ?? $forma->tipo_label) }}</small>
+                                    </button>
+                                @endforeach
                             </div>
 
                             <div class="pdv-pgto__totais">
@@ -576,6 +575,7 @@
                 <input type="hidden" name="caixa_id" value="{{ $caixaAberto->id }}">
                 <input type="hidden" name="cliente_id" x-bind:value="cliente?.id ?? ''">
                 <input type="hidden" name="forma_pagamento" x-bind:value="formaPagamento">
+                <input type="hidden" name="forma_pagamento_id" x-bind:value="formaPagamentoId">
                 <input type="hidden" name="observacao" x-bind:value="observacaoComTroco">
                 <template x-for="(item, indice) in itensParaEnvio" :key="'campo-' + item.chave">
                     <span>
@@ -602,6 +602,8 @@
                         cliente: null,
                         clienteTermo: '',
                         clienteResultados: [],
+                        formasPagamento: @json($formasPagamento->map->paraTela()->values()),
+                        formaPagamentoId: null,
                         formaPagamento: 'dinheiro',
                         observacao: '',
                         descontoGeral: 0,
@@ -627,6 +629,11 @@
                         pixTimer: null,
 
                         init() {
+                            const padrao = this.formasPagamento.find((f) => f.tipo === 'dinheiro') || this.formasPagamento[0];
+                            if (padrao) {
+                                this.formaPagamentoId = padrao.id;
+                                this.formaPagamento = padrao.tipo;
+                            }
                             this.tickAgora();
                             setInterval(() => this.tickAgora(), 1000);
                             this.$nextTick(() => this.$refs.campoCodigo?.focus());
@@ -658,8 +665,11 @@
                         get troco() {
                             return Math.max(0, (Number(this.valorRecebido) || 0) - this.total);
                         },
+                        get formaSelecionada() {
+                            return this.formasPagamento.find((f) => f.id === this.formaPagamentoId) || null;
+                        },
                         get rotuloForma() {
-                            return ({ dinheiro: 'Dinheiro', pix: 'Pix', cartao_credito: 'Cartão crédito', cartao_debito: 'Cartão débito' })[this.formaPagamento] || this.formaPagamento;
+                            return this.formaSelecionada?.nome || '—';
                         },
                         get atalhosTroco() {
                             const base = [this.total, 50, 100, 200].map((v) => Math.ceil(Number(v) * 100) / 100);
@@ -698,9 +708,12 @@
                             return 'R$ ' + Number(valor || 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
                         },
 
-                        selecionarForma(forma) {
-                            this.formaPagamento = forma;
-                            if (forma === 'dinheiro' && (! this.valorRecebido || this.valorRecebido < this.total)) {
+                        selecionarForma(id) {
+                            const forma = this.formasPagamento.find((f) => f.id === id);
+                            if (! forma) return;
+                            this.formaPagamentoId = forma.id;
+                            this.formaPagamento = forma.tipo;
+                            if (forma.tipo === 'dinheiro' && (! this.valorRecebido || this.valorRecebido < this.total)) {
                                 this.valorRecebido = this.total;
                             }
                         },
@@ -863,7 +876,11 @@
                                 this.$nextTick(() => this.$refs.campoTroco?.focus());
                                 return;
                             }
-                            if (this.formaPagamento === 'pix' && this.pixGatewayAtivo) {
+                            if (! this.formaSelecionada) {
+                                alert('Selecione a forma de pagamento.');
+                                return;
+                            }
+                            if (this.formaSelecionada.integrado) {
                                 this.iniciarPixGateway();
                                 return;
                             }

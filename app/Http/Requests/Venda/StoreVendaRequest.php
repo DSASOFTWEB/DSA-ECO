@@ -2,12 +2,15 @@
 
 namespace App\Http\Requests\Venda;
 
+use App\Http\Requests\Concerns\UsaFormaPagamentoCadastrada;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreVendaRequest extends FormRequest
 {
+    use UsaFormaPagamentoCadastrada;
+
     public function authorize(): bool
     {
         return $this->user()->can('create', \App\Models\Venda::class);
@@ -18,7 +21,7 @@ class StoreVendaRequest extends FormRequest
         return [
             'caixa_id' => ['required', 'integer', Rule::exists('caixas', 'id')->where('empresa_id', $this->user()->empresa_id)],
             'cliente_id' => ['nullable', Rule::exists('clientes', 'id')->where('empresa_id', $this->user()->empresa_id)],
-            'forma_pagamento' => ['required', 'in:dinheiro,cartao_credito,cartao_debito,pix'],
+            ...$this->regrasFormaPagamento(),
             'observacao' => ['nullable', 'string', 'max:1000'],
             'itens' => ['required', 'array', 'min:1'],
             'itens.*.produto_id' => ['nullable', 'exists:produtos,id'],

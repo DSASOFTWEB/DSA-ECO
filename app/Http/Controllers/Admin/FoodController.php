@@ -12,6 +12,7 @@ use App\Models\Atendimento;
 use App\Models\AtendimentoItem;
 use App\Models\Caixa;
 use App\Models\CategoriaProduto;
+use App\Models\FormaPagamento;
 use App\Models\PontoAtendimento;
 use App\Models\Produto;
 use App\Models\Unidade;
@@ -92,8 +93,9 @@ class FoodController extends Controller
             ->where('id', '!=', $atendimento->ponto_atendimento_id)
             ->whereNotIn('status', ['reservada', 'bloqueada'])->orderBy('tipo')->orderBy('numero')->get();
         $caixas = Caixa::where('unidade_id', $atendimento->unidade_id)->where('status', 'aberto')->with('terminal')->get();
+        $formasPagamento = FormaPagamento::ativasDaEmpresa((int) $atendimento->empresa_id);
 
-        return view('food.atendimento', compact('atendimento', 'produtos', 'categorias', 'destinos', 'caixas'));
+        return view('food.atendimento', compact('atendimento', 'produtos', 'categorias', 'destinos', 'caixas', 'formasPagamento'));
     }
 
     public function adicionarItem(StoreAtendimentoItemRequest $request, Atendimento $atendimento): RedirectResponse
@@ -131,6 +133,12 @@ class FoodController extends Controller
 
     public function fechar(FecharAtendimentoRequest $request, Atendimento $atendimento): RedirectResponse
     {
+        foreach (array_keys($request->input('pagamentos', [])) as $indice) {
+            if ($request->formaPagamentoCadastrada($indice)?->ehPixIntegrado()) {
+                return back()->with('erro', 'Pix integrado precisa do QR Code: confirme o fechamento pela tela e aguarde o pagamento.');
+            }
+        }
+
         $atendimento = $this->atendimentos->fechar($atendimento, $request->validated(), $request->user());
 
         return redirect()->route('vendas.show', $atendimento->venda_id)->with('sucesso', 'Conta fechada e lançada no caixa.');

@@ -173,6 +173,8 @@
         produtos: {{ Js::from($produtosJson) }},
         emAndamento: {{ $emAndamento ? 'true' : 'false' }},
         subtotal: {{ (float) $atendimento->subtotal }},
+        formas: {{ Js::from(($formasPagamento ?? collect())->map->paraTela()->values()) }},
+        pixUrl: @js(route('food.atendimentos.pix', $atendimento)),
     })"
     x-cloak
 >
@@ -367,15 +369,14 @@
     </div>
 
     {{-- Modal fechar --}}
-    <div class="food-modal" x-show="painel === 'fechar'" x-transition @keydown.escape.window="painel = null">
-        <div class="food-modal__card" @click.outside="painel = null"
-             x-data="{ desconto: 0, taxa: 10, subtotal: {{ (float) $atendimento->subtotal }}, get total(){ return Math.max(0, this.subtotal + this.subtotal * this.taxa / 100 - this.desconto).toFixed(2) } }">
+    <div class="food-modal" x-show="painel === 'fechar'" x-transition @keydown.escape.window="if (! fech.pixAberto) painel = null">
+        <div class="food-modal__card" @click.outside="if (! fech.pixAberto) painel = null">
             <h3>Fechar {{ strtolower($rotulo) }}</h3>
-            <form method="POST" action="{{ route('food.atendimentos.fechar', $atendimento) }}" class="space-y-3">
+            <form method="POST" action="{{ route('food.atendimentos.fechar', $atendimento) }}" class="space-y-3" id="form-fechar" x-show="! fech.pixAberto" @submit="fech.confirmar($event)">
                 @csrf
                 <label class="block text-sm font-medium">Caixa
                     <select name="caixa_id" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
-                        <option value="">Selecione</option>
+                        @if($caixas->count() !== 1)<option value="">Selecione</option>@endif
                         @foreach($caixas as $caixa)
                             <option value="{{ $caixa->id }}">Caixa #{{ $caixa->id }} {{ $caixa->terminal?->nome }}</option>
                         @endforeach
@@ -383,34 +384,35 @@
                 </label>
                 <div class="grid grid-cols-2 gap-3">
                     <label class="text-sm font-medium">Desconto
-                        <input name="desconto" type="number" min="0" step="0.01" x-model.number="desconto" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                        <input name="desconto" type="number" min="0" step="0.01" x-model.number="fech.desconto" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
                     </label>
                     <label class="text-sm font-medium">Serviço %
-                        <input name="percentual_servico" type="number" min="0" max="100" step="0.01" x-model.number="taxa" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                        <input name="percentual_servico" type="number" min="0" max="100" step="0.01" x-model.number="fech.taxa" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
                     </label>
                 </div>
-                <label class="block text-sm font-medium">Forma
-                    <select name="pagamentos[0][forma]" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
-                        <option value="dinheiro">Dinheiro</option>
-                        <option value="pix">Pix</option>
-                        <option value="credito">Crédito</option>
-                        <option value="debito">Débito</option>
-                        <option value="fiado">Fiado</option>
-                        <option value="outro">Outro</option>
+                <label class="block text-sm font-medium">Forma de pagamento
+                    <select name="pagamentos[0][forma_pagamento_id]" required x-model.number="fech.formaId" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                        @foreach($formasPagamento as $forma)
+                            <option value="{{ $forma->id }}">{{ $forma->nome }}{{ $forma->ehPixIntegrado() ? ' (QR Code)' : '' }}</option>
+                        @endforeach
                     </select>
                 </label>
+                <p x-show="fech.forma?.integrado" x-cloak class="text-xs text-teal-700">Será gerado o QR Code Pix; a conta fecha sozinha quando o banco confirmar o pagamento.</p>
                 <label class="block text-sm font-medium">Valor
-                    <input name="pagamentos[0][valor]" type="number" min="0.01" step="0.01" required :value="total" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                    <input name="pagamentos[0][valor]" type="number" min="0.01" step="0.01" required :value="fech.total" :readonly="fech.forma?.integrado" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
                 </label>
-                <div class="rounded-lg bg-slate-100 p-3 text-right text-lg font-bold">Total: R$ <span x-text="total.replace('.', ',')"></span></div>
+                <div class="rounded-lg bg-slate-100 p-3 text-right text-lg font-bold">Total: R$ <span x-text="fech.total.replace('.', ',')"></span></div>
                 @if($caixas->isEmpty())
                     <p class="text-xs text-rose-600">Abra um caixa nesta unidade antes de fechar.</p>
                 @endif
                 <div class="food-modal__actions">
                     <button type="button" class="food-acao" @click="painel = null">Voltar</button>
-                    <button type="submit" class="food-acao food-acao--success" @disabled($caixas->isEmpty())>Confirmar fechamento</button>
+                    <button type="submit" class="food-acao food-acao--success" x-bind:disabled="fech.enviando || {{ $caixas->isEmpty() ? 'true' : 'false' }}" x-text="fech.forma?.integrado ? 'Gerar QR Code Pix' : 'Confirmar fechamento'">Confirmar fechamento</button>
                 </div>
             </form>
+
+            {{-- Recebimento Pix integrado --}}
+            @include('partials.pix-recebimento', ['alvo' => 'fech'])
         </div>
     </div>
     @endif
@@ -418,12 +420,40 @@
 @endsection
 
 @push('scripts')
+@include('partials.pix-recebimento-script')
 <script>
-function foodLancamento({ produtos, emAndamento, subtotal }) {
+function foodFechamento({ subtotal, formas, pixUrl }) {
+    return {
+        ...pixRecebimento({ url: pixUrl, formId: 'form-fechar' }),
+        subtotal,
+        formas,
+        desconto: 0,
+        taxa: 10,
+        formaId: formas[0]?.id ?? null,
+        enviando: false,
+        get forma() {
+            return this.formas.find((f) => f.id === this.formaId) || null;
+        },
+        get total() {
+            return Math.max(0, this.subtotal + this.subtotal * this.taxa / 100 - this.desconto).toFixed(2);
+        },
+        confirmar(evento) {
+            if (this.forma?.integrado) {
+                evento.preventDefault();
+                this.gerarPix();
+                return;
+            }
+            this.enviando = true;
+        },
+    };
+}
+
+function foodLancamento({ produtos, emAndamento, subtotal, formas, pixUrl }) {
     return {
         produtos,
         emAndamento,
         subtotal,
+        fech: foodFechamento({ subtotal, formas: formas || [], pixUrl }),
         categoriaId: null,
         busca: '',
         quantidade: 1,

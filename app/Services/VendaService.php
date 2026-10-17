@@ -92,7 +92,7 @@ class VendaService
                 'empresa_id' => $vendedor->empresa_id,
                 'venda_id' => $venda->id,
                 'gateway' => $pagamentoGateway['gateway']
-                    ?? ($dados['forma_pagamento'] === 'pix' ? 'mercadopago' : $dados['forma_pagamento']),
+                    ?? ($dados['forma_pagamento'] === 'pix' ? 'pix_manual' : $dados['forma_pagamento']),
                 'gateway_payment_id' => $pagamentoGateway['gateway_payment_id'] ?? null,
                 'payload' => $pagamentoGateway['payload'] ?? null,
                 'valor' => $valorTotal,

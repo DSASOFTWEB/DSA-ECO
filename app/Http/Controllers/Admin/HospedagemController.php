@@ -12,6 +12,7 @@ use App\Models\Caixa;
 use App\Models\CategoriaProduto;
 use App\Models\Cliente;
 use App\Models\DocumentoFiscal;
+use App\Models\FormaPagamento;
 use App\Models\Hospedagem;
 use App\Models\Produto;
 use App\Models\Quarto;
@@ -361,8 +362,10 @@ class HospedagemController extends Controller
         $totalEstimado = $this->hospedagemService->calcularTotal($hospedagem);
         $quantidadeItensNfce = count($this->hospedagemFiscalService->itensProdutos($hospedagem));
         $quantidadeItensNfse = count($this->hospedagemFiscalService->itensServicos($hospedagem));
+        $formasPagamento = FormaPagamento::ativasDaEmpresa((int) $hospedagem->empresa_id);
 
         return view('hospedagens.checkout', compact(
+            'formasPagamento',
             'hospedagem',
             'caixaAberto',
             'caixasDisponiveis',
@@ -381,6 +384,10 @@ class HospedagemController extends Controller
             return back()->with('erro', 'Abra o caixa antes de fazer o check-out.');
         }
 
+        if ($request->formaPagamentoCadastrada()?->ehPixIntegrado()) {
+            return back()->with('erro', 'Pix integrado precisa do QR Code: confirme o check-out pela tela e aguarde o pagamento.');
+        }
+
         try {
             $hospedagem = $this->hospedagemService->checkout(
                 $hospedagem,
@@ -393,26 +400,8 @@ class HospedagemController extends Controller
             return back()->with('erro', $e->getMessage());
         }
 
-        $documentosEmitidos = [];
-        $falhasFiscais = [];
-
-        if ($request->boolean('emitir_nfce')) {
-            try {
-                $documentosEmitidos[] = 'NFC-e nº '.$this->hospedagemFiscalService
-                    ->emitirNfceConsumos($hospedagem, $request->user())->numero;
-            } catch (NegocioException|IntegrationException $e) {
-                $falhasFiscais[] = 'NFC-e: '.$e->getMessage();
-            }
-        }
-
-        if ($request->boolean('emitir_nfse')) {
-            try {
-                $documentosEmitidos[] = 'NFS-e nº '.$this->hospedagemFiscalService
-                    ->emitirNfseServicos($hospedagem, $request->user())->numero;
-            } catch (NegocioException|IntegrationException $e) {
-                $falhasFiscais[] = 'NFS-e: '.$e->getMessage();
-            }
-        }
+        ['emitidos' => $documentosEmitidos, 'falhas' => $falhasFiscais] = $this->hospedagemFiscalService
+            ->emitirAposCheckout($hospedagem, $request->user(), $request->boolean('emitir_nfce'), $request->boolean('emitir_nfse'));
 
         $redirect = redirect()->route('hospedagens.show', $hospedagem)
             ->with('sucesso', 'Check-out realizado com sucesso.'.($documentosEmitidos ? ' '.implode(' e ', $documentosEmitidos).' emitida(s).' : ''));

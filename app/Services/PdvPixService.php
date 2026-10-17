@@ -3,24 +3,33 @@
 namespace App\Services;
 
 use App\Exceptions\NegocioException;
+use App\Models\Atendimento;
 use App\Models\Caixa;
 use App\Models\CobrancaPix;
 use App\Models\Empresa;
+use App\Models\Hospedagem;
 use App\Models\User;
+use App\Services\Fiscal\HospedagemFiscalService;
+use App\Services\Food\AtendimentoService;
 use App\Services\Integrations\Pix\GatewayPix;
 use App\Services\Integrations\Pix\GatewayPixResolver;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Recebimento Pix do PDV pelo gateway da empresa: gera a cobrança com o
- * total calculado no servidor, acompanha o status e só cria a venda quando
- * o banco confirma o pagamento (idempotente — pode ser chamado a cada poll).
+ * Recebimento Pix integrado pelo gateway da empresa (PDV, fechamento de
+ * mesa/comanda e check-out da hospedagem): gera a cobrança com o total
+ * calculado no servidor, acompanha o status e só registra a venda / fecha
+ * a conta quando o banco confirma o pagamento (idempotente — pode ser
+ * chamado a cada poll).
  */
 class PdvPixService
 {
     public function __construct(
         protected GatewayPixResolver $resolver,
         protected VendaService $vendaService,
+        protected AtendimentoService $atendimentoService,
+        protected HospedagemService $hospedagemService,
+        protected HospedagemFiscalService $hospedagemFiscalService,
     ) {}
 
     public function iniciar(array $dadosVenda, User $operador, Caixa $caixa): CobrancaPix
@@ -29,34 +38,91 @@ class PdvPixService
             throw new NegocioException('Não é possível receber sem um caixa aberto.');
         }
 
-        $gateway = $this->gatewayDa($operador->empresa_id);
         $valor = $this->vendaService->calcularTotal($dadosVenda['itens'] ?? []);
 
         if ($valor < 0.01) {
             throw new NegocioException('O total da venda precisa ser maior que zero para gerar o Pix.');
         }
 
-        $cobranca = $gateway->criarCobranca($valor, "Venda PDV - caixa #{$caixa->id}");
-
-        return CobrancaPix::create([
-            'empresa_id' => $operador->empresa_id,
-            'caixa_id' => $caixa->id,
-            'usuario_id' => $operador->id,
-            'gateway' => $gateway->nome(),
-            'txid' => $cobranca['txid'],
-            'valor' => $valor,
-            'status' => CobrancaPix::STATUS_PENDENTE,
-            'pix_copia_e_cola' => $cobranca['copia_e_cola'],
+        return $this->criarCobranca($operador, $caixa, $valor, "Venda PDV - caixa #{$caixa->id}", [
             'dados_venda' => array_merge($dadosVenda, ['forma_pagamento' => 'pix']),
-            'payload' => $cobranca['payload'],
-            'expira_em' => now()->addSeconds($cobranca['expiracao_segundos']),
+        ]);
+    }
+
+    /**
+     * Pix integrado no fechamento de mesa/comanda: só fecha a conta quando o
+     * banco confirmar.
+     */
+    public function iniciarAtendimento(Atendimento $atendimento, array $dadosFechamento, User $operador, Caixa $caixa): CobrancaPix
+    {
+        if (! $caixa->estaAberto() || $caixa->unidade_id !== $atendimento->unidade_id) {
+            throw new NegocioException('Selecione um caixa aberto da mesma unidade.');
+        }
+
+        if (! $atendimento->estaEmAndamento()) {
+            throw new NegocioException('Este atendimento não está disponível para fechamento.');
+        }
+
+        $valor = $this->atendimentoService->calcularTotalFechamento($atendimento, $dadosFechamento);
+
+        if ($valor < 0.01) {
+            throw new NegocioException('O total da conta precisa ser maior que zero para gerar o Pix.');
+        }
+
+        $pendente = $this->reaproveitarPendente(CobrancaPix::where('atendimento_id', $atendimento->id), $valor, $caixa);
+        if ($pendente) {
+            return $pendente;
+        }
+
+        return $this->criarCobranca($operador, $caixa, $valor, "Conta {$atendimento->ponto->identificacao} - atendimento #{$atendimento->id}", [
+            'atendimento_id' => $atendimento->id,
+            'dados_venda' => array_merge($dadosFechamento, [
+                'caixa_id' => $caixa->id,
+                'pagamentos' => [['forma' => 'pix', 'valor' => $valor]],
+            ]),
+        ]);
+    }
+
+    /**
+     * Pix integrado no check-out da hospedagem: só finaliza a estadia (e
+     * emite as notas marcadas) quando o banco confirmar.
+     */
+    public function iniciarHospedagem(Hospedagem $hospedagem, array $dadosCheckout, User $operador, Caixa $caixa): CobrancaPix
+    {
+        if (! $caixa->estaAberto()) {
+            throw new NegocioException('Abra o caixa antes de fazer o check-out.');
+        }
+
+        if (! $hospedagem->estaHospedado()) {
+            throw new NegocioException('Só é possível fazer check-out de quem já fez check-in.');
+        }
+
+        $valor = $this->hospedagemService->calcularTotal($hospedagem, (float) ($dadosCheckout['desconto'] ?? 0));
+
+        if ($valor < 0.01) {
+            throw new NegocioException('O total da conta precisa ser maior que zero para gerar o Pix.');
+        }
+
+        $pendente = $this->reaproveitarPendente(CobrancaPix::where('hospedagem_id', $hospedagem->id), $valor, $caixa);
+        if ($pendente) {
+            return $pendente;
+        }
+
+        return $this->criarCobranca($operador, $caixa, $valor, "Hospedagem #{$hospedagem->id} - quarto {$hospedagem->quarto->numero}", [
+            'hospedagem_id' => $hospedagem->id,
+            'dados_venda' => [
+                'desconto' => (float) ($dadosCheckout['desconto'] ?? 0),
+                'emitir_nfce' => (bool) ($dadosCheckout['emitir_nfce'] ?? false),
+                'emitir_nfse' => (bool) ($dadosCheckout['emitir_nfse'] ?? false),
+            ],
         ]);
     }
 
     /**
      * Consulta o gateway enquanto estiver pendente e, quando pago, registra
-     * a venda. Se o registro falhar (ex.: caixa fechado no meio do caminho),
-     * guarda o motivo em `erro` e tenta de novo na próxima chamada.
+     * a venda / fecha a conta. Se o registro falhar (ex.: caixa fechado no
+     * meio do caminho), guarda o motivo em `erro` e tenta de novo na próxima
+     * chamada.
      */
     public function atualizar(CobrancaPix $cobranca): CobrancaPix
     {
@@ -77,8 +143,12 @@ class PdvPixService
             }
         }
 
-        if ($cobranca->estaPaga() && ! $cobranca->venda_id) {
-            $this->registrarVenda($cobranca);
+        if ($cobranca->estaPaga() && ! $this->concluida($cobranca)) {
+            $hospedagemFinalizada = $this->registrarVenda($cobranca);
+
+            if ($hospedagemFinalizada) {
+                $this->emitirNotasHospedagem($cobranca->fresh());
+            }
         }
 
         return $cobranca->fresh();
@@ -98,40 +168,149 @@ class PdvPixService
         return $cobranca;
     }
 
-    protected function registrarVenda(CobrancaPix $cobranca): void
+    /**
+     * Venda registrada (PDV, mesa) ou estadia finalizada (hospedagem).
+     */
+    public function concluida(CobrancaPix $cobranca): bool
     {
-        DB::transaction(function () use ($cobranca): void {
+        if ($cobranca->hospedagem_id) {
+            return Hospedagem::withoutGlobalScopes()->whereKey($cobranca->hospedagem_id)->value('status') === 'finalizado';
+        }
+
+        return (bool) $cobranca->venda_id;
+    }
+
+    /**
+     * Reabrir a tela com o mesmo valor reaproveita o QR pendente; com valor
+     * diferente (item lançado, desconto mudou) o antigo é cancelado antes.
+     */
+    protected function reaproveitarPendente($query, float $valor, Caixa $caixa): ?CobrancaPix
+    {
+        $pendente = $query->where('status', CobrancaPix::STATUS_PENDENTE)->latest('id')->first();
+
+        if (! $pendente) {
+            return null;
+        }
+
+        $pendente = $this->atualizar($pendente);
+
+        if ($pendente->estaPaga()) {
+            return $pendente;
+        }
+
+        if ($pendente->estaPendente()) {
+            if (abs((float) $pendente->valor - $valor) < 0.009 && (int) $pendente->caixa_id === $caixa->id) {
+                return $pendente;
+            }
+
+            $this->cancelar($pendente);
+        }
+
+        return null;
+    }
+
+    protected function criarCobranca(User $operador, Caixa $caixa, float $valor, string $descricao, array $atributos): CobrancaPix
+    {
+        $gateway = $this->gatewayDa($operador->empresa_id);
+        $cobranca = $gateway->criarCobranca($valor, $descricao);
+
+        return CobrancaPix::create(array_merge([
+            'empresa_id' => $operador->empresa_id,
+            'caixa_id' => $caixa->id,
+            'usuario_id' => $operador->id,
+            'gateway' => $gateway->nome(),
+            'txid' => $cobranca['txid'],
+            'valor' => $valor,
+            'status' => CobrancaPix::STATUS_PENDENTE,
+            'pix_copia_e_cola' => $cobranca['copia_e_cola'],
+            'payload' => $cobranca['payload'],
+            'expira_em' => now()->addSeconds($cobranca['expiracao_segundos']),
+        ], $atributos));
+    }
+
+    /**
+     * @return bool true quando finalizou uma hospedagem nesta chamada
+     *              (as notas fiscais são emitidas fora da transação).
+     */
+    protected function registrarVenda(CobrancaPix $cobranca): bool
+    {
+        return DB::transaction(function () use ($cobranca): bool {
             $travada = CobrancaPix::whereKey($cobranca->id)->lockForUpdate()->first();
 
-            if (! $travada || $travada->venda_id) {
-                return;
+            if (! $travada || $this->concluida($travada)) {
+                return false;
             }
 
             if (! $travada->caixa || ! $travada->usuario) {
                 $travada->update(['erro' => 'O caixa ou o operador desta cobrança não existe mais. Registre a venda manualmente.']);
 
-                return;
+                return false;
             }
 
+            $pagamentoGateway = [
+                'gateway' => $travada->gateway,
+                'gateway_payment_id' => $travada->e2eid ?: $travada->txid,
+                'payload' => ['txid' => $travada->txid, 'e2eid' => $travada->e2eid],
+            ];
+
             try {
-                $venda = $this->vendaService->criar(
-                    $travada->dados_venda,
-                    $travada->usuario,
-                    $travada->caixa,
-                    [
-                        'gateway' => $travada->gateway,
-                        'gateway_payment_id' => $travada->e2eid ?: $travada->txid,
-                        'payload' => ['txid' => $travada->txid, 'e2eid' => $travada->e2eid],
-                    ],
-                );
+                if ($travada->hospedagem_id) {
+                    $this->hospedagemService->checkout(
+                        Hospedagem::withoutGlobalScopes()->findOrFail($travada->hospedagem_id),
+                        $travada->caixa,
+                        $travada->usuario,
+                        'pix',
+                        (float) ($travada->dados_venda['desconto'] ?? 0),
+                    );
+                    $travada->update(['erro' => null]);
+
+                    return true;
+                }
+
+                if ($travada->atendimento_id) {
+                    $vendaId = $this->atendimentoService
+                        ->fechar(Atendimento::withoutGlobalScopes()->findOrFail($travada->atendimento_id), $travada->dados_venda, $travada->usuario, $pagamentoGateway)
+                        ->venda_id;
+                } else {
+                    $vendaId = $this->vendaService->criar(
+                        $travada->dados_venda,
+                        $travada->usuario,
+                        $travada->caixa,
+                        $pagamentoGateway,
+                    )->id;
+                }
             } catch (NegocioException $e) {
                 $travada->update(['erro' => $e->getMessage()]);
 
-                return;
+                return false;
             }
 
-            $travada->update(['venda_id' => $venda->id, 'erro' => null]);
+            $travada->update(['venda_id' => $vendaId, 'erro' => null]);
+
+            return false;
         });
+    }
+
+    /**
+     * Notas marcadas no check-out; o resultado fica na cobrança para a tela
+     * mostrar ao operador quando o pagamento confirmar.
+     */
+    protected function emitirNotasHospedagem(CobrancaPix $cobranca): void
+    {
+        $dados = $cobranca->dados_venda;
+
+        if (empty($dados['emitir_nfce']) && empty($dados['emitir_nfse'])) {
+            return;
+        }
+
+        $resultado = $this->hospedagemFiscalService->emitirAposCheckout(
+            Hospedagem::withoutGlobalScopes()->findOrFail($cobranca->hospedagem_id),
+            $cobranca->usuario,
+            ! empty($dados['emitir_nfce']),
+            ! empty($dados['emitir_nfse']),
+        );
+
+        $cobranca->update(['dados_venda' => array_merge($dados, ['fiscal' => $resultado])]);
     }
 
     protected function gatewayDaCobranca(CobrancaPix $cobranca): GatewayPix

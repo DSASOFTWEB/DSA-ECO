@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\DependenteController;
 use App\Http\Controllers\Admin\EmpresaController;
 use App\Http\Controllers\Admin\FinanceiroController;
 use App\Http\Controllers\Admin\FoodController;
+use App\Http\Controllers\Admin\FormaPagamentoController;
 use App\Http\Controllers\Admin\HospedagemController;
 use App\Http\Controllers\Admin\MensalidadeController;
 use App\Http\Controllers\Admin\MovimentacaoController;
@@ -172,6 +173,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('categorias-produtos', CategoriaProdutoController::class, ['parameters' => ['categorias-produtos' => 'categoriaProduto']])->except(['show']);
     Route::resource('marcas', MarcaController::class)->except(['show']);
     Route::resource('fornecedores', FornecedorController::class, ['parameters' => ['fornecedores' => 'fornecedor']])->except(['show']);
+    Route::resource('formas-pagamento', FormaPagamentoController::class, ['parameters' => ['formas-pagamento' => 'formaPagamento']])->except(['show']);
 
     Route::post('vendas/pix', [PdvPixController::class, 'store'])->name('vendas.pix.store');
     Route::get('vendas/pix/{cobrancaPix}/status', [PdvPixController::class, 'status'])->name('vendas.pix.status');
@@ -192,6 +194,7 @@ Route::middleware('auth')->group(function () {
     Route::post('food/atendimentos/{atendimento}/pre-fechar', [FoodController::class, 'preFechar'])->name('food.atendimentos.pre-fechar');
     Route::post('food/atendimentos/{atendimento}/transferir', [FoodController::class, 'transferir'])->name('food.atendimentos.transferir');
     Route::post('food/atendimentos/{atendimento}/fechar', [FoodController::class, 'fechar'])->name('food.atendimentos.fechar');
+    Route::post('food/atendimentos/{atendimento}/pix', [PdvPixController::class, 'storeAtendimento'])->name('food.atendimentos.pix');
     Route::get('food/atendimentos/{atendimento}/conta', [FoodController::class, 'conta'])->name('food.atendimentos.conta');
     Route::get('food/atendimentos/{atendimento}/conta.escpos', [FoodController::class, 'contaEscpos'])->name('food.atendimentos.conta.escpos');
 
@@ -225,6 +228,7 @@ Route::middleware('auth')->group(function () {
     Route::post('hospedagens/{hospedagem}/nao-perturbe', [HospedagemController::class, 'naoPerturbe'])->name('hospedagens.nao-perturbe');
     Route::get('hospedagens/{hospedagem}/checkout', [HospedagemController::class, 'checkoutForm'])->name('hospedagens.checkout');
     Route::post('hospedagens/{hospedagem}/checkout', [HospedagemController::class, 'checkout'])->name('hospedagens.checkout.store');
+    Route::post('hospedagens/{hospedagem}/checkout/pix', [PdvPixController::class, 'storeHospedagem'])->name('hospedagens.checkout.pix');
     Route::post('hospedagens/{hospedagem}/emitir-nfce', [HospedagemController::class, 'emitirNfce'])->name('hospedagens.emitir-nfce');
     Route::post('hospedagens/{hospedagem}/emitir-nfse', [HospedagemController::class, 'emitirNfse'])->name('hospedagens.emitir-nfse');
     Route::post('hospedagens/{hospedagem}/documentos-fiscais/{documento}/consultar-lote-nfse', [HospedagemController::class, 'consultarLoteNfse'])->name('hospedagens.documentos-fiscais.consultar-lote-nfse');

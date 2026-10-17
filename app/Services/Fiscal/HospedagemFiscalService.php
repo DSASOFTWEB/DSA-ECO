@@ -2,6 +2,7 @@
 
 namespace App\Services\Fiscal;
 
+use App\Exceptions\IntegrationException;
 use App\Exceptions\NegocioException;
 use App\Models\DocumentoFiscal;
 use App\Models\Empresa;
@@ -16,6 +17,36 @@ class HospedagemFiscalService
         protected NfceEmissaoService $nfce,
         protected NfseEmissaoService $nfse,
     ) {}
+
+    /**
+     * Emite as notas marcadas no check-out. Falha fiscal não desfaz o
+     * check-out: volta na lista de falhas para o operador ver.
+     *
+     * @return array{emitidos: list<string>, falhas: list<string>}
+     */
+    public function emitirAposCheckout(Hospedagem $hospedagem, User $operador, bool $nfce, bool $nfse): array
+    {
+        $emitidos = [];
+        $falhas = [];
+
+        if ($nfce) {
+            try {
+                $emitidos[] = 'NFC-e nº '.$this->emitirNfceConsumos($hospedagem, $operador)->numero;
+            } catch (NegocioException|IntegrationException $e) {
+                $falhas[] = 'NFC-e: '.$e->getMessage();
+            }
+        }
+
+        if ($nfse) {
+            try {
+                $emitidos[] = 'NFS-e nº '.$this->emitirNfseServicos($hospedagem, $operador)->numero;
+            } catch (NegocioException|IntegrationException $e) {
+                $falhas[] = 'NFS-e: '.$e->getMessage();
+            }
+        }
+
+        return ['emitidos' => $emitidos, 'falhas' => $falhas];
+    }
 
     /**
      * NFC-e dos consumos de produto (tipo_item=produto).

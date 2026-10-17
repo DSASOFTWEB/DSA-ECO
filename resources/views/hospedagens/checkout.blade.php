@@ -25,12 +25,21 @@
         @else
             <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
                  x-data="{
+                    rec: pixRecebimento({ url: @js(route('hospedagens.checkout.pix', $hospedagem)), formId: 'form-checkout' }),
+                    formas: {{ Js::from($formasPagamento->map->paraTela()->values()) }},
+                    formaId: {{ $formasPagamento->first()?->id ?? 'null' }},
+                    enviando: false,
                     valorDiaria: {{ (float) $hospedagem->valor_diaria }},
                     noites: {{ $noites }},
                     totalConsumos: {{ (float) $hospedagem->consumos->sum('subtotal') }},
                     desconto: 0,
+                    get forma() { return this.formas.find((f) => f.id === this.formaId) || null },
                     get total() { return Math.max(0, (this.valorDiaria * this.noites) + this.totalConsumos - (Number(this.desconto) || 0)) },
-                    formatar(valor) { return 'R$ ' + Number(valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }
+                    formatar(valor) { return 'R$ ' + Number(valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) },
+                    confirmar(evento) {
+                        if (this.forma?.integrado) { evento.preventDefault(); this.rec.gerarPix(); return; }
+                        this.enviando = true;
+                    }
                  }">
                 <h2 class="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Fechar conta — Quarto {{ $hospedagem->quarto->numero }}</h2>
                 <p class="mb-5 text-sm text-slate-500">{{ $hospedagem->cliente->nome }} · <span x-text="noites"></span> diária(s)</p>
@@ -40,7 +49,9 @@
                     <div class="flex justify-between"><dt class="text-slate-500">Consumos</dt><dd x-text="formatar(totalConsumos)"></dd></div>
                 </dl>
 
-                <form method="POST" action="{{ route('hospedagens.checkout.store', $hospedagem) }}" class="mt-5 space-y-4">
+                @include('partials.pix-recebimento', ['alvo' => 'rec'])
+
+                <form method="POST" action="{{ route('hospedagens.checkout.store', $hospedagem) }}" class="mt-5 space-y-4" id="form-checkout" x-show="! rec.pixAberto" @submit="confirmar($event)">
                     @csrf
                     <input type="hidden" name="caixa_id" value="{{ $caixaAberto->id }}">
 
@@ -51,12 +62,12 @@
 
                     <div>
                         <label class="block text-sm font-medium text-slate-700">Forma de pagamento</label>
-                        <select name="forma_pagamento" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                            <option value="dinheiro">Dinheiro</option>
-                            <option value="cartao_credito">Cartão de crédito</option>
-                            <option value="cartao_debito">Cartão de débito</option>
-                            <option value="pix">Pix</option>
+                        <select name="forma_pagamento_id" required x-model.number="formaId" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                            @foreach ($formasPagamento as $forma)
+                                <option value="{{ $forma->id }}">{{ $forma->nome }}{{ $forma->ehPixIntegrado() ? ' (QR Code)' : '' }}</option>
+                            @endforeach
                         </select>
+                        <p x-show="forma?.integrado" x-cloak class="mt-1 text-xs text-teal-700">Será gerado o QR Code Pix; o check-out é concluído sozinho quando o banco confirmar o pagamento.</p>
                     </div>
 
                     <fieldset class="rounded-xl border border-slate-200 p-4 dark:border-gray-700">
@@ -87,7 +98,8 @@
                         <span class="text-2xl font-bold" x-text="formatar(total)"></span>
                     </div>
 
-                    <button type="submit" class="w-full rounded-xl bg-emerald-600 py-3.5 text-base font-semibold text-white shadow-sm transition hover:bg-emerald-700">
+                    <button type="submit" :disabled="enviando" class="w-full rounded-xl bg-emerald-600 py-3.5 text-base font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
+                            x-text="forma?.integrado ? 'Gerar QR Code Pix' : 'Confirmar check-out'">
                         Confirmar check-out
                     </button>
                 </form>
@@ -95,3 +107,7 @@
         @endif
     </div>
 @endsection
+
+@push('scripts')
+    @include('partials.pix-recebimento-script')
+@endpush

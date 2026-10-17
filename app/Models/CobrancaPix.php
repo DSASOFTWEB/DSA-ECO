@@ -21,7 +21,7 @@ class CobrancaPix extends Model
     protected $table = 'cobrancas_pix';
 
     protected $fillable = [
-        'empresa_id', 'caixa_id', 'usuario_id', 'venda_id', 'gateway', 'txid', 'valor',
+        'empresa_id', 'caixa_id', 'usuario_id', 'venda_id', 'atendimento_id', 'hospedagem_id', 'gateway', 'txid', 'valor',
         'status', 'pix_copia_e_cola', 'dados_venda', 'payload', 'e2eid', 'erro',
         'expira_em', 'pago_em',
     ];

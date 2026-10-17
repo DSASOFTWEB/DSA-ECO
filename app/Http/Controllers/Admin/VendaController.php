@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Venda\StoreVendaRequest;
 use App\Models\Caixa;
 use App\Models\Empresa;
+use App\Models\FormaPagamento;
 use App\Models\Produto;
 use App\Models\TipoEntrada;
 use App\Models\User;
@@ -72,8 +73,9 @@ class VendaController extends Controller
         ])->values();
 
         $pixGatewayAtivo = (bool) Empresa::find($user->empresa_id)?->gatewayPixAtivo();
+        $formasPagamento = FormaPagamento::ativasDaEmpresa((int) $user->empresa_id);
 
-        return view('vendas.create', compact('produtos', 'tiposEntrada', 'caixaAberto', 'produtosJson', 'tiposEntradaJson', 'caixasDisponiveis', 'pixGatewayAtivo'));
+        return view('vendas.create', compact('produtos', 'tiposEntrada', 'caixaAberto', 'produtosJson', 'tiposEntradaJson', 'caixasDisponiveis', 'pixGatewayAtivo', 'formasPagamento'));
     }
 
     public function store(StoreVendaRequest $request): RedirectResponse

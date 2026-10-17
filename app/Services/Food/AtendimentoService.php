@@ -288,9 +288,12 @@ class AtendimentoService
         });
     }
 
-    public function fechar(Atendimento $atendimento, array $dados, User $operador): Atendimento
+    /**
+     * @param  array{gateway?:string, gateway_payment_id?:string, payload?:array}  $pagamentoGateway  Pix já confirmado pelo gateway da empresa
+     */
+    public function fechar(Atendimento $atendimento, array $dados, User $operador, array $pagamentoGateway = []): Atendimento
     {
-        return DB::transaction(function () use ($atendimento, $dados, $operador) {
+        return DB::transaction(function () use ($atendimento, $dados, $operador, $pagamentoGateway) {
             $atendimento = Atendimento::whereKey($atendimento->id)->lockForUpdate()->firstOrFail();
             if ($atendimento->status === 'fechado' && $atendimento->venda_id) {
                 return $atendimento;
@@ -306,15 +309,8 @@ class AtendimentoService
                 throw new NegocioException('Selecione um caixa aberto da mesma unidade.');
             }
 
-            $subtotal = round((float) $itens->sum('subtotal'), 2);
-            $desconto = round((float) ($dados['desconto'] ?? 0), 2);
-            $percentualServico = round((float) ($dados['percentual_servico'] ?? 0), 2);
-            $valorServico = round($subtotal * ($percentualServico / 100), 2);
-            $total = round($subtotal + $valorServico - $desconto, 2);
-
-            if ($total < 0 || $desconto > $subtotal + $valorServico) {
-                throw new NegocioException('O desconto informado é inválido.');
-            }
+            ['subtotal' => $subtotal, 'desconto' => $desconto, 'percentual_servico' => $percentualServico,
+                'valor_servico' => $valorServico, 'total' => $total] = $this->calcularTotais((float) $itens->sum('subtotal'), $dados);
             $totalPagamentos = round(collect($dados['pagamentos'])->sum(fn ($p) => (float) $p['valor']), 2);
             if (abs($totalPagamentos - $total) > 0.009) {
                 throw new NegocioException('A soma dos pagamentos deve ser igual ao total da conta.');
@@ -350,7 +346,10 @@ class AtendimentoService
                 $pagamento = Pagamento::create([
                     'empresa_id' => $atendimento->empresa_id,
                     'venda_id' => $venda->id,
-                    'gateway' => $parcela['forma'] === 'pix' ? 'mercadopago' : $parcela['forma'],
+                    'gateway' => $pagamentoGateway['gateway']
+                        ?? ($parcela['forma'] === 'pix' ? 'pix_manual' : $parcela['forma']),
+                    'gateway_payment_id' => $pagamentoGateway['gateway_payment_id'] ?? null,
+                    'payload' => $pagamentoGateway['payload'] ?? null,
                     'valor' => $parcela['valor'],
                     'status' => 'aprovado',
                     'metodo_pagamento' => $parcela['forma'],
@@ -385,6 +384,45 @@ class AtendimentoService
 
             return $atendimento->fresh(['ponto', 'itens.produto', 'venda.pagamentos']);
         });
+    }
+
+    /**
+     * Total do fechamento calculado no servidor, sem gravar nada — é o valor
+     * cobrado no Pix integrado antes de a conta ser fechada.
+     */
+    public function calcularTotalFechamento(Atendimento $atendimento, array $dados): float
+    {
+        $subtotal = (float) $atendimento->itens()->where('status', 'ativo')->sum('subtotal');
+
+        if ($subtotal <= 0) {
+            throw new NegocioException('Não é possível fechar uma conta sem itens.');
+        }
+
+        return $this->calcularTotais($subtotal, $dados)['total'];
+    }
+
+    /**
+     * @return array{subtotal: float, desconto: float, percentual_servico: float, valor_servico: float, total: float}
+     */
+    protected function calcularTotais(float $subtotal, array $dados): array
+    {
+        $subtotal = round($subtotal, 2);
+        $desconto = round((float) ($dados['desconto'] ?? 0), 2);
+        $percentualServico = round((float) ($dados['percentual_servico'] ?? 0), 2);
+        $valorServico = round($subtotal * ($percentualServico / 100), 2);
+        $total = round($subtotal + $valorServico - $desconto, 2);
+
+        if ($total < 0 || $desconto > $subtotal + $valorServico) {
+            throw new NegocioException('O desconto informado é inválido.');
+        }
+
+        return [
+            'subtotal' => $subtotal,
+            'desconto' => $desconto,
+            'percentual_servico' => $percentualServico,
+            'valor_servico' => $valorServico,
+            'total' => $total,
+        ];
     }
 
     protected function recalcular(Atendimento $atendimento): void

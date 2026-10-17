@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\DB;
 
 class AtendimentoService
 {
+    public const MENSAGEM_CAIXA_FECHADO = 'Nenhum caixa aberto nesta unidade. Favor abra seu caixa para iniciar o seu dia.';
+
     public function __construct(
         protected EstoqueService $estoqueService,
         protected ComissaoService $comissaoService,
@@ -36,6 +38,10 @@ class AtendimentoService
 
             if ($ponto->atendimentos()->whereIn('status', ['aberto', 'pre_fechado'])->exists()) {
                 throw new NegocioException('Já existe um atendimento em andamento neste ponto.');
+            }
+
+            if (! $this->existeCaixaAberto($ponto->empresa_id, $ponto->unidade_id)) {
+                throw new NegocioException(self::MENSAGEM_CAIXA_FECHADO);
             }
 
             $atendimento = Atendimento::create([
@@ -170,6 +176,22 @@ class AtendimentoService
 
             if ($desconto > $bruto) {
                 throw new NegocioException('O desconto do item não pode superar seu valor bruto.');
+            }
+
+            if ($produto->controla_estoque) {
+                // A baixa só acontece no fechamento; reserva o que já está lançado em contas abertas.
+                $jaLancado = (int) AtendimentoItem::query()
+                    ->where('produto_id', $produto->id)
+                    ->where('status', 'ativo')
+                    ->whereHas('atendimento', fn ($q) => $q->whereIn('status', ['aberto', 'pre_fechado']))
+                    ->sum('quantidade');
+                $disponivel = max(0, (int) $produto->estoque_atual - $jaLancado);
+
+                if ($quantidade > $disponivel) {
+                    throw new NegocioException($disponivel === 0
+                        ? "Produto \"{$produto->nome}\" sem estoque. Faça a entrada de estoque antes de lançar."
+                        : "Estoque insuficiente para \"{$produto->nome}\": disponível {$disponivel}, solicitado {$quantidade}.");
+                }
             }
 
             $item = $atendimento->itens()->create([
@@ -374,6 +396,14 @@ class AtendimentoService
             'valor_servico' => $valorServico,
             'valor_total' => max(0, $subtotal + $valorServico - (float) $atendimento->desconto),
         ]);
+    }
+
+    public function existeCaixaAberto(int $empresaId, int $unidadeId): bool
+    {
+        return Caixa::where('empresa_id', $empresaId)
+            ->where('unidade_id', $unidadeId)
+            ->where('status', 'aberto')
+            ->exists();
     }
 
     protected function validarOperavel(Atendimento $atendimento, User $operador): void

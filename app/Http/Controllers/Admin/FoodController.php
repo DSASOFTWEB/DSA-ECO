@@ -36,8 +36,9 @@ class FoodController extends Controller
         $pontos = PontoAtendimento::with(['atendimentoAtual.itensAtivos'])
             ->where('unidade_id', $unidadeId)->where('tipo', $tipo)
             ->orderBy('ordem')->orderBy('numero')->get();
+        $caixaAberto = $this->atendimentos->existeCaixaAberto((int) $request->user()->empresa_id, (int) $unidadeId);
 
-        return view('food.mapa', compact('unidades', 'unidadeId', 'tipo', 'pontos'));
+        return view('food.mapa', compact('unidades', 'unidadeId', 'tipo', 'pontos', 'caixaAberto'));
     }
 
     public function storePonto(StorePontoAtendimentoRequest $request): RedirectResponse

@@ -19,6 +19,13 @@
         </div>
     </div>
 
+    @unless($caixaAberto)
+        <x-alert type="warning" title="Caixa fechado">
+            {{ \App\Services\Food\AtendimentoService::MENSAGEM_CAIXA_FECHADO }}
+            <a href="{{ route('caixas.index') }}" class="ml-1 font-semibold underline">Ir para o caixa</a>
+        </x-alert>
+    @endunless
+
     <div class="flex flex-wrap gap-4 text-xs font-medium text-gray-600 dark:text-gray-300">
         <span><i class="mr-1 inline-block h-3 w-3 rounded-full bg-emerald-500"></i>Livre</span>
         <span><i class="mr-1 inline-block h-3 w-3 rounded-full bg-rose-500"></i>Ocupada</span>

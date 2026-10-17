@@ -118,6 +118,7 @@ class FoodMesaComandaTest extends TestCase
     {
         [$empresa, $unidade, $operador] = $this->criarOperador();
         $mesa = $this->criarPonto($empresa, $unidade, 'mesa', 1);
+        $this->criarCaixaAberto($empresa, $unidade, $operador);
         $this->actingAs($operador);
         app(AtendimentoService::class)->abrir($mesa, $operador, 2);
 
@@ -239,6 +240,60 @@ class FoodMesaComandaTest extends TestCase
         Gate::before(fn () => true);
 
         return [$empresa, $unidade, $operador];
+    }
+
+    public function test_nao_abre_mesa_sem_caixa_aberto_na_unidade(): void
+    {
+        [$empresa, $unidade, $operador] = $this->criarOperador();
+        $mesa = $this->criarPonto($empresa, $unidade, 'mesa', 1);
+
+        $this->actingAs($operador)
+            ->post(route('food.pontos.abrir', $mesa), ['quantidade_pessoas' => 1])
+            ->assertRedirect()
+            ->assertSessionHas('erro', AtendimentoService::MENSAGEM_CAIXA_FECHADO);
+
+        $this->assertDatabaseMissing('atendimentos', ['ponto_atendimento_id' => $mesa->id]);
+        $this->assertSame('livre', $mesa->fresh()->status);
+    }
+
+    public function test_nao_lanca_produto_sem_estoque_considerando_contas_abertas(): void
+    {
+        [$empresa, $unidade, $operador] = $this->criarOperador();
+        $this->criarCaixaAberto($empresa, $unidade, $operador);
+        $produto = Produto::create([
+            'empresa_id' => $empresa->id,
+            'unidade_id' => $unidade->id,
+            'nome' => 'Coca Zero',
+            'preco_custo' => 3,
+            'preco_venda' => 6.5,
+            'controla_estoque' => true,
+            'estoque_atual' => 1,
+            'estoque_minimo' => 0,
+            'ativo' => true,
+        ]);
+        $this->actingAs($operador);
+        $service = app(AtendimentoService::class);
+        $atendimento = $service->abrir($this->criarPonto($empresa, $unidade, 'mesa', 1), $operador);
+        $service->adicionarItem($atendimento, ['produto_id' => $produto->id, 'quantidade' => 1], $operador);
+
+        $this->from(route('food.atendimentos.show', $atendimento))
+            ->post(route('food.atendimentos.itens.store', $atendimento), ['produto_id' => $produto->id, 'quantidade' => 1])
+            ->assertRedirect(route('food.atendimentos.show', $atendimento))
+            ->assertSessionHas('erro', 'Produto "Coca Zero" sem estoque. Faça a entrada de estoque antes de lançar.');
+
+        $this->assertSame(1, $atendimento->itens()->count());
+    }
+
+    protected function criarCaixaAberto(Empresa $empresa, Unidade $unidade, User $operador): Caixa
+    {
+        return Caixa::create([
+            'empresa_id' => $empresa->id,
+            'unidade_id' => $unidade->id,
+            'usuario_abertura_id' => $operador->id,
+            'data_abertura' => now(),
+            'valor_abertura' => 0,
+            'status' => 'aberto',
+        ]);
     }
 
     protected function criarPonto(Empresa $empresa, Unidade $unidade, string $tipo, int $numero): PontoAtendimento

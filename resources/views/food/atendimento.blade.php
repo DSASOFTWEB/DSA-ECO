@@ -151,6 +151,15 @@
 }
 .food-modal__card h3 { font-size:16px; font-weight:800; margin-bottom:12px; }
 .food-modal__actions { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+.food-flash-area { flex-shrink:0; padding:8px 12px 0; display:flex; flex-direction:column; gap:6px; }
+.food-flash {
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    border-radius:10px; border:1px solid; padding:10px 14px; font-size:13px; font-weight:700;
+}
+.food-flash button { font-size:18px; line-height:1; opacity:.7; }
+.food-flash--erro { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+.food-flash--aviso { background:#fffbeb; border-color:#fde68a; color:#92400e; }
+.food-flash--ok { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
 .food-modal__actions button, .food-modal__actions .food-acao {
     min-height:42px; padding:0 14px; border-radius:8px; font-weight:700;
 }
@@ -185,6 +194,35 @@
             <a href="{{ route('food.atendimentos.conta', $atendimento) }}" class="food-btn-top" target="_blank">Conta</a>
         </div>
     </header>
+
+    @if(session('erro') || $errors->any() || session('sucesso') || ($emAndamento && $caixas->isEmpty()))
+        <div class="food-flash-area">
+            @if($emAndamento && $caixas->isEmpty())
+                <div class="food-flash food-flash--aviso">
+                    <span>{{ \App\Services\Food\AtendimentoService::MENSAGEM_CAIXA_FECHADO }}</span>
+                    <a href="{{ route('caixas.index') }}" class="underline">Ir para o caixa</a>
+                </div>
+            @endif
+            @if(session('erro'))
+                <div class="food-flash food-flash--erro" x-data="{ show: true }" x-show="show">
+                    <span>{{ session('erro') }}</span>
+                    <button type="button" @click="show = false" aria-label="Fechar">&times;</button>
+                </div>
+            @endif
+            @if($errors->any())
+                <div class="food-flash food-flash--erro" x-data="{ show: true }" x-show="show">
+                    <span>{{ $errors->first() }}</span>
+                    <button type="button" @click="show = false" aria-label="Fechar">&times;</button>
+                </div>
+            @endif
+            @if(session('sucesso'))
+                <div class="food-flash food-flash--ok" x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)">
+                    <span>{{ session('sucesso') }}</span>
+                    <button type="button" @click="show = false" aria-label="Fechar">&times;</button>
+                </div>
+            @endif
+        </div>
+    @endif
 
     <div class="food-lanc__body">
         {{-- Painel do pedido (esquerda — referência ZeusFOOD) --}}

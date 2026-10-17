@@ -28,33 +28,44 @@
                 quantidade: {{ (int) old('quantidade', 1) }},
                 get ehPlano() { return this.planos[this.tipoId] ?? false },
                 get total() { return (this.valores[this.tipoId] ?? 0) * this.quantidade },
+                temMais: false,
+                area: null,
+                init() {
+                    this.area = this.$el.closest('.area-rolagem');
+                    if (! this.area) return;
+                    const checar = () => { this.temMais = this.area.scrollHeight - this.area.scrollTop - this.area.clientHeight > 12 };
+                    this.area.addEventListener('scroll', checar, { passive: true });
+                    window.addEventListener('resize', checar);
+                    this.$watch('ehPlano', () => this.$nextTick(checar));
+                    this.$nextTick(checar);
+                },
+                verMais() { this.area?.scrollBy({ top: this.area.clientHeight * 0.6, behavior: 'smooth' }) },
                 inc() { if (this.quantidade < 20) this.quantidade++ },
                 dec() { if (this.quantidade > 1) this.quantidade-- },
               }">
-            <h1 class="text-xl font-extrabold sm:text-2xl tracking-tight text-slate-900">Vamos nessa? 🌊</h1>
-            <p class="mt-1 hidden text-[15px] sm:block leading-snug text-slate-600">Escolha sua entrada abaixo.</p>
+            <h1 class="text-xl font-extrabold tracking-tight text-slate-900">Vamos nessa? 🌊</h1>
 
             {{-- Como funciona: plano x avulso --}}
-            <div class="mt-3 grid gap-2 sm:mt-4 sm:grid-cols-2">
+            <div class="mt-3 grid gap-2 sm:grid-cols-2">
                 @if ($tiposPlano->isNotEmpty())
-                    <div class="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-2.5 sm:p-3">
-                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white sm:h-9 sm:w-9">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+                    <div class="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+                        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-600 text-white">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
                         </span>
                         <span>
-                            <span class="block text-sm font-bold text-emerald-900">Tem plano?</span>
-                            <span class="block text-sm leading-snug text-emerald-800">Entrada <strong>grátis</strong>: escolha seu plano e informe CPF ou nome.</span>
+                            <span class="block text-[13px] font-bold leading-tight text-emerald-900">Tem plano?</span>
+                            <span class="block text-[13px] leading-snug text-emerald-800">Entrada <strong>grátis</strong>: escolha seu plano e informe CPF ou nome.</span>
                         </span>
                     </div>
                 @endif
                 @if ($tiposAvulsos->isNotEmpty())
-                    <div class="flex items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-2.5 sm:p-3 {{ $tiposPlano->isEmpty() ? 'sm:col-span-2' : '' }}">
-                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-sky-600 text-white sm:h-9 sm:w-9">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h4.5v4.5h-4.5zM15.75 4.5h4.5v4.5h-4.5zM3.75 15h4.5v4.5h-4.5zM15 15h1.5v1.5H15zM18.75 18.75h1.5v1.5h-1.5zM12 4.5v3M12 12h3m4.5 0h.75M12 15.75V19.5"/></svg>
+                    <div class="flex items-center gap-2.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 {{ $tiposPlano->isEmpty() ? 'sm:col-span-2' : '' }}">
+                        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-sky-600 text-white">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h4.5v4.5h-4.5zM15.75 4.5h4.5v4.5h-4.5zM3.75 15h4.5v4.5h-4.5zM15 15h1.5v1.5H15zM18.75 18.75h1.5v1.5h-1.5zM12 4.5v3M12 12h3m4.5 0h.75M12 15.75V19.5"/></svg>
                         </span>
                         <span>
-                            <span class="block text-sm font-bold text-sky-900">Não tem plano?</span>
-                            <span class="block text-sm leading-snug text-sky-800">Escolha o ingresso e pague com <strong>Pix</strong>.</span>
+                            <span class="block text-[13px] font-bold leading-tight text-sky-900">Não tem plano?</span>
+                            <span class="block text-[13px] leading-snug text-sky-800">Escolha o ingresso e pague com <strong>Pix</strong>.</span>
                         </span>
                     </div>
                 @endif
@@ -62,29 +73,29 @@
 
             @foreach ([['titulo' => 'Tenho plano', 'tipos' => $tiposPlano, 'plano' => true], ['titulo' => 'Ingresso avulso', 'tipos' => $tiposAvulsos, 'plano' => false]] as $grupo)
                 @continue($grupo['tipos']->isEmpty())
-                <h2 class="mb-2 mt-4 flex items-center gap-2 sm:mt-5 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <h2 class="mb-1.5 mt-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     {{ $grupo['titulo'] }}
                     <span class="h-px flex-1 bg-slate-200"></span>
                 </h2>
-                <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                     @foreach ($grupo['tipos'] as $tipo)
                         @php $cor = $grupo['plano'] ? ['barra' => 'bg-emerald-500', 'ring' => 'ring-emerald-500 border-emerald-500', 'icone' => 'bg-emerald-100 text-emerald-700'] : $paleta[$loop->index % count($paleta)]; @endphp
-                        <label class="relative flex min-h-[6rem] cursor-pointer flex-col overflow-hidden rounded-2xl border-2 bg-white text-left shadow-sm transition hover:shadow-md focus-within:ring-2"
+                        <label class="relative flex cursor-pointer flex-col overflow-hidden rounded-xl border-2 bg-white text-left shadow-sm transition hover:shadow-md focus-within:ring-2"
                                :class="tipoId === {{ $tipo->id }} ? '{{ $cor['ring'] }} ring-2 ring-offset-1' : 'border-slate-200'">
                             <input type="radio" name="tipo_entrada_id" value="{{ $tipo->id }}" x-model.number="tipoId" class="sr-only">
-                            <span class="h-1.5 w-full shrink-0 {{ $cor['barra'] }}"></span>
-                            <span class="flex flex-1 flex-col gap-2 p-3">
-                                <span class="pr-7 text-sm font-bold leading-snug text-slate-900">{{ $tipo->nome }}</span>
+                            <span class="h-1 w-full shrink-0 {{ $cor['barra'] }}"></span>
+                            <span class="flex flex-1 flex-col gap-1.5 px-2.5 py-2">
+                                <span class="pr-6 text-[13px] font-bold leading-tight text-slate-900">{{ $tipo->nome }}</span>
                                 <span class="mt-auto">
                                     @if ($tipo->eh_plano)
-                                        <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">Grátis · plano</span>
+                                        <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">Grátis · plano</span>
                                     @else
-                                        <span class="text-lg font-extrabold text-slate-900">R$ {{ number_format($tipo->valor, 2, ',', '.') }}</span>
+                                        <span class="text-base font-extrabold text-slate-900">R$ {{ number_format($tipo->valor, 2, ',', '.') }}</span>
                                     @endif
                                 </span>
                             </span>
-                            <span x-show="tipoId === {{ $tipo->id }}" x-cloak class="absolute right-2 top-3 grid h-6 w-6 place-items-center rounded-full {{ $cor['barra'] }} text-white shadow">
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="m5 13 4 4L19 7"/></svg>
+                            <span x-show="tipoId === {{ $tipo->id }}" x-cloak class="absolute right-1.5 top-2.5 grid h-5 w-5 place-items-center rounded-full {{ $cor['barra'] }} text-white shadow">
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="m5 13 4 4L19 7"/></svg>
                             </span>
                         </label>
                     @endforeach
@@ -124,11 +135,18 @@
                 só gruda dentro do elemento pai, e o pai precisa ser o conteúdo todo
                 para o botão aparecer mesmo quando o formulário está fora da tela (celular).
             --}}
-            <div x-show="ehPlano || {{ $pixDisponivel ? 'true' : 'false' }}" class="sticky -bottom-4 z-10 -mx-4 -mb-4 mt-5 sm:-bottom-6 space-y-2 border-t border-slate-200 bg-white px-4 pt-3 shadow-[0_-8px_16px_-8px_rgba(15,23,42,0.12)] sm:-mx-6 sm:-mb-6 sm:px-6"
+            <div x-show="ehPlano || {{ $pixDisponivel ? 'true' : 'false' }}" class="sticky -bottom-4 z-10 -mx-4 -mb-4 mt-4 sm:-bottom-5 border-t border-slate-200 bg-white px-4 pt-3 shadow-[0_-8px_16px_-8px_rgba(15,23,42,0.12)] sm:-mx-5 sm:-mb-5 sm:px-5"
                  style="padding-bottom: max(1rem, env(safe-area-inset-bottom))">
+                {{-- Com muitos tipos de entrada: degradê sobre os cards escondidos + atalho para rolar --}}
+                <div x-show="temMais" x-transition.opacity x-cloak class="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-white to-white/0"></div>
+                <button type="button" x-show="temMais" x-transition.opacity x-cloak @click="verMais()"
+                        class="absolute -top-12 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-slate-900/90 px-4 py-1.5 text-xs font-bold text-white shadow-lg hover:bg-slate-900">
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7"/></svg>
+                    Mais opções
+                </button>
                 @if ($pixDisponivel)
-                    <div x-show="!ehPlano" class="space-y-2">
-                        <div class="flex items-stretch gap-2">
+                    <div x-show="!ehPlano" class="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                        <div class="flex items-stretch gap-2 sm:flex-1">
                             <div class="flex shrink-0 flex-col justify-center rounded-2xl border border-slate-300 bg-white px-2.5 py-1.5 sm:px-3">
                                 <span class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Quantidade</span>
                                 <div class="flex items-center gap-1.5 sm:gap-2">
@@ -143,11 +161,10 @@
                             </div>
                         </div>
 
-                        <button type="submit" form="form-pix" class="flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-600 py-4 text-base font-bold text-white shadow-md transition hover:bg-sky-700">
+                        <button type="submit" form="form-pix" class="flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-600 py-4 text-base sm:w-60 sm:shrink-0 sm:py-0 font-bold text-white shadow-md transition hover:bg-sky-700">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h4.5v4.5h-4.5zM15.75 4.5h4.5v4.5h-4.5zM3.75 15h4.5v4.5h-4.5zM15 15h1.5v1.5H15zM18.75 18.75h1.5v1.5h-1.5zM12 4.5v3M12 12h3m4.5 0h.75M12 15.75V19.5"/></svg>
                             Gerar QR Code Pix
                         </button>
-                        <p class="hidden text-center text-xs text-slate-500 sm:block">Depois do pagamento você recebe o voucher de entrada na tela.</p>
                     </div>
                 @endif
 

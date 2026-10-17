@@ -7,12 +7,12 @@
     <title>@yield('titulo', 'Comprar entrada')</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
-        /* Esconde a barra de rolagem do cartão (mas o touch-scroll continua
-           funcionando como rede de segurança em telas muito pequenas/muitos
-           tipos de entrada) — o layout é dimensionado pra normalmente nem
-           precisar disso. */
-        .sem-barra-rolagem::-webkit-scrollbar { display: none; }
-        .sem-barra-rolagem { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Barra de rolagem fina e discreta no cartão: com muitos tipos de
+           entrada o conteúdo rola por dentro, e a barra mostra que há mais. */
+        .area-rolagem { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+        .area-rolagem::-webkit-scrollbar { width: 6px; }
+        .area-rolagem::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        .area-rolagem::-webkit-scrollbar-track { background: transparent; }
     </style>
 </head>
 <body class="relative h-dvh overflow-hidden bg-gradient-to-b from-sky-600 via-cyan-500 to-teal-500 text-gray-900 antialiased">
@@ -31,10 +31,10 @@
         </svg>
     </div>
 
-    <main class="relative z-10 mx-auto flex h-dvh max-w-2xl flex-col px-3 py-3 sm:py-5">
-        <div class="mb-3 flex shrink-0 items-center justify-center gap-2.5">
+    <main class="relative z-10 mx-auto flex h-dvh max-w-2xl flex-col px-3 py-3 sm:py-4 lg:max-w-3xl">
+        <div class="mb-2.5 flex shrink-0 items-center justify-center gap-2.5">
             @if (($unidade ?? null)?->empresa?->logoUrl())
-                <img src="{{ $unidade->empresa->logoUrl() }}" alt="{{ $unidade->empresa->nome }}" class="h-10 max-w-[180px] object-contain drop-shadow">
+                <img src="{{ $unidade->empresa->logoUrl() }}" alt="{{ $unidade->empresa->nome }}" class="h-9 max-w-[180px] object-contain drop-shadow">
             @else
                 <span class="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/20 text-white backdrop-blur">
                     <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-width="1.8" d="M3 16.5c2.5-2 4.5-2 7 0s4.5 2 7 0 3.5-2 4-1.5M4 12c2-1.5 4-1.5 6 0s4 1.5 6 0 3.5-1.5 4-1M6 7.5h12"/></svg>
@@ -45,7 +45,7 @@
 
         <div class="shrink-0">@include('partials.flash')</div>
 
-        <div class="sem-barra-rolagem min-h-0 overflow-y-auto rounded-3xl border border-white/50 bg-white p-4 shadow-2xl sm:p-6">
+        <div class="area-rolagem min-h-0 overflow-y-auto overscroll-contain rounded-3xl border border-white/50 bg-white p-4 shadow-2xl sm:p-5">
             @yield('conteudo')
         </div>
     </main>

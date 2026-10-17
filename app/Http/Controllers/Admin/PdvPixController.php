@@ -11,11 +11,15 @@ use App\Http\Requests\Venda\StoreVendaRequest;
 use App\Models\Atendimento;
 use App\Models\Caixa;
 use App\Models\CobrancaPix;
+use App\Models\Empresa;
 use App\Models\Hospedagem;
 use App\Models\Venda;
+use App\Services\Impressao\PixQrEscPosBuilder;
 use App\Services\PdvPixService;
 use App\Services\QrCodeService;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 
 /**
  * Tela de recebimento Pix do PDV (QR Code dinâmico do gateway da empresa).
@@ -124,6 +128,58 @@ class PdvPixController extends Controller
     }
 
     /**
+     * QR Code da cobrança para imprimir na térmica 80mm e entregar ao cliente.
+     * Abre numa janela à parte: o modal do Pix segue aguardando o pagamento.
+     */
+    public function imprimir(CobrancaPix $cobrancaPix): View
+    {
+        $this->autorizar($cobrancaPix);
+        $empresa = Empresa::findOrFail($cobrancaPix->empresa_id);
+        $impressao = $empresa->configuracaoImpressao();
+
+        return view('vendas.pix-imprimir', [
+            'cobranca' => $cobrancaPix,
+            'empresaNome' => $empresa->nome,
+            'referencia' => $this->referencia($cobrancaPix),
+            'qrCode' => $this->qrCodeService->gerarDataUri($cobrancaPix->pix_copia_e_cola, 300),
+            'impressaoModo' => $impressao['modo'],
+            'escposColunas' => $impressao['colunas'],
+            'escposAgenteUrl' => $impressao['agente_url'],
+        ]);
+    }
+
+    public function imprimirEscpos(CobrancaPix $cobrancaPix): Response
+    {
+        $this->autorizar($cobrancaPix);
+        $empresa = Empresa::findOrFail($cobrancaPix->empresa_id);
+        $bytes = (new PixQrEscPosBuilder($empresa->configuracaoImpressao()['colunas']))
+            ->montarCobranca($cobrancaPix, $empresa->nome, $this->referencia($cobrancaPix));
+
+        return response($bytes, 200, [
+            'Content-Type' => 'application/octet-stream',
+            'Content-Disposition' => 'attachment; filename="pix-qrcode-'.$cobrancaPix->id.'.bin"',
+        ]);
+    }
+
+    /** Linha que identifica a cobrança no papel: venda do PDV, mesa/comanda ou quarto. */
+    protected function referencia(CobrancaPix $cobranca): string
+    {
+        if ($cobranca->atendimento_id) {
+            $ponto = Atendimento::withoutGlobalScopes()->with('ponto')->find($cobranca->atendimento_id)?->ponto;
+
+            return $ponto ? ucfirst($ponto->identificacao) : 'Mesa/comanda';
+        }
+
+        if ($cobranca->hospedagem_id) {
+            $quarto = Hospedagem::withoutGlobalScopes()->with('quarto')->find($cobranca->hospedagem_id)?->quarto;
+
+            return 'Hospedagem'.($quarto ? ' - Quarto '.$quarto->numero : '');
+        }
+
+        return 'Venda PDV';
+    }
+
+    /**
      * Mesma mensagem do check-out comum, mostrada na tela da hospedagem
      * para onde o front redireciona.
      */
@@ -185,6 +241,7 @@ class PdvPixController extends Controller
             'qr_code' => $comQrCode ? $this->qrCodeService->gerarDataUri($cobranca->pix_copia_e_cola, 260) : null,
             'status_url' => route('vendas.pix.status', $cobranca),
             'cancelar_url' => route('vendas.pix.cancelar', $cobranca),
+            'imprimir_url' => route('vendas.pix.imprimir', $cobranca),
         ], fn ($valor) => $valor !== null);
     }
 }

@@ -43,6 +43,9 @@
                 <template x-if="{{ $alvo }}.pix.status === 'pendente'">
                     <button type="button" class="{{ $btn }}" :disabled="{{ $alvo }}.cancelando" @click="{{ $alvo }}.cancelarPix()">Cancelar cobrança</button>
                 </template>
+                <template x-if="{{ $alvo }}.pix.status === 'pendente' && {{ $alvo }}.pix.imprimir_url">
+                    <button type="button" class="{{ $btnOk }}" @click="{{ $alvo }}.imprimir()" title="Imprimir o QR Code na impressora 80mm para o cliente">🖨 Imprimir QR Code</button>
+                </template>
                 <template x-if="{{ $alvo }}.pix.status === 'cancelada' || {{ $alvo }}.pix.status === 'expirada'">
                     <button type="button" class="{{ $btn }}" @click="{{ $alvo }}.fecharPix()">Voltar</button>
                 </template>

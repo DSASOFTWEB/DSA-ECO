@@ -84,6 +84,11 @@ function pixRecebimento({ url, formId }) {
                 this.cancelando = false;
             }
         },
+        imprimir() {
+            // Janela à parte: esta tela segue consultando o pagamento.
+            const janela = window.open(this.pix?.imprimir_url, 'pix-qrcode', 'width=420,height=760');
+            if (! janela) alert('O navegador bloqueou a janela de impressão. Permita pop-ups para este site e tente de novo.');
+        },
         copiar() {
             navigator.clipboard?.writeText(this.pix?.copia_e_cola || '').then(() => {
                 this.copiado = true;

@@ -329,6 +329,54 @@ class FormaPagamentoTest extends TestCase
         }
     }
 
+    public function test_qr_code_do_pix_pode_ser_impresso_em_80mm_e_escpos(): void
+    {
+        [$empresa, $operador, $caixa, $atendimento] = $this->cenarioMesa();
+        $pixQr = FormaPagamento::create(['empresa_id' => $empresa->id, 'nome' => 'Pix QR', 'tipo' => 'pix', 'integrado' => true, 'ativo' => true]);
+
+        $resposta = $this->actingAs($operador)
+            ->postJson(route('food.atendimentos.pix', $atendimento), [
+                'caixa_id' => $caixa->id,
+                'percentual_servico' => 0,
+                'pagamentos' => [['forma_pagamento_id' => $pixQr->id, 'valor' => 30]],
+            ])
+            ->assertCreated();
+        $cobranca = CobrancaPix::findOrFail($resposta->json('id'));
+        $resposta->assertJsonPath('imprimir_url', route('vendas.pix.imprimir', $cobranca));
+
+        $this->get(route('vendas.pix.imprimir', $cobranca))
+            ->assertOk()
+            ->assertSee('PAGUE COM PIX')
+            ->assertSee('R$ 30,00')
+            ->assertSee($atendimento->ponto->identificacao, false)
+            ->assertSee('data:image', false)
+            ->assertSee($cobranca->pix_copia_e_cola);
+
+        $bin = $this->get(route('vendas.pix.imprimir.escpos', $cobranca))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/octet-stream');
+        $bytes = $bin->getContent();
+        $this->assertStringContainsString("\x1D(k", $bytes, 'QR nativo ESC/POS (GS ( k)');
+        $this->assertStringContainsString($cobranca->pix_copia_e_cola, $bytes);
+        $this->assertStringEndsWith("\x1D\x56\x00", $bytes, 'corta o papel no fim');
+    }
+
+    public function test_nao_imprime_qr_code_de_outra_empresa(): void
+    {
+        [$empresa, $operador, $caixa, $atendimento] = $this->cenarioMesa();
+        $pixQr = FormaPagamento::create(['empresa_id' => $empresa->id, 'nome' => 'Pix QR', 'tipo' => 'pix', 'integrado' => true, 'ativo' => true]);
+        $id = $this->actingAs($operador)->postJson(route('food.atendimentos.pix', $atendimento), [
+            'caixa_id' => $caixa->id,
+            'percentual_servico' => 0,
+            'pagamentos' => [['forma_pagamento_id' => $pixQr->id, 'valor' => 30]],
+        ])->json('id');
+
+        [, $intruso] = $this->cenario();
+
+        $this->actingAs($intruso)->get(route('vendas.pix.imprimir', $id))->assertNotFound();
+        $this->actingAs($intruso)->get(route('vendas.pix.imprimir.escpos', $id))->assertNotFound();
+    }
+
     public function test_operador_de_mesa_sem_permissao_de_vendas_acompanha_o_pix_da_mesa(): void
     {
         $empresa = Empresa::factory()->create();

@@ -558,6 +558,9 @@
                                 <template x-if="pix.status === 'pendente'">
                                     <button type="button" class="pdv-btn" :disabled="pixCancelando" @click="cancelarPix()">Cancelar cobrança</button>
                                 </template>
+                                <template x-if="pix.status === 'pendente' && pix.imprimir_url">
+                                    <button type="button" class="pdv-btn pdv-btn--primary" @click="imprimirPix()" title="Imprimir o QR Code na impressora 80mm para o cliente">🖨 Imprimir QR Code</button>
+                                </template>
                                 <template x-if="pix.status === 'cancelada' || pix.status === 'expirada'">
                                     <button type="button" class="pdv-btn" @click="fecharPix()">Voltar à venda</button>
                                 </template>
@@ -966,6 +969,12 @@
                             } finally {
                                 this.pixCancelando = false;
                             }
+                        },
+
+                        imprimirPix() {
+                            // Janela à parte: o modal segue consultando o pagamento.
+                            const janela = window.open(this.pix?.imprimir_url, 'pix-qrcode', 'width=420,height=760');
+                            if (! janela) alert('O navegador bloqueou a janela de impressão. Permita pop-ups para este site e tente de novo.');
                         },
 
                         copiarPix() {

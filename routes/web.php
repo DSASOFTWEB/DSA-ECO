@@ -178,6 +178,8 @@ Route::middleware('auth')->group(function () {
     Route::post('vendas/pix', [PdvPixController::class, 'store'])->name('vendas.pix.store');
     Route::get('vendas/pix/{cobrancaPix}/status', [PdvPixController::class, 'status'])->name('vendas.pix.status');
     Route::post('vendas/pix/{cobrancaPix}/cancelar', [PdvPixController::class, 'cancelar'])->name('vendas.pix.cancelar');
+    Route::get('vendas/pix/{cobrancaPix}/imprimir', [PdvPixController::class, 'imprimir'])->name('vendas.pix.imprimir');
+    Route::get('vendas/pix/{cobrancaPix}/imprimir.escpos', [PdvPixController::class, 'imprimirEscpos'])->name('vendas.pix.imprimir.escpos');
     Route::resource('vendas', VendaController::class)->only(['index', 'create', 'store', 'show']);
     Route::get('vendas/{venda}/comprovante', [VendaController::class, 'comprovante'])->name('vendas.comprovante');
     Route::get('vendas/{venda}/comprovante.escpos', [VendaController::class, 'comprovanteEscpos'])->name('vendas.comprovante.escpos');

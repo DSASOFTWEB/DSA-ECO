@@ -361,6 +361,8 @@
                         'noites' => $checkout['noites'],
                         'quantidadeItensNfce' => $checkout['quantidadeItensNfce'],
                         'quantidadeItensNfse' => $checkout['quantidadeItensNfse'],
+                        'formasPagamento' => $checkout['formasPagamento'],
+                        'emModal' => true,
                     ])
                 @endif
             </x-modal>

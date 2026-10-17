@@ -183,6 +183,7 @@ class HospedagemController extends Controller
                 'noites' => $this->hospedagemService->noites($hospedagem),
                 'quantidadeItensNfce' => count($itensNfce),
                 'quantidadeItensNfse' => count($itensNfse),
+                'formasPagamento' => FormaPagamento::ativasDaEmpresa((int) $hospedagem->empresa_id),
             ];
         }
 

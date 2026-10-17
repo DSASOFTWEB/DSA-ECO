@@ -312,6 +312,23 @@ class FormaPagamentoTest extends TestCase
         $this->assertSame(1, \App\Models\CaixaMovimentacao::where('categoria', 'hospedagem')->count());
     }
 
+    public function test_modal_e_pagina_de_checkout_da_hospedagem_listam_as_formas_cadastradas(): void
+    {
+        [$empresa, $operador, , $unidade] = $this->cenario();
+        $hospedagem = $this->hospedagem($empresa, $unidade, $operador);
+        FormaPagamento::create(['empresa_id' => $empresa->id, 'nome' => 'Pix Qrcode', 'tipo' => 'pix', 'integrado' => true, 'ativo' => true]);
+
+        foreach ([route('hospedagens.show', $hospedagem), route('hospedagens.checkout', $hospedagem)] as $url) {
+            $this->actingAs($operador)->get($url)
+                ->assertOk()
+                ->assertSee('Pix Qrcode (QR Code)')
+                ->assertSee('name="forma_pagamento_id"', false)
+                ->assertDontSee('<option value="cartao_credito">', false)
+                ->assertSee(str_replace('/', '\/', route('hospedagens.checkout.pix', $hospedagem)), false)
+                ->assertSee('function pixRecebimento', false);
+        }
+    }
+
     public function test_operador_de_mesa_sem_permissao_de_vendas_acompanha_o_pix_da_mesa(): void
     {
         $empresa = Empresa::factory()->create();

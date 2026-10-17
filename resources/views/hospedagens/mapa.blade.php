@@ -20,6 +20,7 @@
             termo: '',
             resultados: [],
             buscando: false,
+            buscou: false,
             salvandoCliente: false,
             clienteErros: {},
             novoCliente: { nome: '', cpf: '', data_nascimento: '', telefone: '', whatsapp: '', unidade_id: '' },
@@ -29,18 +30,27 @@
                 this.$nextTick(() => this.$refs.buscaCliente?.focus());
             },
             buscarCliente() {
-                if (this.termo.trim().length < 2) { this.resultados = []; return; }
+                if (this.termo.trim().length < 2) { this.resultados = []; this.buscou = false; return; }
                 this.buscando = true;
                 fetch('{{ route('clientes.buscar') }}?termo=' + encodeURIComponent(this.termo), { headers: { 'Accept': 'application/json' } })
                     .then(response => response.ok ? response.json() : Promise.reject())
                     .then(dados => { this.resultados = dados; })
                     .catch(() => { this.resultados = []; })
-                    .finally(() => { this.buscando = false; });
+                    .finally(() => { this.buscando = false; this.buscou = true; });
             },
             selecionarCliente(cliente) {
                 this.clienteSelecionado = cliente;
                 this.resultados = [];
                 this.termo = '';
+            },
+            abrirNovoCliente() {
+                const termo = this.termo.trim();
+                if (termo) {
+                    if (/^[\d.\-\s]+$/.test(termo)) this.novoCliente.cpf = termo;
+                    else this.novoCliente.nome = termo;
+                }
+                this.clienteErros = {};
+                this.$dispatch('open-modal', 'novo-cliente');
             },
             cadastrarCliente(event) {
                 this.salvandoCliente = true;
@@ -165,7 +175,7 @@
                         <div class="flex items-center justify-between gap-3">
                             <label class="block text-sm font-medium text-slate-700 dark:text-slate-200">Hóspede titular</label>
                             @can('create', App\Models\Cliente::class)
-                                <button type="button" @click="$dispatch('open-modal', 'novo-cliente')" class="inline-flex items-center gap-1 rounded-lg border border-sky-200 px-2.5 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50 dark:border-sky-800 dark:text-sky-400 dark:hover:bg-sky-500/10">
+                                <button type="button" @click="abrirNovoCliente()" class="inline-flex items-center gap-1 rounded-lg border border-sky-200 px-2.5 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50 dark:border-sky-800 dark:text-sky-400 dark:hover:bg-sky-500/10">
                                     <span class="text-base leading-none">+</span> Novo cliente
                                 </button>
                             @endcan
@@ -184,6 +194,14 @@
                                     <li><button type="button" @click="selecionarCliente(cliente)" class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-white/5"><span x-text="cliente.nome"></span> <span class="text-slate-400" x-text="cliente.cpf"></span></button></li>
                                 </template>
                             </ul>
+                            {{-- Não encontrou: oferece o cadastro rápido com o que foi digitado --}}
+                            <div x-show="buscou && !buscando && termo.trim().length >= 2 && resultados.length === 0" x-cloak
+                                 class="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                                <span>Nenhum cliente encontrado para "<strong x-text="termo.trim()"></strong>".</span>
+                                @can('create', App\Models\Cliente::class)
+                                    <button type="button" @click="abrirNovoCliente()" class="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700">Cadastrar novo cliente</button>
+                                @endcan
+                            </div>
                         </div>
                         <input type="hidden" name="cliente_id" :value="clienteSelecionado?.id ?? '{{ old('cliente_id') }}'" required>
                         @error('cliente_id')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror

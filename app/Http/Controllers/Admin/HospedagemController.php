@@ -135,8 +135,10 @@ class HospedagemController extends Controller
         $this->authorize('create', Hospedagem::class);
 
         $quartos = Quarto::ativos()->with('unidade')->orderBy('numero')->get();
+        $clienteAnterior = old('cliente_id') ? Cliente::find(old('cliente_id')) : null;
+        $unidades = Unidade::ativas()->orderBy('nome')->get();
 
-        return view('hospedagens.create', compact('quartos'));
+        return view('hospedagens.create', compact('quartos', 'clienteAnterior', 'unidades'));
     }
 
     public function store(StoreHospedagemRequest $request): RedirectResponse

@@ -57,6 +57,10 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            // Mesmo fuso do app (America/Sao_Paulo, sem horário de verão desde 2019).
+            // As colunas TIMESTAMP ficam em UTC no MySQL e são convertidas na
+            // leitura/gravação por este fuso — dados antigos continuam corretos.
+            'timezone' => env('DB_TIMEZONE', '-03:00'),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],

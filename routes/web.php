@@ -28,6 +28,7 @@ use App\Http\Controllers\Admin\MarcaController;
 use App\Http\Controllers\Admin\ProdutoController;
 use App\Http\Controllers\Admin\QuartoController;
 use App\Http\Controllers\Admin\RelatorioController;
+use App\Http\Controllers\Admin\RelatorioGerencialController;
 use App\Http\Controllers\Admin\RelatorioMovimentacaoController;
 use App\Http\Controllers\Admin\TerminalController;
 use App\Http\Controllers\Admin\TipoEntradaController;
@@ -300,6 +301,8 @@ Route::middleware('auth')->group(function () {
     Route::get('relatorios', [RelatorioController::class, 'index'])->name('relatorios.index');
     Route::get('relatorios/financeiro.pdf', [RelatorioController::class, 'financeiroPdf'])->name('relatorios.financeiro.pdf');
     Route::get('relatorios/financeiro.xlsx', [RelatorioController::class, 'financeiroExcel'])->name('relatorios.financeiro.excel');
+    Route::get('relatorios/gerencial/{relatorio}', [RelatorioGerencialController::class, 'show'])->name('relatorios.gerencial');
+    Route::get('relatorios/gerencial/{relatorio}/excel', [RelatorioGerencialController::class, 'excel'])->name('relatorios.gerencial.excel');
     Route::get('relatorios/movimentacoes', [RelatorioMovimentacaoController::class, 'index'])->name('relatorios.movimentacoes');
     Route::get('relatorios/movimentacoes/pdf', [RelatorioMovimentacaoController::class, 'pdf'])->name('relatorios.movimentacoes.pdf');
 });

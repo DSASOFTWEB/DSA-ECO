@@ -15,8 +15,21 @@ class Venda extends Model
 {
     use BelongsToTenant, HasFactory, LogsActivity, SoftDeletes;
 
+    /** De onde a venda veio (coluna `origem`) — base dos relatórios por canal. */
+    public const ORIGEM_PDV = 'pdv';
+
+    public const ORIGEM_MESA = 'mesa';
+
+    public const ORIGEM_ONLINE = 'online';
+
+    public const ORIGENS = [
+        self::ORIGEM_PDV => 'PDV',
+        self::ORIGEM_MESA => 'Mesas e comandas',
+        self::ORIGEM_ONLINE => 'Link externo',
+    ];
+
     protected $fillable = [
-        'empresa_id', 'unidade_id', 'cliente_id', 'vendedor_id', 'caixa_id',
+        'empresa_id', 'unidade_id', 'cliente_id', 'vendedor_id', 'caixa_id', 'origem',
         'valor_bruto', 'desconto', 'valor_total', 'status', 'forma_pagamento', 'observacao',
     ];
 

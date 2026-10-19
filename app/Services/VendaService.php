@@ -59,6 +59,7 @@ class VendaService
 
             $venda = Venda::create([
                 'empresa_id' => $vendedor->empresa_id,
+                'origem' => Venda::ORIGEM_PDV,
                 'unidade_id' => $caixa->unidade_id,
                 'cliente_id' => $dados['cliente_id'] ?? null,
                 'vendedor_id' => $vendedor->id,
@@ -145,6 +146,7 @@ class VendaService
                 'empresa_id' => $unidade->empresa_id,
                 'unidade_id' => $unidade->id,
                 'vendedor_id' => null,
+                'origem' => Venda::ORIGEM_ONLINE,
                 'valor_bruto' => $valorTotal,
                 'desconto' => 0,
                 'valor_total' => $valorTotal,

@@ -322,6 +322,7 @@ class AtendimentoService
                 'unidade_id' => $atendimento->unidade_id,
                 'cliente_id' => $atendimento->cliente_id,
                 'vendedor_id' => $operador->id,
+                'origem' => Venda::ORIGEM_MESA,
                 'caixa_id' => $caixa->id,
                 'valor_bruto' => $subtotal + $valorServico,
                 'desconto' => $desconto,

@@ -126,6 +126,15 @@ class Empresa extends Model
         };
     }
 
+    /**
+     * Pronta para emitir NFC-e: certificado A1 + CSC/CSC ID. Usado para só
+     * perguntar "emitir NFC-e?" na finalização quando a emissão é possível.
+     */
+    public function nfceHabilitada(): bool
+    {
+        return filled($this->csc) && filled($this->csc_id) && $this->temCertificadoDigital();
+    }
+
     public function temCertificadoDigital(): bool
     {
         $conteudo = $this->attributes['certificado_arquivo'] ?? null;

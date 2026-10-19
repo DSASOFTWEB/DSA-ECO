@@ -69,6 +69,21 @@ class Venda extends Model
         return $this->hasMany(VendaItem::class);
     }
 
+    public function documentosFiscais(): HasMany
+    {
+        return $this->hasMany(DocumentoFiscal::class);
+    }
+
+    /** NFC-e autorizada da venda (para reimprimir o cupom fiscal). */
+    public function nfceAutorizada(): ?DocumentoFiscal
+    {
+        return $this->documentosFiscais
+            ->where('modelo', DocumentoFiscal::MODELO_NFCE)
+            ->where('status', DocumentoFiscal::STATUS_AUTORIZADO)
+            ->sortByDesc('id')
+            ->first();
+    }
+
     public function pagamentos(): HasMany
     {
         return $this->hasMany(Pagamento::class);

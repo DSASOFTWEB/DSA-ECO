@@ -161,6 +161,29 @@ class EscPosCupomBuilder
         return "\x1B\x45".($on ? "\x01" : "\x00");
     }
 
+    /**
+     * QR Code nativo da impressora (GS ( k): modelo 2, tamanho do módulo
+     * (1-16 pontos), correção de erro M, grava os dados e imprime.
+     */
+    protected function qrCode(string $dados, int $tamanhoModulo = 6): string
+    {
+        $tamanho = strlen($dados) + 3;
+
+        return "\x1D(k\x04\x00\x31\x41\x32\x00"                        // modelo 2
+            ."\x1D(k\x03\x00\x31\x43".chr(max(1, min(16, $tamanhoModulo))) // tamanho do módulo
+            ."\x1D(k\x03\x00\x31\x45\x31"                              // correção de erro M
+            ."\x1D(k".chr($tamanho % 256).chr(intdiv($tamanho, 256))."\x31\x50\x30".$dados // grava
+            ."\x1D(k\x03\x00\x31\x51\x30";                             // imprime
+    }
+
+    /** GS ! — 1 = normal, 2 = altura e largura dobradas. */
+    protected function cmdTamanhoTexto(int $fator): string
+    {
+        $n = max(0, min(7, $fator - 1));
+
+        return "\x1D\x21".chr(($n << 4) | $n);
+    }
+
     protected function cmdCut(): string
     {
         // GS V 0 — full cut

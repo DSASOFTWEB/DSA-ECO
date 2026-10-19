@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\ContratoController;
 use App\Http\Controllers\Admin\CortesiaController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DependenteController;
+use App\Http\Controllers\Admin\DocumentoFiscalController;
 use App\Http\Controllers\Admin\EmpresaController;
 use App\Http\Controllers\Admin\FinanceiroController;
 use App\Http\Controllers\Admin\FoodController;
@@ -179,6 +180,8 @@ Route::middleware('auth')->group(function () {
     Route::post('vendas/pix', [PdvPixController::class, 'store'])->name('vendas.pix.store');
     Route::get('vendas/pix/{cobrancaPix}/status', [PdvPixController::class, 'status'])->name('vendas.pix.status');
     Route::post('vendas/pix/{cobrancaPix}/cancelar', [PdvPixController::class, 'cancelar'])->name('vendas.pix.cancelar');
+    Route::get('fiscal/documentos/{documento}/danfce', [DocumentoFiscalController::class, 'danfce'])->name('fiscal.danfce');
+    Route::get('fiscal/documentos/{documento}/danfce.escpos', [DocumentoFiscalController::class, 'danfceEscpos'])->name('fiscal.danfce.escpos');
     Route::get('vendas/pix/{cobrancaPix}/imprimir', [PdvPixController::class, 'imprimir'])->name('vendas.pix.imprimir');
     Route::get('vendas/pix/{cobrancaPix}/imprimir.escpos', [PdvPixController::class, 'imprimirEscpos'])->name('vendas.pix.imprimir.escpos');
     Route::resource('vendas', VendaController::class)->only(['index', 'create', 'store', 'show']);

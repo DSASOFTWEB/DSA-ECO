@@ -314,6 +314,9 @@
                                         <td class="py-2 pr-3 font-mono text-xs text-slate-600">{{ $doc->recibo ?: '—' }}</td>
                                         <td class="py-2 pr-3 text-slate-700">R$ {{ number_format($doc->valor_total, 2, ',', '.') }}</td>
                                         <td class="py-2 text-right">
+                                            @if ($doc->modelo === \App\Models\DocumentoFiscal::MODELO_NFCE && $doc->status === \App\Models\DocumentoFiscal::STATUS_AUTORIZADO)
+                                                <a href="{{ route('fiscal.danfce', $doc) }}" target="_blank" class="mr-2 text-xs font-semibold text-emerald-700 hover:underline">🧾 Imprimir NFC-e</a>
+                                            @endif
                                             @if ($doc->modelo === 'nfse' && $doc->status === 'processando' && $doc->protocolo)
                                                 <form method="POST" action="{{ route('hospedagens.documentos-fiscais.consultar-lote-nfse', [$hospedagem, $doc]) }}" class="mb-1 inline">
                                                     @csrf

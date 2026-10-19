@@ -9,6 +9,9 @@
             <p class="text-sm text-slate-500">{{ $venda->cliente?->nome ?? 'Consumidor final' }} · vendedor {{ $venda->vendedor?->name ?? 'venda online' }} · <x-status-badge :status="$venda->status" /></p>
         </div>
         <div class="flex flex-wrap gap-2">
+            @if ($nfce = $venda->nfceAutorizada())
+                <a href="{{ route('fiscal.danfce', $nfce) }}" target="_blank" class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">🧾 Imprimir NFC-e nº {{ $nfce->numero }}</a>
+            @endif
             @if ($venda->status === 'pago' && $venda->ehEntradaAvulsa())
                 <a href="{{ route('vendas.voucher', $venda) }}" target="_blank" class="inline-flex items-center rounded-lg border border-cyan-300 px-4 py-2 text-sm font-medium text-cyan-700 hover:bg-cyan-50 dark:border-cyan-500/40 dark:text-cyan-400 dark:hover:bg-cyan-500/10">Baixar voucher (PDF)</a>
             @endif

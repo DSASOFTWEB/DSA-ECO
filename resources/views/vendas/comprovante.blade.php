@@ -276,6 +276,9 @@
             <button type="button" class="btn-print" id="btn-escpos" style="background:{{ $primarioEscpos || $modo === 'escpos' ? '#0f766e' : '#334155' }}">Imprimir ESC/POS</button>
             <a href="{{ $escposUrl }}" class="btn-muted" download>Baixar .bin ESC/POS</a>
         @endif
+        @if ($nfce = $venda->nfceAutorizada())
+            <a href="{{ route('fiscal.danfce', $nfce) }}" class="btn-print" style="background:#047857">🧾 Imprimir NFC-e nº {{ $nfce->numero }}</a>
+        @endif
         <a href="{{ route('vendas.create') }}" class="btn-print" style="background:#1d4ed8">Nova venda</a>
         @if ($venda->status === 'pago' && $venda->ehEntradaAvulsa())
             <a href="{{ route('vendas.voucher', $venda) }}" target="_blank">Baixar PDF voucher</a>
@@ -285,6 +288,12 @@
         <a href="{{ route('empresa.edit') }}" class="btn-muted" title="Configurar impressão">⚙ Impressão</a>
     </div>
     <p id="escpos-status" class="no-print" style="text-align:center;font-size:12px;color:#334155;margin:8px 0 0;font-family:system-ui,sans-serif"></p>
+    @if ($fiscal = session('fiscal'))
+        {{-- Resultado da NFC-e escolhida na finalização (F4) --}}
+        <p class="no-print" role="status" style="max-width:520px;margin:10px auto 0;padding:10px 14px;border-radius:10px;font:600 13px system-ui,sans-serif;text-align:center;{{ $fiscal['ok'] ? 'background:#dcfce7;color:#14532d;border:1px solid #86efac' : 'background:#fef2f2;color:#991b1b;border:1px solid #fecaca' }}">
+            {{ $fiscal['ok'] ? '✔' : '⚠' }} {{ $fiscal['mensagem'] }}
+        </p>
+    @endif
 
     <div class="cupom-preview">
         <div class="cupom-thermal" id="recibo">

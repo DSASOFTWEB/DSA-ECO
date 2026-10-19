@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\Venda;
 use App\Services\BarcodeService;
 use App\Services\CaixaService;
+use App\Services\Fiscal\VendaFiscalService;
 use App\Services\Impressao\EscPosCupomBuilder;
 use App\Services\QrCodeService;
 use App\Services\Relatorios\VoucherEntradaPdfExport;
@@ -72,10 +73,12 @@ class VendaController extends Controller
             'preco' => (float) $tipo->valor,
         ])->values();
 
-        $pixGatewayAtivo = (bool) Empresa::find($user->empresa_id)?->gatewayPixAtivo();
+        $empresa = Empresa::find($user->empresa_id);
+        $pixGatewayAtivo = (bool) $empresa?->gatewayPixAtivo();
+        $nfceHabilitada = (bool) $empresa?->nfceHabilitada();
         $formasPagamento = FormaPagamento::ativasDaEmpresa((int) $user->empresa_id);
 
-        return view('vendas.create', compact('produtos', 'tiposEntrada', 'caixaAberto', 'produtosJson', 'tiposEntradaJson', 'caixasDisponiveis', 'pixGatewayAtivo', 'formasPagamento'));
+        return view('vendas.create', compact('produtos', 'tiposEntrada', 'caixaAberto', 'produtosJson', 'tiposEntradaJson', 'caixasDisponiveis', 'pixGatewayAtivo', 'nfceHabilitada', 'formasPagamento'));
     }
 
     public function store(StoreVendaRequest $request): RedirectResponse
@@ -90,6 +93,16 @@ class VendaController extends Controller
             $venda = $this->vendaService->criar($request->validated(), $request->user(), $caixa);
         } catch (NegocioException $e) {
             return back()->withInput()->with('erro', $e->getMessage());
+        }
+
+        // "F4 emitir NFC-e" na finalização: autorizada, vai direto para o
+        // cupom fiscal (DANFE); se falhar, a venda segue e o comprovante avisa.
+        if ($request->boolean('emitir_nfce')) {
+            $fiscal = app(VendaFiscalService::class)->emitirAposVenda($venda, $request->user());
+
+            return redirect()
+                ->route(...($fiscal['ok'] ? ['fiscal.danfce', $fiscal['documento_id']] : ['vendas.comprovante', $venda]))
+                ->with('fiscal', $fiscal);
         }
 
         return redirect()->route('vendas.comprovante', $venda)->with('sucesso', 'Venda registrada com sucesso.');

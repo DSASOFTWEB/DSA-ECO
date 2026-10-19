@@ -66,70 +66,24 @@
         <div class="aviso">*** NÃO É COMPROVANTE DE PAGAMENTO ***</div>
     </div>
 
+    @include('partials.escpos-imprimir-script')
     <script>
         const MODO = @json($impressaoModo);
-        const ESCPOS_URL = @json(route('vendas.pix.imprimir.escpos', $cobranca));
-        const ESCPOS_AGENTE = @json($escposAgenteUrl);
-        const COLUNAS = @json((int) $escposColunas);
-        const statusEl = document.getElementById('status');
-        const setStatus = (msg) => { statusEl.textContent = msg || ''; };
+        const imprimirQr = () => imprimirEscPos({
+            url: @json(route('vendas.pix.imprimir.escpos', $cobranca)),
+            agente: @json($escposAgenteUrl),
+            colunas: @json((int) $escposColunas),
+            arquivo: 'pix-qrcode-{{ $cobranca->id }}.bin',
+            status: document.getElementById('status'),
+            botao: document.getElementById('btn-escpos'),
+        });
 
-        async function imprimirEscPos() {
-            const btn = document.getElementById('btn-escpos');
-            if (btn) btn.disabled = true;
-            try {
-                setStatus('Gerando QR Code ESC/POS...');
-                const res = await fetch(ESCPOS_URL, { credentials: 'same-origin' });
-                if (! res.ok) throw new Error('Falha ao gerar ESC/POS (HTTP ' + res.status + ')');
-                const bytes = new Uint8Array(await res.arrayBuffer());
-
-                if (ESCPOS_AGENTE) {
-                    let binario = '';
-                    for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-                    const ctrl = new AbortController();
-                    const timer = setTimeout(() => ctrl.abort(), 2500);
-                    try {
-                        const r = await fetch(ESCPOS_AGENTE.replace(/\/$/, '') + '/print', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ columns: COLUNAS, cut: true, payload_base64: btoa(binario) }),
-                            signal: ctrl.signal,
-                        });
-                        if (r.ok) { setStatus('QR Code enviado à impressora.'); return; }
-                    } catch (e) { /* agente fora do ar: tenta Web Serial */ } finally { clearTimeout(timer); }
-                }
-
-                if ('serial' in navigator) {
-                    try {
-                        setStatus('Selecione a porta serial da impressora...');
-                        const port = await navigator.serial.requestPort();
-                        await port.open({ baudRate: 9600 });
-                        const writer = port.writable.getWriter();
-                        try { await writer.write(bytes); } finally { writer.releaseLock(); await port.close(); }
-                        setStatus('QR Code enviado via Web Serial.');
-                        return;
-                    } catch (e) { /* cancelou a porta: cai no download */ }
-                }
-
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
-                a.download = 'pix-qrcode-{{ $cobranca->id }}.bin';
-                a.click();
-                URL.revokeObjectURL(a.href);
-                setStatus('Agente/Serial indisponíveis — arquivo .bin baixado.');
-            } catch (e) {
-                setStatus(e.message || 'Erro ao imprimir ESC/POS');
-            } finally {
-                if (btn) btn.disabled = false;
-            }
-        }
-
-        document.getElementById('btn-escpos')?.addEventListener('click', imprimirEscPos);
+        document.getElementById('btn-escpos')?.addEventListener('click', imprimirQr);
 
         // Imprime sozinho ao abrir; na impressão DOM fecha a janela depois.
         window.addEventListener('load', () => {
             if (MODO === 'escpos') {
-                imprimirEscPos();
+                imprimirQr();
                 return;
             }
             if (window.opener) window.addEventListener('afterprint', () => setTimeout(() => window.close(), 300));

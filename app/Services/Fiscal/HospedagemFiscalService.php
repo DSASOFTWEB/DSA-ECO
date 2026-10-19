@@ -88,7 +88,7 @@ class HospedagemFiscalService
                 'valor_total' => collect($itens)->sum(fn ($i) => round($i['quantidade'] * $i['valor_unitario'], 2)),
             ]);
 
-            return $this->nfce->emitir($empresa, $unidade, $hospedagem, $documento, $itens);
+            return $this->nfce->emitir($empresa, $unidade, $hospedagem->cliente, $hospedagem->forma_pagamento, $documento, $itens);
         });
     }
 

@@ -31,7 +31,7 @@ class DocumentoFiscal extends Model
     protected $table = 'documentos_fiscais';
 
     protected $fillable = [
-        'empresa_id', 'unidade_id', 'hospedagem_id', 'cliente_id', 'emitido_por_id',
+        'empresa_id', 'unidade_id', 'hospedagem_id', 'venda_id', 'cliente_id', 'emitido_por_id',
         'modelo', 'origem', 'ambiente', 'status', 'serie', 'numero', 'chave', 'protocolo', 'recibo',
         'valor_total', 'forma_pagamento', 'xml', 'xml_protocolado', 'xml_path', 'xml_envio_path', 'link',
         'itens', 'retorno', 'mensagem_erro', 'autorizado_em',
@@ -50,6 +50,11 @@ class DocumentoFiscal extends Model
     public function hospedagem(): BelongsTo
     {
         return $this->belongsTo(Hospedagem::class);
+    }
+
+    public function venda(): BelongsTo
+    {
+        return $this->belongsTo(Venda::class);
     }
 
     public function cliente(): BelongsTo

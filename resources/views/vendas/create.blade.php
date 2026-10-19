@@ -117,6 +117,13 @@
 .pdv-modal__actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
 .pdv-btn { border-radius:8px; border:1px solid var(--pdv-border); background:#fff; padding:8px 12px; font-weight:600; }
 .pdv-btn--primary { background:var(--pdv-blue); border-color:var(--pdv-blue); color:#fff; }
+.pdv-fiscal-opcao { display:flex; flex-direction:column; align-items:flex-start; gap:2px; border-radius:10px; border:2px solid var(--pdv-border); background:#fff; padding:14px; text-align:left; }
+.pdv-fiscal-opcao:hover, .pdv-fiscal-opcao:focus { border-color:var(--pdv-blue); outline:none; }
+.pdv-fiscal-opcao strong { font-size:16px; }
+.pdv-fiscal-opcao small { color:var(--pdv-muted); font-size:12px; }
+.pdv-fiscal-opcao kbd { border-radius:6px; background:#0f172a; color:#fff; padding:2px 8px; font-size:12px; font-weight:700; }
+.pdv-fiscal-opcao--nfce { border-color:#16a34a; background:#f0fdf4; }
+.pdv-fiscal-opcao--nfce kbd { background:#16a34a; }
 .pdv-pix { max-width:440px; }
 .pdv-pix__estado { display:flex; flex-direction:column; align-items:center; gap:8px; padding:24px 8px; text-align:center; color:var(--pdv-muted); }
 .pdv-pix__estado--ok strong { color:var(--pdv-green); font-size:16px; }
@@ -494,8 +501,32 @@
                         </template>
                     </div>
                     <div class="pdv-modal__actions">
-                        <button type="button" class="pdv-btn" @click="dlgTroco = false">Voltar</button>
+                        <button type="button" class="pdv-btn" @click="dlgTroco = false; fiscalDecidido = false">Voltar</button>
                         <button type="button" class="pdv-btn pdv-btn--primary" :disabled="valorRecebido + 0.001 < total" @click="enviarFormulario()">Confirmar</button>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Modal fiscal: emitir NFC-e (F4) ou apenas pedido (F2) --}}
+            <div class="pdv-modal" x-show="dlgFiscal" x-cloak>
+                <div class="pdv-modal__card" @click.outside="cancelarFiscal()">
+                    <h3>Como deseja finalizar?</h3>
+                    <div class="pdv-resumo__linha"><span>Total</span><strong x-text="formatar(total)"></strong></div>
+                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                        <button type="button" class="pdv-fiscal-opcao pdv-fiscal-opcao--nfce" @click="escolherFiscal(true)" x-ref="botaoNfce">
+                            <kbd>F4</kbd>
+                            <strong>Emitir NFC-e</strong>
+                            <small>Cupom fiscal dos produtos</small>
+                        </button>
+                        <button type="button" class="pdv-fiscal-opcao" @click="escolherFiscal(false)">
+                            <kbd>F2</kbd>
+                            <strong>Apenas pedido</strong>
+                            <small>Sem nota fiscal</small>
+                        </button>
+                    </div>
+                    <p class="mt-2 text-xs text-slate-500">Ingressos e serviços não entram na NFC-e — só os produtos da venda.</p>
+                    <div class="pdv-modal__actions">
+                        <button type="button" class="pdv-btn" @click="cancelarFiscal()">Voltar <small>Esc</small></button>
                     </div>
                 </div>
             </div>
@@ -579,6 +610,7 @@
                 <input type="hidden" name="cliente_id" x-bind:value="cliente?.id ?? ''">
                 <input type="hidden" name="forma_pagamento" x-bind:value="formaPagamento">
                 <input type="hidden" name="forma_pagamento_id" x-bind:value="formaPagamentoId">
+                <input type="hidden" name="emitir_nfce" x-bind:value="emitirNfce ? 1 : 0">
                 <input type="hidden" name="observacao" x-bind:value="observacaoComTroco">
                 <template x-for="(item, indice) in itensParaEnvio" :key="'campo-' + item.chave">
                     <span>
@@ -621,6 +653,10 @@
                         dlgDesconto: false,
                         dlgDescontoItem: false,
                         dlgTroco: false,
+                        nfceHabilitada: @json($nfceHabilitada),
+                        dlgFiscal: false,
+                        emitirNfce: false,
+                        fiscalDecidido: false,
                         pixGatewayAtivo: @json($pixGatewayAtivo),
                         dlgPix: false,
                         pix: null,
@@ -871,8 +907,33 @@
                             this.sugestaoIdx = Math.max(0, Math.min(max, this.sugestaoIdx + delta));
                         },
 
+                        // Pergunta "F4 NFC-e / F2 apenas pedido" só quando a empresa emite
+                        // NFC-e e a venda tem produto (ingresso/serviço não entra na nota).
+                        get precisaPerguntarFiscal() {
+                            return this.nfceHabilitada && this.itens.some((i) => i.tipo === 'produto');
+                        },
+
+                        escolherFiscal(emitir) {
+                            this.emitirNfce = emitir;
+                            this.fiscalDecidido = true;
+                            this.dlgFiscal = false;
+                            this.$nextTick(() => this.finalizar());
+                        },
+
+                        cancelarFiscal() {
+                            this.dlgFiscal = false;
+                            this.fiscalDecidido = false;
+                            this.emitirNfce = false;
+                        },
+
                         finalizar() {
                             if (this.itens.length === 0 || this.salvando) return;
+                            if (this.precisaPerguntarFiscal && ! this.fiscalDecidido) {
+                                this.dlgFiscal = true;
+                                this.$nextTick(() => this.$refs.botaoNfce?.focus());
+                                return;
+                            }
+                            if (! this.precisaPerguntarFiscal) this.emitirNfce = false;
                             if (this.formaPagamento === 'dinheiro') {
                                 if (! this.valorRecebido || this.valorRecebido < this.total) this.valorRecebido = this.total;
                                 this.dlgTroco = true;
@@ -987,6 +1048,7 @@
                         fecharPix() {
                             this.pararPolling();
                             this.dlgPix = false;
+                            this.fiscalDecidido = false;
                             this.pix = null;
                             this.pixFalha = '';
                         },
@@ -1008,6 +1070,12 @@
                             const emCampoTexto = ['INPUT', 'TEXTAREA', 'SELECT'].includes(alvo.tagName);
                             if (this.dlgPix) {
                                 if (['F2', 'F4', 'F6', 'F7', 'Escape'].includes(evento.key)) evento.preventDefault();
+                                return;
+                            }
+                            if (this.dlgFiscal) {
+                                if (evento.key === 'F4') { evento.preventDefault(); this.escolherFiscal(true); }
+                                else if (evento.key === 'F2') { evento.preventDefault(); this.escolherFiscal(false); }
+                                else if (evento.key === 'Escape') { evento.preventDefault(); this.cancelarFiscal(); }
                                 return;
                             }
                             if (evento.key === 'F2') { evento.preventDefault(); this.iniciarVenda(); return; }

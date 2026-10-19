@@ -60,6 +60,7 @@ class FecharAtendimentoRequest extends FormRequest
                 ->where('empresa_id', $this->user()->empresa_id)->where('ativo', true)],
             'pagamentos.*.forma' => ['required', Rule::in(array_keys(FormaPagamento::TIPOS))],
             'pagamentos.*.valor' => ['required', 'numeric', 'gt:0'],
+            'emitir_nfce' => ['sometimes', 'boolean'],
         ];
     }
 

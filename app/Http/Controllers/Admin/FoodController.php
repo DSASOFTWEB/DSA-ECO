@@ -16,6 +16,7 @@ use App\Models\FormaPagamento;
 use App\Models\PontoAtendimento;
 use App\Models\Produto;
 use App\Models\Unidade;
+use App\Services\Fiscal\VendaFiscalService;
 use App\Services\Food\AtendimentoService;
 use App\Services\Impressao\ContaAtendimentoEscPosBuilder;
 use Illuminate\Http\RedirectResponse;
@@ -94,8 +95,11 @@ class FoodController extends Controller
             ->whereNotIn('status', ['reservada', 'bloqueada'])->orderBy('tipo')->orderBy('numero')->get();
         $caixas = Caixa::where('unidade_id', $atendimento->unidade_id)->where('status', 'aberto')->with('terminal')->get();
         $formasPagamento = FormaPagamento::ativasDaEmpresa((int) $atendimento->empresa_id);
+        // Pergunta "F4 NFC-e / F2 apenas pedido" só se der para emitir e houver mercadoria.
+        $perguntarNfce = (bool) $atendimento->empresa?->nfceHabilitada()
+            && $atendimento->itens->contains(fn ($item) => $item->status === 'ativo' && $item->produto && $item->produto->tipo_item !== Produto::TIPO_SERVICO);
 
-        return view('food.atendimento', compact('atendimento', 'produtos', 'categorias', 'destinos', 'caixas', 'formasPagamento'));
+        return view('food.atendimento', compact('atendimento', 'produtos', 'categorias', 'destinos', 'caixas', 'formasPagamento', 'perguntarNfce'));
     }
 
     public function adicionarItem(StoreAtendimentoItemRequest $request, Atendimento $atendimento): RedirectResponse
@@ -140,6 +144,17 @@ class FoodController extends Controller
         }
 
         $atendimento = $this->atendimentos->fechar($atendimento, $request->validated(), $request->user());
+
+        // "F4 emitir NFC-e" na finalização: autorizada, vai direto para o
+        // cupom fiscal (DANFE). Falha fiscal não reabre a conta.
+        if ($request->boolean('emitir_nfce') && $atendimento->venda) {
+            $fiscal = app(VendaFiscalService::class)->emitirAposVenda($atendimento->venda, $request->user());
+
+            return redirect()
+                ->route(...($fiscal['ok'] ? ['fiscal.danfce', $fiscal['documento_id']] : ['vendas.show', $atendimento->venda_id]))
+                ->with('sucesso', 'Conta fechada e lançada no caixa.')
+                ->with('fiscal', $fiscal);
+        }
 
         return redirect()->route('vendas.show', $atendimento->venda_id)->with('sucesso', 'Conta fechada e lançada no caixa.');
     }

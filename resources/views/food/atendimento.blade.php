@@ -175,6 +175,7 @@
         subtotal: {{ (float) $atendimento->subtotal }},
         formas: {{ Js::from(($formasPagamento ?? collect())->map->paraTela()->values()) }},
         pixUrl: @js(route('food.atendimentos.pix', $atendimento)),
+        perguntarNfce: @json($perguntarNfce ?? false),
     })"
     x-cloak
 >
@@ -369,11 +370,12 @@
     </div>
 
     {{-- Modal fechar --}}
-    <div class="food-modal" x-show="painel === 'fechar'" x-transition @keydown.escape.window="if (! fech.pixAberto) painel = null">
-        <div class="food-modal__card" @click.outside="if (! fech.pixAberto) painel = null">
+    <div class="food-modal" x-show="painel === 'fechar'" x-transition @keydown.window="fech.teclaFiscal($event)" @keydown.escape.window="if (! fech.pixAberto && ! fech.etapaFiscal) painel = null">
+        <div class="food-modal__card" @click.outside="if (! fech.pixAberto && ! fech.etapaFiscal) painel = null">
             <h3>Fechar {{ strtolower($rotulo) }}</h3>
-            <form method="POST" action="{{ route('food.atendimentos.fechar', $atendimento) }}" class="space-y-3" id="form-fechar" x-show="! fech.pixAberto" @submit="fech.confirmar($event)">
+            <form method="POST" action="{{ route('food.atendimentos.fechar', $atendimento) }}" class="space-y-3" id="form-fechar" x-show="! fech.pixAberto && ! fech.etapaFiscal" @submit="fech.confirmar($event)">
                 @csrf
+                <input type="hidden" name="emitir_nfce" :value="fech.emitirNfce ? 1 : 0">
                 <label class="block text-sm font-medium">Caixa
                     <select name="caixa_id" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
                         @if($caixas->count() !== 1)<option value="">Selecione</option>@endif
@@ -412,6 +414,27 @@
             </form>
 
             {{-- Recebimento Pix integrado --}}
+            {{-- Etapa fiscal: emitir NFC-e (F4) ou apenas pedido (F2) --}}
+            <div x-show="fech.etapaFiscal" x-cloak class="space-y-3">
+                <p class="text-sm text-slate-600">Total: <strong>R$ <span x-text="fech.total.replace('.', ',')"></span></strong> — como deseja finalizar?</p>
+                <div class="grid gap-2 sm:grid-cols-2">
+                    <button type="button" @click="fech.escolherFiscal(true)" class="flex flex-col items-start gap-0.5 rounded-xl border-2 border-emerald-500 bg-emerald-50 p-3 text-left hover:bg-emerald-100">
+                        <kbd class="rounded bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">F4</kbd>
+                        <strong class="text-base text-slate-900">Emitir NFC-e</strong>
+                        <small class="text-xs text-slate-500">Cupom fiscal dos produtos</small>
+                    </button>
+                    <button type="button" @click="fech.escolherFiscal(false)" class="flex flex-col items-start gap-0.5 rounded-xl border-2 border-slate-300 bg-white p-3 text-left hover:border-slate-500">
+                        <kbd class="rounded bg-slate-800 px-2 py-0.5 text-xs font-bold text-white">F2</kbd>
+                        <strong class="text-base text-slate-900">Apenas pedido</strong>
+                        <small class="text-xs text-slate-500">Sem nota fiscal</small>
+                    </button>
+                </div>
+                <p class="text-xs text-slate-500">A taxa de serviço não entra na NFC-e — só os produtos consumidos.</p>
+                <div class="food-modal__actions">
+                    <button type="button" class="food-acao" @click="fech.cancelarFiscal()">Voltar <small>Esc</small></button>
+                </div>
+            </div>
+
             @include('partials.pix-recebimento', ['alvo' => 'fech'])
         </div>
     </div>
@@ -422,7 +445,7 @@
 @push('scripts')
 @include('partials.pix-recebimento-script')
 <script>
-function foodFechamento({ subtotal, formas, pixUrl }) {
+function foodFechamento({ subtotal, formas, pixUrl, perguntarNfce }) {
     return {
         ...pixRecebimento({ url: pixUrl, formId: 'form-fechar' }),
         subtotal,
@@ -431,13 +454,49 @@ function foodFechamento({ subtotal, formas, pixUrl }) {
         taxa: 10,
         formaId: formas[0]?.id ?? null,
         enviando: false,
+        // "F4 emitir NFC-e / F2 apenas pedido": só quando a empresa emite NFC-e
+        // e a conta tem produto (calculado no servidor).
+        perguntarNfce,
+        etapaFiscal: false,
+        fiscalDecidido: false,
+        emitirNfce: false,
         get forma() {
             return this.formas.find((f) => f.id === this.formaId) || null;
         },
         get total() {
             return Math.max(0, this.subtotal + this.subtotal * this.taxa / 100 - this.desconto).toFixed(2);
         },
+        escolherFiscal(emitir) {
+            this.emitirNfce = emitir;
+            this.fiscalDecidido = true;
+            this.etapaFiscal = false;
+            // Reenvia o formulário já com a escolha (passa de novo por confirmar()).
+            this.$nextTick(() => document.getElementById('form-fechar')?.requestSubmit());
+        },
+        cancelarFiscal() {
+            this.etapaFiscal = false;
+            this.fiscalDecidido = false;
+        },
+        teclaFiscal(evento) {
+            if (! this.etapaFiscal) return;
+            if (evento.key === 'F4') { evento.preventDefault(); this.escolherFiscal(true); }
+            else if (evento.key === 'F2') { evento.preventDefault(); this.escolherFiscal(false); }
+            // Adiado: o Esc do modal (mesmo evento) ainda vê a etapa fiscal aberta e não fecha tudo.
+            else if (evento.key === 'Escape') { evento.preventDefault(); setTimeout(() => this.cancelarFiscal(), 0); }
+        },
+        fecharPix() {
+            this.pararPolling();
+            this.pixAberto = false;
+            this.pix = null;
+            this.pixFalha = '';
+            this.fiscalDecidido = false;
+        },
         confirmar(evento) {
+            if (this.perguntarNfce && ! this.fiscalDecidido) {
+                evento.preventDefault();
+                this.etapaFiscal = true;
+                return;
+            }
             if (this.forma?.integrado) {
                 evento.preventDefault();
                 this.gerarPix();
@@ -448,12 +507,12 @@ function foodFechamento({ subtotal, formas, pixUrl }) {
     };
 }
 
-function foodLancamento({ produtos, emAndamento, subtotal, formas, pixUrl }) {
+function foodLancamento({ produtos, emAndamento, subtotal, formas, pixUrl, perguntarNfce }) {
     return {
         produtos,
         emAndamento,
         subtotal,
-        fech: foodFechamento({ subtotal, formas: formas || [], pixUrl }),
+        fech: foodFechamento({ subtotal, formas: formas || [], pixUrl, perguntarNfce }),
         categoriaId: null,
         busca: '',
         quantidade: 1,

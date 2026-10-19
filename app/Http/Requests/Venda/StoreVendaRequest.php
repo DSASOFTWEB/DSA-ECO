@@ -23,6 +23,7 @@ class StoreVendaRequest extends FormRequest
             'cliente_id' => ['nullable', Rule::exists('clientes', 'id')->where('empresa_id', $this->user()->empresa_id)],
             ...$this->regrasFormaPagamento(),
             'observacao' => ['nullable', 'string', 'max:1000'],
+            'emitir_nfce' => ['sometimes', 'boolean'],
             'itens' => ['required', 'array', 'min:1'],
             'itens.*.produto_id' => ['nullable', 'exists:produtos,id'],
             'itens.*.tipo_entrada_id' => ['nullable', 'exists:tipos_entrada,id'],

@@ -122,6 +122,9 @@ class PdvPixController extends Controller
 
         if (isset($resposta['redirect']) && $cobrancaPix->hospedagem_id) {
             $this->avisarCheckout($cobrancaPix);
+        } elseif (isset($resposta['redirect'], $cobrancaPix->dados_venda['fiscal_venda'])) {
+            // NFC-e da venda (F4) emitida após a confirmação do Pix.
+            session()->flash('fiscal', $cobrancaPix->dados_venda['fiscal_venda']);
         }
 
         return response()->json($resposta);
@@ -234,6 +237,8 @@ class PdvPixController extends Controller
             'redirect' => match (true) {
                 (bool) $cobranca->hospedagem_id => $this->pdvPixService->concluida($cobranca) ? route('hospedagens.show', $cobranca->hospedagem_id) : null,
                 ! $cobranca->venda_id => null,
+                // NFC-e (F4) autorizada após o Pix: vai direto para o cupom fiscal.
+                ! empty($cobranca->dados_venda['fiscal_venda']['documento_id']) => route('fiscal.danfce', $cobranca->dados_venda['fiscal_venda']['documento_id']),
                 (bool) $cobranca->atendimento_id => route('vendas.show', $cobranca->venda_id),
                 default => route('vendas.comprovante', $cobranca->venda_id),
             },

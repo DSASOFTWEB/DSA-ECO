@@ -4,6 +4,8 @@
         ['message' => session('erro') ?? session('error'), 'type' => 'danger', 'title' => 'Não foi possível concluir'],
         ['message' => session('aviso') ?? session('warning'), 'type' => 'warning', 'title' => 'Atenção'],
         ['message' => session('info'), 'type' => 'info', 'title' => 'Informação'],
+        // Resultado da NFC-e escolhida na finalização (F4): ['ok' => bool, 'mensagem' => string]
+        ['message' => session('fiscal')['mensagem'] ?? null, 'type' => (session('fiscal')['ok'] ?? false) ? 'success' : 'warning', 'title' => 'NFC-e'],
     ], fn ($alert) => filled($alert['message']));
 @endphp
 <div class="mb-6 space-y-3" aria-live="polite">

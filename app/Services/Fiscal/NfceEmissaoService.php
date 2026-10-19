@@ -6,8 +6,9 @@ use App\Exceptions\IntegrationException;
 use App\Exceptions\NegocioException;
 use App\Models\DocumentoFiscal;
 use App\Models\Empresa;
-use App\Models\Hospedagem;
+use App\Models\Cliente;
 use App\Models\Unidade;
+use App\Support\Documento;
 use NFePHP\NFe\Common\Standardize;
 use NFePHP\NFe\Complements;
 use NFePHP\NFe\Make;
@@ -15,7 +16,8 @@ use NFePHP\NFe\Tools;
 use stdClass;
 
 /**
- * Monta e transmite NFC-e (modelo 65) dos consumos de produto da hospedagem.
+ * Monta e transmite NFC-e (modelo 65) de mercadorias: consumos de produto da
+ * hospedagem ou produtos de uma venda (PDV, mesa e comanda).
  */
 class NfceEmissaoService
 {
@@ -27,10 +29,10 @@ class NfceEmissaoService
     /**
      * @param  list<array{descricao:string, quantidade:float|int, valor_unitario:float, ncm?:?string, cfop?:?string, cst_icms?:?string, csosn?:?string, origem?:?int, unidade?:string, ean?:?string}>  $itens
      */
-    public function emitir(Empresa $empresa, Unidade $unidade, Hospedagem $hospedagem, DocumentoFiscal $documento, array $itens): DocumentoFiscal
+    public function emitir(Empresa $empresa, Unidade $unidade, ?Cliente $cliente, ?string $formaPagamento, DocumentoFiscal $documento, array $itens): DocumentoFiscal
     {
         if ($itens === []) {
-            throw new NegocioException('Não há consumos de produto para emitir NFC-e nesta hospedagem.');
+            throw new NegocioException('Não há produtos para emitir NFC-e.');
         }
 
         if (! filled($empresa->csc) || ! filled($empresa->csc_id)) {
@@ -50,7 +52,7 @@ class NfceEmissaoService
         $numero = $this->proximoNumero($empresa);
         $serie = (int) ($empresa->numero_serie_nfce ?: 1);
 
-        $xml = $this->montarXml($empresa, $unidade, $hospedagem, $itens, $serie, $numero, (string) $cMun);
+        $xml = $this->montarXml($empresa, $unidade, $cliente, $formaPagamento, $itens, $serie, $numero, (string) $cMun);
         $assinado = $tools->signNFe($xml);
         $xmlEnvioPath = $this->xmlStorage->salvarEnvio($documento, $assinado);
 
@@ -61,7 +63,7 @@ class NfceEmissaoService
             'xml' => $assinado,
             'xml_envio_path' => $xmlEnvioPath,
             'itens' => $itens,
-            'valor_total' => collect($itens)->sum(fn ($i) => round(((float) $i['quantidade']) * ((float) $i['valor_unitario']), 2)),
+            'valor_total' => self::totalItens($itens),
         ]);
 
         try {
@@ -162,7 +164,8 @@ class NfceEmissaoService
     protected function montarXml(
         Empresa $empresa,
         Unidade $unidade,
-        Hospedagem $hospedagem,
+        ?Cliente $cliente,
+        ?string $formaPagamento,
         array $itens,
         int $serie,
         int $numero,
@@ -220,23 +223,36 @@ class NfceEmissaoService
         $ender->xPais = 'BRASIL';
         $make->tagenderEmit($ender);
 
-        $cliente = $hospedagem->cliente;
-        $cpf = preg_replace('/\D+/', '', (string) ($cliente?->cpf ?? ''));
-        if (strlen((string) $cpf) === 11) {
+        // Sem cliente (ou com CPF/CNPJ inválido) a nota vai para consumidor
+        // final, sem a tag <dest> — CPF errado faria a SEFAZ rejeitar a nota.
+        $documentoCliente = Documento::somenteDigitos($cliente?->cpf);
+        $temCpf = Documento::cpfValido($documentoCliente);
+        $temCnpj = ! $temCpf && Documento::cnpjValido($documentoCliente);
+        if ($temCpf || $temCnpj) {
             $dest = new stdClass;
-            $dest->xNome = substr((string) $cliente->nome, 0, 60);
-            $dest->CPF = $cpf;
+            // Em homologação a SEFAZ exige este nome no destinatário.
+            $dest->xNome = $tpAmb === 2
+                ? 'NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL'
+                : substr((string) $cliente->nome, 0, 60);
+            if ($temCpf) {
+                $dest->CPF = $documentoCliente;
+            } else {
+                $dest->CNPJ = $documentoCliente;
+            }
             $dest->indIEDest = 9;
             $make->tagdest($dest);
         }
 
         $vProd = 0.0;
-        foreach ($itens as $i => $item) {
+        $vDesc = 0.0;
+        foreach (array_values($itens) as $i => $item) {
             $nItem = $i + 1;
             $qCom = (float) $item['quantidade'];
             $vUn = round((float) $item['valor_unitario'], 2);
             $vItem = round($qCom * $vUn, 2);
+            $vDescItem = round(min($vItem, max(0, (float) ($item['desconto'] ?? 0))), 2);
             $vProd += $vItem;
+            $vDesc += $vDescItem;
 
             $prod = new stdClass;
             $prod->item = $nItem;
@@ -253,6 +269,9 @@ class NfceEmissaoService
             $prod->uTrib = $prod->uCom;
             $prod->qTrib = $prod->qCom;
             $prod->vUnTrib = $prod->vUnCom;
+            if ($vDescItem > 0) {
+                $prod->vDesc = number_format($vDescItem, 2, '.', '');
+            }
             $prod->indTot = 1;
             $make->tagprod($prod);
 
@@ -266,7 +285,7 @@ class NfceEmissaoService
                 $icms->orig = (int) ($item['origem'] ?? 0);
                 $icms->CST = (string) ($item['cst_icms'] ?? '00');
                 $icms->modBC = 3;
-                $icms->vBC = number_format($vItem, 2, '.', '');
+                $icms->vBC = number_format($vItem - $vDescItem, 2, '.', '');
                 $icms->pICMS = number_format((float) ($item['aliq_icms'] ?? 0), 2, '.', '');
                 $icms->vICMS = '0.00';
                 $make->tagICMS($icms);
@@ -307,14 +326,14 @@ class NfceEmissaoService
         $total->vProd = number_format($vProd, 2, '.', '');
         $total->vFrete = '0.00';
         $total->vSeg = '0.00';
-        $total->vDesc = '0.00';
+        $total->vDesc = number_format($vDesc, 2, '.', '');
         $total->vII = '0.00';
         $total->vIPI = '0.00';
         $total->vIPIDevol = '0.00';
         $total->vPIS = '0.00';
         $total->vCOFINS = '0.00';
         $total->vOutro = '0.00';
-        $total->vNF = number_format($vProd, 2, '.', '');
+        $total->vNF = number_format($vProd - $vDesc, 2, '.', '');
         $make->tagICMSTot($total);
 
         $transp = new stdClass;
@@ -326,8 +345,8 @@ class NfceEmissaoService
         $make->tagpag($pag);
 
         $detPag = new stdClass;
-        $detPag->tPag = $this->mapaFormaPagamento($hospedagem->forma_pagamento);
-        $detPag->vPag = number_format($vProd, 2, '.', '');
+        $detPag->tPag = $this->mapaFormaPagamento($formaPagamento);
+        $detPag->vPag = number_format($vProd - $vDesc, 2, '.', '');
         $make->tagdetPag($detPag);
 
         if (filled($empresa->observacao_padrao_nfce)) {
@@ -342,6 +361,16 @@ class NfceEmissaoService
         }
 
         return $make->getXML();
+    }
+
+    /** Valor da nota: quantidade × unitário − desconto de cada item. */
+    public static function totalItens(array $itens): float
+    {
+        return round(collect($itens)->sum(function ($i) {
+            $bruto = round(((float) $i['quantidade']) * ((float) $i['valor_unitario']), 2);
+
+            return $bruto - min($bruto, max(0, (float) ($i['desconto'] ?? 0)));
+        }), 2);
     }
 
     protected function mapaFormaPagamento(?string $forma): string

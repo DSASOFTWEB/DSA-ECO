@@ -9,7 +9,9 @@ use App\Models\CobrancaPix;
 use App\Models\Empresa;
 use App\Models\Hospedagem;
 use App\Models\User;
+use App\Models\Venda;
 use App\Services\Fiscal\HospedagemFiscalService;
+use App\Services\Fiscal\VendaFiscalService;
 use App\Services\Food\AtendimentoService;
 use App\Services\Integrations\Pix\GatewayPix;
 use App\Services\Integrations\Pix\GatewayPixResolver;
@@ -30,6 +32,7 @@ class PdvPixService
         protected AtendimentoService $atendimentoService,
         protected HospedagemService $hospedagemService,
         protected HospedagemFiscalService $hospedagemFiscalService,
+        protected VendaFiscalService $vendaFiscalService,
     ) {}
 
     public function iniciar(array $dadosVenda, User $operador, Caixa $caixa): CobrancaPix
@@ -144,11 +147,12 @@ class PdvPixService
         }
 
         if ($cobranca->estaPaga() && ! $this->concluida($cobranca)) {
-            $hospedagemFinalizada = $this->registrarVenda($cobranca);
-
-            if ($hospedagemFinalizada) {
-                $this->emitirNotasHospedagem($cobranca->fresh());
-            }
+            // Notas fiscais saem fora da transação (chamada à SEFAZ).
+            match ($this->registrarVenda($cobranca)) {
+                'hospedagem' => $this->emitirNotasHospedagem($cobranca->fresh()),
+                'venda' => $this->emitirNfceVenda($cobranca->fresh()),
+                default => null,
+            };
         }
 
         return $cobranca->fresh();
@@ -229,22 +233,22 @@ class PdvPixService
     }
 
     /**
-     * @return bool true quando finalizou uma hospedagem nesta chamada
-     *              (as notas fiscais são emitidas fora da transação).
+     * @return string|null o que foi concluído nesta chamada: "hospedagem" ou
+     *                     "venda" (para emitir as notas fora da transação).
      */
-    protected function registrarVenda(CobrancaPix $cobranca): bool
+    protected function registrarVenda(CobrancaPix $cobranca): ?string
     {
-        return DB::transaction(function () use ($cobranca): bool {
+        return DB::transaction(function () use ($cobranca): ?string {
             $travada = CobrancaPix::whereKey($cobranca->id)->lockForUpdate()->first();
 
             if (! $travada || $this->concluida($travada)) {
-                return false;
+                return null;
             }
 
             if (! $travada->caixa || ! $travada->usuario) {
                 $travada->update(['erro' => 'O caixa ou o operador desta cobrança não existe mais. Registre a venda manualmente.']);
 
-                return false;
+                return null;
             }
 
             $pagamentoGateway = [
@@ -264,7 +268,7 @@ class PdvPixService
                     );
                     $travada->update(['erro' => null]);
 
-                    return true;
+                    return 'hospedagem';
                 }
 
                 if ($travada->atendimento_id) {
@@ -282,12 +286,12 @@ class PdvPixService
             } catch (NegocioException $e) {
                 $travada->update(['erro' => $e->getMessage()]);
 
-                return false;
+                return null;
             }
 
             $travada->update(['venda_id' => $vendaId, 'erro' => null]);
 
-            return false;
+            return 'venda';
         });
     }
 
@@ -311,6 +315,27 @@ class PdvPixService
         );
 
         $cobranca->update(['dados_venda' => array_merge($dados, ['fiscal' => $resultado])]);
+    }
+
+    /**
+     * "F4 emitir NFC-e" escolhido antes de gerar o QR (PDV ou mesa): a nota
+     * sai agora que a venda existe. O resultado fica na cobrança para a tela
+     * mostrar quando redirecionar.
+     */
+    protected function emitirNfceVenda(CobrancaPix $cobranca): void
+    {
+        $dados = $cobranca->dados_venda;
+
+        if (empty($dados['emitir_nfce']) || ! $cobranca->venda_id || ! $cobranca->usuario) {
+            return;
+        }
+
+        $resultado = $this->vendaFiscalService->emitirAposVenda(
+            Venda::withoutGlobalScopes()->findOrFail($cobranca->venda_id),
+            $cobranca->usuario,
+        );
+
+        $cobranca->update(['dados_venda' => array_merge($dados, ['fiscal_venda' => $resultado])]);
     }
 
     protected function gatewayDaCobranca(CobrancaPix $cobranca): GatewayPix

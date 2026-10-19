@@ -142,8 +142,9 @@
 
         document.getElementById('btn-escpos')?.addEventListener('click', imprimirDanfce);
 
-        // Imprime sozinho ao abrir (como o cupom do PDV).
+        // Imprime sozinho ao abrir (como o cupom do PDV); ?ver=1 só mostra.
         window.addEventListener('load', () => {
+            if (new URLSearchParams(window.location.search).has('ver')) return;
             if (MODO === 'escpos') { imprimirDanfce(); return; }
             setTimeout(() => window.print(), 250);
         });

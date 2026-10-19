@@ -92,6 +92,54 @@ class EvolutionApiService
         );
     }
 
+    public function configurada(): bool
+    {
+        return filled($this->baseUrl) && filled($this->apiKey) && filled($this->instancia);
+    }
+
+    /**
+     * Envia um arquivo (ex.: ZIP do fechamento fiscal) como documento do
+     * WhatsApp. $base64 = conteúdo do arquivo em base64.
+     *
+     * @throws IntegrationException
+     */
+    public function enviarDocumento(string $numero, string $base64, string $nomeArquivo, string $mimetype, string $legenda = ''): array
+    {
+        if (! $this->configurada()) {
+            throw new IntegrationException(
+                'Evolution API não configurada (EVOLUTION_API_URL/EVOLUTION_API_KEY ausentes).',
+                servico: 'evolution-api',
+            );
+        }
+
+        $client = $this->client(max($this->timeout, 60));
+
+        return $this->comRetry(
+            servico: 'evolution-api',
+            operacao: "enviarDocumento:{$numero}",
+            requisicao: function () use ($client, $numero, $base64, $nomeArquivo, $mimetype, $legenda) {
+                $resposta = $client->post("{$this->baseUrl}/message/sendMedia/{$this->instancia}", [
+                    'headers' => [
+                        'apikey' => $this->apiKey,
+                        'Content-Type' => 'application/json',
+                    ],
+                    'json' => [
+                        'number' => $numero,
+                        'mediatype' => 'document',
+                        'mimetype' => $mimetype,
+                        'caption' => $legenda,
+                        'media' => $base64,
+                        'fileName' => $nomeArquivo,
+                    ],
+                ]);
+
+                return json_decode((string) $resposta->getBody(), true) ?? [];
+            },
+            maxTentativas: $this->maxTentativas,
+            delayMs: $this->delayMs,
+        );
+    }
+
     /**
      * Consulta o status de conexão da instância (útil para o painel admin
      * avisar "WhatsApp desconectado" antes de tentar disparar cobranças).

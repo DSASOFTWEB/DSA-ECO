@@ -22,6 +22,7 @@ use App\Http\Controllers\Admin\FormaPagamentoController;
 use App\Http\Controllers\Admin\HospedagemController;
 use App\Http\Controllers\Admin\MensalidadeController;
 use App\Http\Controllers\Admin\MovimentacaoController;
+use App\Http\Controllers\Admin\NfceRelatorioController;
 use App\Http\Controllers\Admin\PlanoController;
 use App\Http\Controllers\Admin\CategoriaProdutoController;
 use App\Http\Controllers\Admin\FornecedorController;
@@ -92,6 +93,8 @@ Route::middleware('throttle:20,1')->group(function () {
         Route::get('comprar/pedido/{venda}/voucher', [CheckoutPublicoController::class, 'voucher'])->name('checkout.voucher');
         Route::get('comprar/{unidade}/plano/{cliente}', [CheckoutPublicoController::class, 'planoResultado'])->name('checkout.plano-resultado');
         Route::get('comprar/{unidade}/plano/{cliente}/voucher', [CheckoutPublicoController::class, 'planoVoucher'])->name('checkout.plano-voucher');
+        // Pacote do fechamento de NFC-e enviado ao contador (link de 7 dias).
+        Route::get('fiscal/fechamentos/{fechamento}/baixar', [NfceRelatorioController::class, 'downloadAssinado'])->name('fiscal.fechamentos.publico');
     });
 
     Route::post('comprar/{unidade}/verificar-plano', [CheckoutPublicoController::class, 'verificarPlano'])->name('checkout.verificar-plano');
@@ -180,6 +183,12 @@ Route::middleware('auth')->group(function () {
     Route::post('vendas/pix', [PdvPixController::class, 'store'])->name('vendas.pix.store');
     Route::get('vendas/pix/{cobrancaPix}/status', [PdvPixController::class, 'status'])->name('vendas.pix.status');
     Route::post('vendas/pix/{cobrancaPix}/cancelar', [PdvPixController::class, 'cancelar'])->name('vendas.pix.cancelar');
+    Route::get('relatorios/nfce', [NfceRelatorioController::class, 'index'])->name('relatorios.nfce');
+    Route::post('relatorios/nfce/fechar', [NfceRelatorioController::class, 'fechar'])->name('relatorios.nfce.fechar');
+    Route::get('fiscal/documentos/{documento}/xml', [NfceRelatorioController::class, 'xml'])->name('fiscal.xml');
+    Route::get('fiscal/fechamentos/{fechamento}/download', [NfceRelatorioController::class, 'download'])->name('fiscal.fechamentos.download');
+    Route::post('fiscal/fechamentos/{fechamento}/email', [NfceRelatorioController::class, 'enviarEmail'])->name('fiscal.fechamentos.email');
+    Route::post('fiscal/fechamentos/{fechamento}/whatsapp', [NfceRelatorioController::class, 'enviarWhatsapp'])->name('fiscal.fechamentos.whatsapp');
     Route::get('fiscal/documentos/{documento}/danfce', [DocumentoFiscalController::class, 'danfce'])->name('fiscal.danfce');
     Route::get('fiscal/documentos/{documento}/danfce.escpos', [DocumentoFiscalController::class, 'danfceEscpos'])->name('fiscal.danfce.escpos');
     Route::get('vendas/pix/{cobrancaPix}/imprimir', [PdvPixController::class, 'imprimir'])->name('vendas.pix.imprimir');

@@ -109,6 +109,26 @@ class DanfceService
         ];
     }
 
+    /**
+     * DANFE em PDF no formato bobina 80mm (largura fixa, altura conforme o
+     * número de itens/pagamentos) — usado no pacote do fechamento do mês.
+     */
+    public function pdf(DocumentoFiscal $documento): string
+    {
+        $d = $this->dados($documento);
+
+        $linhas = count($d['itens']) * 2
+            + count(array_filter($d['itens'], fn ($i) => $i['desconto'] > 0))
+            + count($d['pagamentos']);
+        $altura = 470 + ($linhas * 10) + ($d['homologacao'] ? 20 : 0) + ($d['info_complementar'] !== '' ? 30 : 0);
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('fiscal.danfce-pdf', [
+            'd' => $d,
+            'qrCode' => $d['qr_code'] !== '' ? app(\App\Services\QrCodeService::class)->gerarDataUri($d['qr_code'], 240) : null,
+        ])->setOption('isFontSubsettingEnabled', true) // só os caracteres usados: PDF ~10x menor
+            ->setPaper([0, 0, 226.77, $altura])->output(); // 80mm = 226,77pt
+    }
+
     protected function no(?DOMElement $pai, string $tag): ?DOMElement
     {
         $no = $pai?->getElementsByTagName($tag)->item(0);

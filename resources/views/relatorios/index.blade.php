@@ -15,6 +15,17 @@
     <section class="mb-8">
         <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Relatórios gerenciais</h2>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {{-- NFC-e emitidas: DANFE, XML e fechamento do mês para o contador --}}
+            <a href="{{ route('relatorios.nfce') }}" class="group relative flex items-start gap-3 overflow-hidden rounded-2xl border border-emerald-200 bg-white p-4 pt-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-500/30 dark:bg-white/[0.03]">
+                <span class="absolute inset-x-0 top-0 h-1 bg-emerald-600"></span>
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                    <x-nav-icon name="document" class="h-5 w-5" />
+                </span>
+                <span class="min-w-0">
+                    <span class="block text-sm font-semibold text-gray-800 group-hover:text-brand-600 dark:text-white/90">NFC-e emitidas</span>
+                    <span class="mt-0.5 block text-xs leading-snug text-gray-500 dark:text-gray-400">Notas por período: DANFE, impressão e XML. Fechamento do mês com envio ao contador.</span>
+                </span>
+            </a>
             @foreach (\App\Services\Relatorios\RelatorioGerencialService::RELATORIOS as $chaveRel => $rel)
                 @php $cor = $coresRelatorio[$loop->index % count($coresRelatorio)]; @endphp
                 <a href="{{ route('relatorios.gerencial', $chaveRel) }}" class="group relative flex items-start gap-3 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 pt-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-gray-800 dark:bg-white/[0.03]">

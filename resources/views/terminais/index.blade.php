@@ -17,6 +17,7 @@
                     <th class="px-4 py-3">Terminal</th>
                     <th class="px-4 py-3">Unidade</th>
                     <th class="px-4 py-3">Caixa</th>
+                    <th class="px-4 py-3">Série NFC-e</th>
                     <th class="px-4 py-3">Status</th>
                     <th class="px-4 py-3"></th>
                 </tr>
@@ -33,6 +34,7 @@
                                 <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500 dark:bg-white/5 dark:text-gray-400">Fechado</span>
                             @endif
                         </td>
+                        <td class="px-4 py-3 text-slate-600 dark:text-slate-300">@if ($terminal->serie_nfce) <span class="font-semibold">Série {{ $terminal->serie_nfce }}</span> <span class="text-xs text-slate-400">· último nº {{ $empresaSerie->ambiente_nfe === \App\Models\Empresa::AMBIENTE_PRODUCAO ? $terminal->numero_ultima_nfce_producao : $terminal->numero_ultima_nfce_homologacao }}</span> @else <span class="text-xs text-slate-400">Padrão da empresa (série {{ $empresaSerie->numero_serie_nfce ?: 1 }})</span> @endif</td>
                         <td class="px-4 py-3"><x-status-badge :status="$terminal->status" /></td>
                         <td class="px-4 py-3 text-right">
                             @can('update', $terminal)
@@ -41,7 +43,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">Nenhum terminal cadastrado.</td></tr>
+                    <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">Nenhum terminal cadastrado.</td></tr>
                 @endforelse
             </tbody>
         </table>

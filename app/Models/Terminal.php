@@ -16,7 +16,22 @@ class Terminal extends Model
     // tentaria usar a tabela "terminals" (inglês) em vez de "terminais".
     protected $table = 'terminais';
 
-    protected $fillable = ['empresa_id', 'unidade_id', 'nome', 'status'];
+    protected $fillable = [
+        'empresa_id', 'unidade_id', 'nome', 'status',
+        'serie_nfce', 'numero_ultima_nfce_producao', 'numero_ultima_nfce_homologacao',
+    ];
+
+    protected $casts = [
+        'serie_nfce' => 'integer',
+        'numero_ultima_nfce_producao' => 'integer',
+        'numero_ultima_nfce_homologacao' => 'integer',
+    ];
+
+    /** Terminal com série própria de NFC-e (senão usa a série padrão da empresa). */
+    public function temSerieNfce(): bool
+    {
+        return $this->serie_nfce !== null;
+    }
 
     public function unidade(): BelongsTo
     {

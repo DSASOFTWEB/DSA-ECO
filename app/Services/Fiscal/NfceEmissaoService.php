@@ -7,6 +7,7 @@ use App\Exceptions\NegocioException;
 use App\Models\DocumentoFiscal;
 use App\Models\Empresa;
 use App\Models\Cliente;
+use App\Models\Terminal;
 use App\Models\Unidade;
 use App\Support\Documento;
 use NFePHP\NFe\Common\Standardize;
@@ -29,7 +30,7 @@ class NfceEmissaoService
     /**
      * @param  list<array{descricao:string, quantidade:float|int, valor_unitario:float, ncm?:?string, cfop?:?string, cst_icms?:?string, csosn?:?string, origem?:?int, unidade?:string, ean?:?string}>  $itens
      */
-    public function emitir(Empresa $empresa, Unidade $unidade, ?Cliente $cliente, ?string $formaPagamento, DocumentoFiscal $documento, array $itens): DocumentoFiscal
+    public function emitir(Empresa $empresa, Unidade $unidade, ?Cliente $cliente, ?string $formaPagamento, DocumentoFiscal $documento, array $itens, ?Terminal $terminal = null): DocumentoFiscal
     {
         if ($itens === []) {
             throw new NegocioException('Não há produtos para emitir NFC-e.');
@@ -49,8 +50,7 @@ class NfceEmissaoService
         $tools = new Tools(json_encode($config), $cert['certificate']);
         $tools->model(65);
 
-        $numero = $this->proximoNumero($empresa);
-        $serie = (int) ($empresa->numero_serie_nfce ?: 1);
+        ['dono' => $donoSerie, 'campo' => $campoNumero, 'serie' => $serie, 'numero' => $numero] = $this->numeracao($empresa, $terminal);
 
         $xml = $this->montarXml($empresa, $unidade, $cliente, $formaPagamento, $itens, $serie, $numero, (string) $cMun);
         $assinado = $tools->signNFe($xml);
@@ -108,7 +108,10 @@ class NfceEmissaoService
                 'retorno' => json_decode(json_encode($std), true),
             ]);
 
-            $this->atualizarNumeracao($empresa, $numero);
+            $donoSerie->update([$campoNumero => $numero]);
+            if ($donoSerie instanceof Empresa) {
+                $empresa->setAttribute($campoNumero, $numero);
+            }
 
             return $documento->fresh();
         } catch (IntegrationException $e) {
@@ -140,22 +143,30 @@ class NfceEmissaoService
         ];
     }
 
-    protected function proximoNumero(Empresa $empresa): int
+    /**
+     * Série e próximo número da NFC-e. Terminal com série própria usa a
+     * numeração dele; sem série, a série padrão da empresa. O registro dono
+     * da série fica travado (FOR UPDATE) até o fim da transação de emissão,
+     * então dois caixas da mesma série nunca pegam o mesmo número. O número
+     * só avança quando a SEFAZ autoriza (rejeição não "queima" número).
+     *
+     * @return array{dono: Empresa|Terminal, campo: string, serie: int, numero: int}
+     */
+    protected function numeracao(Empresa $empresa, ?Terminal $terminal): array
     {
         $campo = ((int) $empresa->ambiente_nfe === Empresa::AMBIENTE_PRODUCAO)
             ? 'numero_ultima_nfce_producao'
             : 'numero_ultima_nfce_homologacao';
 
-        return ((int) $empresa->{$campo}) + 1;
-    }
+        if ($terminal?->temSerieNfce()) {
+            $dono = Terminal::withoutGlobalScopes()->whereKey($terminal->id)->lockForUpdate()->firstOrFail();
 
-    protected function atualizarNumeracao(Empresa $empresa, int $numero): void
-    {
-        $campo = ((int) $empresa->ambiente_nfe === Empresa::AMBIENTE_PRODUCAO)
-            ? 'numero_ultima_nfce_producao'
-            : 'numero_ultima_nfce_homologacao';
+            return ['dono' => $dono, 'campo' => $campo, 'serie' => (int) $dono->serie_nfce, 'numero' => (int) $dono->{$campo} + 1];
+        }
 
-        $empresa->update([$campo => $numero]);
+        $dono = Empresa::whereKey($empresa->id)->lockForUpdate()->firstOrFail();
+
+        return ['dono' => $dono, 'campo' => $campo, 'serie' => (int) ($dono->numero_serie_nfce ?: 1), 'numero' => (int) $dono->{$campo} + 1];
     }
 
     /**

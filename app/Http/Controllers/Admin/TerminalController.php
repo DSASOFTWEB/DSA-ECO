@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Terminal\StoreTerminalRequest;
+use App\Models\Empresa;
 use App\Models\Terminal;
 use App\Models\Unidade;
 use Illuminate\Contracts\View\View;
@@ -20,7 +21,9 @@ class TerminalController extends Controller
             ->orderBy('unidade_id')->orderBy('nome')
             ->paginate(15);
 
-        return view('terminais.index', compact('terminais'));
+        $empresaSerie = Empresa::findOrFail(request()->user()->empresa_id);
+
+        return view('terminais.index', compact('terminais', 'empresaSerie'));
     }
 
     public function create(): View
@@ -29,7 +32,9 @@ class TerminalController extends Controller
 
         $unidades = Unidade::ativas()->orderBy('nome')->get();
 
-        return view('terminais.create', compact('unidades'));
+        $seriePadraoEmpresa = $this->seriePadraoEmpresa();
+
+        return view('terminais.create', compact('unidades', 'seriePadraoEmpresa'));
     }
 
     public function store(StoreTerminalRequest $request): RedirectResponse
@@ -45,7 +50,9 @@ class TerminalController extends Controller
 
         $unidades = Unidade::ativas()->orderBy('nome')->get();
 
-        return view('terminais.edit', compact('terminal', 'unidades'));
+        $seriePadraoEmpresa = $this->seriePadraoEmpresa();
+
+        return view('terminais.edit', compact('terminal', 'unidades', 'seriePadraoEmpresa'));
     }
 
     public function update(StoreTerminalRequest $request, Terminal $terminal): RedirectResponse
@@ -53,5 +60,11 @@ class TerminalController extends Controller
         $terminal->update($request->validated());
 
         return redirect()->route('terminais.index')->with('sucesso', 'Terminal atualizado com sucesso.');
+    }
+
+    /** Série de NFC-e usada pelos terminais sem série própria. */
+    protected function seriePadraoEmpresa(): int
+    {
+        return (int) (Empresa::find(request()->user()->empresa_id)?->numero_serie_nfce ?: 1);
     }
 }

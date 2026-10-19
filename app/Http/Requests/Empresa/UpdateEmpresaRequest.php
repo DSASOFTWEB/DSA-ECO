@@ -69,7 +69,9 @@ class UpdateEmpresaRequest extends FormRequest
             'csc' => ['nullable', 'string', 'max:60'],
             'csc_id' => ['nullable', 'string', 'max:10'],
             'numero_serie_nfe' => ['required', 'integer', 'min:1', 'max:999'],
-            'numero_serie_nfce' => ['required', 'integer', 'min:1', 'max:999'],
+            // Série padrão não pode ser a de um terminal (cada série tem um só dono/numeração).
+            'numero_serie_nfce' => ['required', 'integer', 'min:1', 'max:999',
+                Rule::notIn(\App\Models\Terminal::where('empresa_id', $this->user()->empresa_id)->whereNotNull('serie_nfce')->pluck('serie_nfce')->all())],
             'numero_serie_nfse' => ['required', 'integer', 'min:1', 'max:999'],
             'numero_ultima_nfe_producao' => ['required', 'integer', 'min:0'],
             'numero_ultima_nfe_homologacao' => ['required', 'integer', 'min:0'],
@@ -145,5 +147,12 @@ class UpdateEmpresaRequest extends FormRequest
             'aut_xml' => preg_replace('/\D+/', '', (string) $this->input('aut_xml', '')) ?: null,
             'codigo_municipio_ibge' => preg_replace('/\D+/', '', (string) $this->input('codigo_municipio_ibge', '')) ?: null,
         ]);
+    }
+
+    public function messages(): array
+    {
+        return [
+            'numero_serie_nfce.not_in' => 'Esta série de NFC-e já está em uso por um terminal (Cadastros > Terminais).',
+        ];
     }
 }

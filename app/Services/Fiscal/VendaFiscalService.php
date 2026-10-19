@@ -69,7 +69,7 @@ class VendaFiscalService
             throw new NegocioException('Configure o certificado digital e o CSC da NFC-e em Minha Empresa.');
         }
 
-        $venda->loadMissing('unidade', 'cliente');
+        $venda->loadMissing('unidade', 'cliente', 'caixa.terminal');
         if (! $venda->unidade) {
             throw new NegocioException('Unidade da venda não encontrada.');
         }
@@ -92,7 +92,8 @@ class VendaFiscalService
 
             $formaFiscal = $venda->forma_pagamento === 'multiplo' ? 'outro' : $venda->forma_pagamento;
 
-            return $this->nfce->emitir($empresa, $venda->unidade, $venda->cliente, $formaFiscal, $documento, $itens);
+            // Série do terminal do caixa que fez a venda (ou a padrão da empresa).
+            return $this->nfce->emitir($empresa, $venda->unidade, $venda->cliente, $formaFiscal, $documento, $itens, $venda->caixa?->terminal);
         });
     }
 

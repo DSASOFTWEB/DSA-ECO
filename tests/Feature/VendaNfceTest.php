@@ -61,7 +61,7 @@ class VendaNfceTest extends TestCase
 
             public function __construct() {}
 
-            public function emitir($empresa, $unidade, $cliente, $formaPagamento, DocumentoFiscal $documento, array $itens): DocumentoFiscal
+            public function emitir($empresa, $unidade, $cliente, $formaPagamento, DocumentoFiscal $documento, array $itens, $terminal = null): DocumentoFiscal
             {
                 if ($this->rejeitar) {
                     $documento->update(['status' => DocumentoFiscal::STATUS_REJEITADO, 'mensagem_erro' => 'cStat 999: Rejeição de teste']);

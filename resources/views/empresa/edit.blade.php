@@ -436,8 +436,10 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-slate-700">Série NFC-e</label>
+                    <label class="block text-sm font-medium text-slate-700">Série NFC-e (padrão)</label>
                     <input type="number" min="1" name="numero_serie_nfce" value="{{ old('numero_serie_nfce', $empresa->numero_serie_nfce ?? 1) }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    @error('numero_serie_nfce')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                    <p class="mt-1 text-xs text-slate-500">Usada pelos terminais sem série própria. Série por caixa em <a href="{{ route('terminais.index') }}" class="underline">Terminais</a>.</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Últ. NFC-e produção</label>

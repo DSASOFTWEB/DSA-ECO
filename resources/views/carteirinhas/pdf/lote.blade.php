@@ -39,7 +39,9 @@
         .foto { width: 14mm; height: 14mm; border-radius: 7mm; background-color: #2563eb; text-align: center; line-height: 14mm; font-size: 11pt; font-weight: bold; color: #dbeafe; }
         .foto img { width: 14mm; height: 14mm; border-radius: 7mm; }
         .corpo .cel-dados { display: table-cell; vertical-align: middle; }
-        .dados .nome { font-size: 10.5pt; font-weight: bold; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        /* Tamanho calculado por nome (CarteirinhaPdfExport::fonteDoNome): o nome
+           completo sempre cabe — diminui a fonte e, se preciso, usa 2 linhas. */
+        .dados .nome { font-weight: bold; color: #ffffff; line-height: 1.15; word-wrap: break-word; }
         .dados .info { font-size: 7.5pt; color: #bfdbfe; margin-top: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .rodape .cel-info { display: table-cell; vertical-align: bottom; }
@@ -82,7 +84,7 @@
                                 </div>
                                 <div class="cel-dados">
                                     <div class="dados">
-                                        <div class="nome">{{ $cartao['nome'] }}</div>
+                                        <div class="nome" style="font-size: {{ $cartao['nomeFonte'] }}pt">{{ $cartao['nome'] }}</div>
                                         <div class="info">{{ $cartao['ehDependente'] ? 'Dependente' : 'Titular' }}@if($cartao['planoNome']) &middot; {{ $cartao['planoNome'] }}@endif</div>
                                     </div>
                                 </div>

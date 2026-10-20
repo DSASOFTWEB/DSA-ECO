@@ -58,10 +58,15 @@
                         <tr class="transition hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                             <td class="px-4 py-3"><input type="checkbox" value="{{ $carteirinha->id }}" x-model.number="selecionadas" class="rounded border-gray-300"></td>
                             <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ $carteirinha->codigo }}</td>
-                            <td class="px-4 py-3">
-                                <div class="font-medium text-gray-800 dark:text-white/90">{{ $carteirinha->cliente?->nome ?? $carteirinha->dependente?->nome }}</div>
+                            <td @class(['px-4 py-3', 'pl-10' => request('busca') && $carteirinha->dependente])>
+                                <div class="font-medium text-gray-800 dark:text-white/90">
+                                    @if (request('busca') && $carteirinha->dependente)<span class="text-slate-400">↳</span>@endif
+                                    {{ $carteirinha->cliente?->nome ?? $carteirinha->dependente?->nome }}
+                                </div>
                                 @if ($carteirinha->dependente)
                                     <div class="text-xs text-slate-400">dependente de {{ $carteirinha->dependente->cliente?->nome }}</div>
+                                @elseif ($carteirinha->cliente && $carteirinha->cliente->dependentes->isNotEmpty())
+                                    <div class="text-xs text-slate-400">{{ $carteirinha->cliente->dependentes->count() }} dependente(s)</div>
                                 @endif
                             </td>
                             <td class="px-4 py-3">
@@ -72,7 +77,16 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3"><x-status-badge :status="$carteirinha->status" /></td>
-                            <td class="px-4 py-3 text-right">
+                            <td class="whitespace-nowrap px-4 py-3 text-right">
+                                @php
+                                    // Titular + carteirinhas dos dependentes dele, num PDF só.
+                                    $familia = $carteirinha->cliente
+                                        ? collect([$carteirinha->id])->merge($carteirinha->cliente->dependentes->pluck('carteirinha.id')->filter())
+                                        : collect();
+                                @endphp
+                                @if ($familia->count() > 1)
+                                    <a href="{{ route('carteirinhas.imprimir-lote', ['ids' => $familia->implode(',')]) }}" target="_blank" class="mr-3 font-semibold text-emerald-700 hover:underline dark:text-emerald-400">Imprimir família ({{ $familia->count() }})</a>
+                                @endif
                                 <a href="{{ route('carteirinhas.imprimir', $carteirinha) }}" target="_blank" class="mr-3 text-slate-500 hover:underline">Imprimir</a>
                                 <a href="{{ route('carteirinhas.show', $carteirinha) }}" class="text-sky-700 hover:underline">Ver</a>
                             </td>

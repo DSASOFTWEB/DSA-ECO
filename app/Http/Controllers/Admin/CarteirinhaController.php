@@ -19,7 +19,7 @@ class CarteirinhaController extends Controller
     {
         $this->authorize('viewAny', Carteirinha::class);
 
-        $carteirinhas = Carteirinha::with(['cliente', 'dependente.cliente'])
+        $carteirinhas = Carteirinha::with(['cliente.dependentes.carteirinha', 'dependente.cliente'])
             ->tap(fn ($q) => $this->escopoPorEmpresa($q, request()->user()->empresa_id))
             ->when(request('status'), fn ($q, $v) => $q->where('status', $v))
             ->when(request('codigo'), fn ($q, $v) => $q->where('codigo', 'like', "%{$v}%"))
@@ -36,12 +36,20 @@ class CarteirinhaController extends Controller
                     }
                 };
 
+                // Achou o titular: traz também as carteirinhas dos dependentes
+                // dele, para imprimir a família toda de uma vez.
                 $q->where(function ($qq) use ($porNomeOuCpf) {
                     $qq->whereHas('cliente', $porNomeOuCpf)
-                        ->orWhereHas('dependente', $porNomeOuCpf);
+                        ->orWhereHas('dependente', $porNomeOuCpf)
+                        ->orWhereHas('dependente.cliente', $porNomeOuCpf);
                 });
             })
-            ->latest()
+            // Na busca, agrupa por família: titular primeiro, dependentes logo abaixo.
+            ->when(request('busca'), fn ($q) => $q
+                ->orderByRaw('COALESCE(carteirinhas.cliente_id, (SELECT d.cliente_id FROM dependentes d WHERE d.id = carteirinhas.dependente_id))')
+                ->orderByRaw('carteirinhas.cliente_id IS NULL')
+                ->orderBy('carteirinhas.id'),
+                fn ($q) => $q->latest())
             ->paginate(20)
             ->withQueryString();
 

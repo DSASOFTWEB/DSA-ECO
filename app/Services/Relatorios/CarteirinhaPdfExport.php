@@ -40,9 +40,12 @@ class CarteirinhaPdfExport
                 ? $titular?->contratos->firstWhere('status', 'ativo')
                 : $titular?->contratoAtivo;
 
+            $nome = $titular?->nome ?? 'Titular não encontrado';
+
             return [
                 'carteirinha' => $carteirinha,
-                'nome' => $titular?->nome ?? 'Titular não encontrado',
+                'nome' => $nome,
+                'nomeFonte' => self::fonteDoNome($nome),
                 'ehDependente' => $ehDependente,
                 'planoNome' => $contratoAtivo?->plano?->nome,
                 'validade' => $contratoAtivo?->data_fim?->format('m/Y'),
@@ -56,6 +59,25 @@ class CarteirinhaPdfExport
             'cartoes' => $cartoes,
             'geradoEm' => now(),
         ])->setPaper('a4', 'portrait');
+    }
+
+    /**
+     * Tamanho da fonte (pt) para o nome completo caber no cartão sem cortar:
+     * até 10,5pt numa linha; se não couber nem em 8pt, usa duas linhas com
+     * fonte entre 6,5 e 9pt. A área do nome tem ~59mm (≈167pt) de largura e
+     * a letra em negrito da DejaVu Sans ocupa ~0,7 da fonte (maiúsculas).
+     */
+    public static function fonteDoNome(string $nome): float
+    {
+        $largura = 167;
+        $caracteres = max(1, mb_strlen(trim($nome)));
+        $umaLinha = $largura / (0.7 * $caracteres);
+
+        if ($umaLinha >= 8) {
+            return round(min(10.5, $umaLinha), 1);
+        }
+
+        return round(max(6.5, min(9, ($largura * 2 * 0.92) / (0.7 * $caracteres))), 1);
     }
 
     protected function fotoDataUri(?string $path): ?string

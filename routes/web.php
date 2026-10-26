@@ -95,6 +95,8 @@ Route::middleware('throttle:20,1')->group(function () {
         Route::get('comprar/{unidade}/plano/{cliente}/voucher', [CheckoutPublicoController::class, 'planoVoucher'])->name('checkout.plano-voucher');
         // Pacote do fechamento de NFC-e enviado ao contador (link de 7 dias).
         Route::get('fiscal/fechamentos/{fechamento}/baixar', [NfceRelatorioController::class, 'downloadAssinado'])->name('fiscal.fechamentos.publico');
+        // Carteirinha enviada pelo WhatsApp sem a Evolution API (link de 7 dias).
+        Route::get('carteirinhas/{carteirinha}/compartilhada', [CarteirinhaController::class, 'compartilhada'])->name('carteirinhas.compartilhada');
     });
 
     Route::post('comprar/{unidade}/verificar-plano', [CheckoutPublicoController::class, 'verificarPlano'])->name('checkout.verificar-plano');
@@ -265,6 +267,7 @@ Route::middleware('auth')->group(function () {
     Route::get('carteirinhas/{carteirinha}/qrcode', [CarteirinhaController::class, 'qrcode'])->name('carteirinhas.qrcode');
     Route::get('carteirinhas/{carteirinha}/imprimir', [CarteirinhaController::class, 'imprimir'])->name('carteirinhas.imprimir');
     Route::post('carteirinhas/{carteirinha}/bloquear', [CarteirinhaController::class, 'bloquear'])->name('carteirinhas.bloquear');
+    Route::post('carteirinhas/{carteirinha}/whatsapp', [CarteirinhaController::class, 'enviarWhatsapp'])->name('carteirinhas.whatsapp');
     Route::post('carteirinhas/{carteirinha}/desbloquear', [CarteirinhaController::class, 'desbloquear'])->name('carteirinhas.desbloquear');
 
     Route::get('acessos', [AcessoController::class, 'index'])->name('acessos.index');

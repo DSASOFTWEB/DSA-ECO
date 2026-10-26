@@ -35,7 +35,8 @@
         <div class="mb-3 flex items-center justify-between">
             <span class="text-sm text-slate-500"><span x-text="selecionadas.length"></span> selecionada(s)</span>
             <button type="button" @click="imprimirSelecionadas()" :disabled="!selecionadas.length"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900">
+                    :title="selecionadas.length ? '' : 'Marque as carteirinhas na lista para imprimir'"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-600 disabled:shadow-none dark:disabled:bg-gray-800 dark:disabled:text-gray-300">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M6 9V4h12v5M6 18h12v4H6v-4Zm-2-9h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-3v-3H6v3H3a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1Z"/></svg>
                 Imprimir selecionadas (PDF)
             </button>
@@ -55,7 +56,7 @@
                 </thead>
                 <tbody class="divide-y divide-slate-50">
                     @forelse ($carteirinhas as $carteirinha)
-                        <tr class="transition hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                        <tr class="transition hover:bg-gray-50 dark:hover:bg-white/[0.02]" x-data="{ whatsapp: false }">
                             <td class="px-4 py-3"><input type="checkbox" value="{{ $carteirinha->id }}" x-model.number="selecionadas" class="rounded border-gray-300"></td>
                             <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ $carteirinha->codigo }}</td>
                             <td @class(['px-4 py-3', 'pl-10' => request('busca') && $carteirinha->dependente])>
@@ -88,7 +89,9 @@
                                     <a href="{{ route('carteirinhas.imprimir-lote', ['ids' => $familia->implode(',')]) }}" target="_blank" class="mr-3 font-semibold text-emerald-700 hover:underline dark:text-emerald-400">Imprimir família ({{ $familia->count() }})</a>
                                 @endif
                                 <a href="{{ route('carteirinhas.imprimir', $carteirinha) }}" target="_blank" class="mr-3 text-slate-500 hover:underline">Imprimir</a>
+                                <button type="button" @click="whatsapp = ! whatsapp" class="mr-3 font-semibold text-emerald-700 hover:underline dark:text-emerald-400">WhatsApp</button>
                                 <a href="{{ route('carteirinhas.show', $carteirinha) }}" class="text-sky-700 hover:underline">Ver</a>
+                                <div x-show="whatsapp" x-cloak class="mt-2 whitespace-normal">@include('carteirinhas._whatsapp', ['carteirinha' => $carteirinha])</div>
                             </td>
                         </tr>
                     @empty

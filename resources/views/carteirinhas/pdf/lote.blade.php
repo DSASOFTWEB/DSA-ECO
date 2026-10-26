@@ -19,35 +19,40 @@
         .cartao {
             width: 85.6mm;
             height: 54mm;
-            padding: 4mm 5mm;
+            padding: 3.5mm 5mm 3mm;
             border-radius: 3mm;
-            background-color: #1d4ed8;
+            /* Azul mais escuro + textos brancos: no papel (jato de tinta) os tons
+               claros sobre azul ficavam apagados. */
+            background-color: #1e3a8a;
             color: #ffffff;
             overflow: hidden;
         }
 
         .linha-topo, .corpo, .rodape { display: table; width: 100%; }
-        .linha-topo { margin-bottom: 4mm; }
-        .corpo { margin-bottom: 4mm; }
+        .linha-topo { margin-bottom: 2.5mm; }
+        .corpo { margin-bottom: 2mm; }
 
         .linha-topo .cel-logo { display: table-cell; vertical-align: middle; width: 70%; }
-        .linha-topo .cel-rotulo { display: table-cell; vertical-align: middle; width: 30%; text-align: right; font-size: 6.5pt; letter-spacing: 0.5pt; text-transform: uppercase; color: #bfdbfe; }
+        .linha-topo .cel-rotulo { display: table-cell; vertical-align: middle; width: 30%; text-align: right; font-size: 7pt; font-weight: bold; letter-spacing: 0.5pt; text-transform: uppercase; color: #ffffff; }
         .logo { max-height: 7mm; max-width: 28mm; }
-        .empresa-nome { font-size: 8.5pt; font-weight: bold; color: #eff6ff; }
+        .empresa-nome { font-size: 8.5pt; font-weight: bold; color: #ffffff; }
 
         .corpo .cel-foto { display: table-cell; vertical-align: middle; width: 16mm; }
-        .foto { width: 14mm; height: 14mm; border-radius: 7mm; background-color: #2563eb; text-align: center; line-height: 14mm; font-size: 11pt; font-weight: bold; color: #dbeafe; }
+        /* dompdf ignora line-height para centralizar e soma padding à altura:
+           padding-top 5mm + height 9mm = círculo de 14mm com as iniciais no meio. */
+        .foto { width: 14mm; height: 9mm; border-radius: 7mm; background-color: #1e40af; text-align: center; line-height: 1; padding-top: 5mm; font-size: 11pt; font-weight: bold; color: #ffffff; }
+        .foto.com-imagem { padding-top: 0; height: 14mm; }
         .foto img { width: 14mm; height: 14mm; border-radius: 7mm; }
         .corpo .cel-dados { display: table-cell; vertical-align: middle; }
         /* Tamanho calculado por nome (CarteirinhaPdfExport::fonteDoNome): o nome
            completo sempre cabe — diminui a fonte e, se preciso, usa 2 linhas. */
         .dados .nome { font-weight: bold; color: #ffffff; line-height: 1.15; word-wrap: break-word; }
-        .dados .info { font-size: 7.5pt; color: #bfdbfe; margin-top: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dados .info { font-size: 8pt; font-weight: bold; color: #ffffff; margin-top: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .rodape .cel-info { display: table-cell; vertical-align: bottom; }
         .rodape .cel-qr { display: table-cell; vertical-align: bottom; width: 15mm; text-align: right; }
-        .codigo { font-size: 6pt; color: #93c5fd; }
-        .validade { font-size: 6.5pt; color: #bfdbfe; margin-top: 1mm; }
+        .codigo { font-size: 7pt; font-weight: bold; color: #ffffff; letter-spacing: 0.3pt; }
+        .validade { font-size: 7pt; color: #ffffff; margin-top: 1mm; }
         .qr-caixa { display: inline-block; background: #ffffff; padding: 1mm; border-radius: 1mm; }
         .qr-caixa img { width: 12mm; height: 12mm; }
 
@@ -74,7 +79,7 @@
 
                             <div class="corpo">
                                 <div class="cel-foto">
-                                    <div class="foto">
+                                    <div class="foto {{ $cartao['fotoDataUri'] ? 'com-imagem' : '' }}">
                                         @if ($cartao['fotoDataUri'])
                                             <img src="{{ $cartao['fotoDataUri'] }}" alt="">
                                         @else

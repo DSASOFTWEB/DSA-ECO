@@ -11,6 +11,7 @@ use App\Models\FechamentoFiscal;
 use App\Services\Fiscal\FechamentoFiscalService;
 use App\Services\Fiscal\FiscalXmlStorageService;
 use App\Services\Integrations\EvolutionApiService;
+use App\Support\Telefone;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -144,11 +145,8 @@ class NfceRelatorioController extends Controller
             return back()->with('erro', 'O pacote deste mês ainda não está pronto.');
         }
 
-        $numero = preg_replace('/\D+/', '', $dados['telefone']);
-        if (strlen($numero) === 10 || strlen($numero) === 11) {
-            $numero = '55'.$numero;
-        }
-        if (strlen($numero) < 12) {
+        $numero = Telefone::paraWhatsapp($dados['telefone']);
+        if (! $numero) {
             return back()->with('erro', 'Informe o WhatsApp com DDD, ex.: (83) 99999-9999.');
         }
 

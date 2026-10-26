@@ -74,6 +74,61 @@ class CarteirinhaFamiliaTest extends TestCase
         $this->assertLessThanOrEqual(167 * 2, mb_strlen('MARIA APARECIDA DOS SANTOS OLIVEIRA DE ALBUQUERQUE') * 0.7 * $longo);
     }
 
+    public function test_whatsapp_sem_integracao_abre_wa_me_com_link_da_carteirinha(): void
+    {
+        [$titular, $cTitular] = $this->familia('JOAO BATISTA FERREIRA', '529.982.247-25');
+        $titular->update(['whatsapp' => '(83) 99999-1234']);
+
+        $this->get(route('carteirinhas.index', ['busca' => 'JOAO']))->assertOk()->assertSee('WhatsApp')->assertSee('(83) 99999-1234')->assertSee('Família inteira (3)');
+        $this->get(route('carteirinhas.show', $cTitular))->assertOk()->assertSee('Enviar pelo WhatsApp');
+
+        $resposta = $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+            ->post(route('carteirinhas.whatsapp', $cTitular), ['telefone' => '(83) 99999-1234', 'familia' => 1])
+            ->assertRedirect();
+        $destino = $resposta->headers->get('Location');
+        $this->assertStringStartsWith('https://wa.me/5583999991234?text=', $destino);
+        $this->assertStringContainsString(rawurlencode('Olá, Joao! Seguem as carteirinhas da sua família'), $destino);
+
+        // O link do PDF só abre assinado.
+        parse_str((string) parse_url($destino, PHP_URL_QUERY), $query);
+        preg_match('#https?://\S+#', $query['text'], $link);
+        auth()->logout();
+        $this->get($link[0])->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->get(route('carteirinhas.compartilhada', $cTitular))->assertForbidden();
+    }
+
+    public function test_whatsapp_com_integracao_envia_o_pdf_como_arquivo(): void
+    {
+        [$titular, $cTitular, $cFilha] = $this->familia('JOAO BATISTA FERREIRA', '529.982.247-25');
+        $whatsapp = new class extends \App\Services\Integrations\EvolutionApiService
+        {
+            public array $enviados = [];
+
+            public function __construct() {}
+
+            public function configurada(): bool { return true; }
+
+            public function enviarDocumento(string $numero, string $base64, string $nomeArquivo, string $mimetype, string $legenda = ''): array
+            {
+                $this->enviados[] = ['numero' => $numero, 'arquivo' => $nomeArquivo, 'mimetype' => $mimetype, 'pdf' => str_starts_with(base64_decode($base64), '%PDF')];
+
+                return ['ok' => true];
+            }
+        };
+        $this->app->instance(\App\Services\Integrations\EvolutionApiService::class, $whatsapp);
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class);
+
+        $this->post(route('carteirinhas.whatsapp', $cFilha), ['telefone' => '83988887777'])->assertSessionHas('sucesso');
+        $this->post(route('carteirinhas.whatsapp', $cTitular), ['telefone' => '83988887777', 'familia' => 1])->assertSessionHas('sucesso', fn ($m) => str_contains($m, '3 carteirinhas'));
+
+        $this->assertSame('5583988887777', $whatsapp->enviados[0]['numero']);
+        $this->assertSame('application/pdf', $whatsapp->enviados[0]['mimetype']);
+        $this->assertTrue($whatsapp->enviados[0]['pdf']);
+        $this->assertSame('Carteirinhas - JOAO BATISTA FERREIRA.pdf', $whatsapp->enviados[1]['arquivo']);
+
+        $this->post(route('carteirinhas.whatsapp', $cTitular), ['telefone' => '1234'])->assertSessionHas('erro');
+    }
+
     /** @return array{0: Cliente, 1: Carteirinha, 2: Carteirinha, 3: Carteirinha} */
     protected function familia(string $nome, string $cpf): array
     {

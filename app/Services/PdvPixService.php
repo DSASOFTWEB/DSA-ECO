@@ -47,6 +47,21 @@ class PdvPixService
             throw new NegocioException('O total da venda precisa ser maior que zero para gerar o Pix.');
         }
 
+        // Pagamento dividido: o QR cobra só a parcela do Pix integrado; as
+        // demais (dinheiro, cartão...) já foram recebidas no balcão.
+        if (! empty($dadosVenda['pagamentos'])) {
+            $parcelas = $this->vendaService->resolverPagamentos($dadosVenda, $valor)['parcelas'];
+            $integrada = collect($parcelas)->firstWhere('integrado', true);
+
+            if (! $integrada) {
+                throw new NegocioException('Nenhuma parcela usa o Pix com QR Code.');
+            }
+
+            return $this->criarCobranca($operador, $caixa, (float) $integrada['valor'], "Venda PDV - caixa #{$caixa->id}", [
+                'dados_venda' => $dadosVenda,
+            ]);
+        }
+
         return $this->criarCobranca($operador, $caixa, $valor, "Venda PDV - caixa #{$caixa->id}", [
             'dados_venda' => array_merge($dadosVenda, ['forma_pagamento' => 'pix']),
         ]);

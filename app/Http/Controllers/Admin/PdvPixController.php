@@ -44,8 +44,12 @@ class PdvPixController extends Controller
             return response()->json(['message' => 'Abra o caixa da unidade antes de registrar uma venda.'], 422);
         }
 
-        $forma = $request->formaPagamentoCadastrada();
-        if ($request->filled('forma_pagamento_id') && ! $forma?->ehPixIntegrado()) {
+        // Pagamento dividido: basta uma das parcelas ser o Pix integrado.
+        if ($request->filled('pagamentos')) {
+            if (! collect($request->validated('pagamentos'))->contains('integrado', true)) {
+                return response()->json(['message' => 'Nenhuma parcela usa o Pix com QR Code.'], 422);
+            }
+        } elseif ($request->filled('forma_pagamento_id') && ! $request->formaPagamentoCadastrada()?->ehPixIntegrado()) {
             return response()->json(['message' => 'A forma de pagamento escolhida não é Pix integrado.'], 422);
         }
 

@@ -89,30 +89,44 @@ class VendaService
                 }
             }
 
-            $pagamento = Pagamento::create([
-                'empresa_id' => $vendedor->empresa_id,
-                'venda_id' => $venda->id,
-                'gateway' => $pagamentoGateway['gateway']
-                    ?? ($dados['forma_pagamento'] === 'pix' ? 'pix_manual' : $dados['forma_pagamento']),
-                'gateway_payment_id' => $pagamentoGateway['gateway_payment_id'] ?? null,
-                'payload' => $pagamentoGateway['payload'] ?? null,
-                'valor' => $valorTotal,
-                'status' => 'aprovado',
-                'metodo_pagamento' => $dados['forma_pagamento'],
-                'pago_em' => now(),
-            ]);
+            // Uma forma (como sempre) ou pagamento dividido: cada parcela vira
+            // um Pagamento e uma entrada no caixa com a forma certa.
+            ['parcelas' => $parcelas, 'troco' => $troco] = $this->resolverPagamentos($dados, (float) $valorTotal);
+            $varias = count($parcelas) > 1;
 
-            CaixaMovimentacao::create([
-                'caixa_id' => $caixa->id,
-                'tipo' => 'entrada',
-                'categoria' => $temEntradaAvulsa ? 'entrada_avulsa' : 'venda',
-                'descricao' => "Venda #{$venda->id}",
-                'valor' => $valorTotal,
-                'forma_pagamento' => $dados['forma_pagamento'],
-                'referencia_type' => Pagamento::class,
-                'referencia_id' => $pagamento->id,
-                'usuario_id' => $vendedor->id,
-            ]);
+            foreach ($parcelas as $parcela) {
+                // Dados do gateway (Pix QR confirmado) vão para a parcela integrada.
+                $gateway = ($parcela['integrado'] || ! $varias) ? $pagamentoGateway : [];
+
+                $pagamento = Pagamento::create([
+                    'empresa_id' => $vendedor->empresa_id,
+                    'venda_id' => $venda->id,
+                    'gateway' => $gateway['gateway']
+                        ?? ($parcela['forma'] === 'pix' ? 'pix_manual' : $parcela['forma']),
+                    'gateway_payment_id' => $gateway['gateway_payment_id'] ?? null,
+                    'payload' => $gateway['payload'] ?? null,
+                    'valor' => $parcela['valor'],
+                    'status' => 'aprovado',
+                    'metodo_pagamento' => $parcela['forma'],
+                    'pago_em' => now(),
+                ]);
+
+                CaixaMovimentacao::create([
+                    'caixa_id' => $caixa->id,
+                    'tipo' => 'entrada',
+                    'categoria' => $temEntradaAvulsa ? 'entrada_avulsa' : 'venda',
+                    'descricao' => "Venda #{$venda->id}".($varias ? ' ('.(\App\Support\Financeiro::FORMAS_PAGAMENTO[$parcela['forma']]['label'] ?? $parcela['forma']).')' : ''),
+                    'valor' => $parcela['valor'],
+                    'forma_pagamento' => $parcela['forma'],
+                    'referencia_type' => Pagamento::class,
+                    'referencia_id' => $pagamento->id,
+                    'usuario_id' => $vendedor->id,
+                ]);
+            }
+
+            if ($troco > 0) {
+                $venda->update(['observacao' => trim(($venda->observacao ? $venda->observacao.' | ' : '').'Troco: R$ '.number_format($troco, 2, ',', '.'))]);
+            }
 
             $this->comissaoService->calcularParaVenda($venda);
 
@@ -314,6 +328,57 @@ class VendaService
 
             return $venda;
         });
+    }
+
+    /**
+     * Parcelas do pagamento já conferidas contra o total da venda. Sem
+     * "pagamentos" é uma forma só (o valor total). No pagamento dividido a
+     * soma precisa cobrir o total; só o dinheiro pode passar (vira troco e
+     * é descontado da parcela em dinheiro, que entra líquida no caixa).
+     *
+     * @return array{parcelas: list<array{forma: string, valor: float, integrado: bool}>, troco: float}
+     */
+    public function resolverPagamentos(array $dados, float $total): array
+    {
+        $total = round($total, 2);
+        $informadas = $dados['pagamentos'] ?? [];
+
+        if (empty($informadas)) {
+            return ['parcelas' => [['forma' => (string) $dados['forma_pagamento'], 'valor' => $total, 'integrado' => false]], 'troco' => 0.0];
+        }
+
+        $parcelas = array_map(fn ($p) => [
+            'forma' => (string) $p['forma'],
+            'valor' => round((float) $p['valor'], 2),
+            'integrado' => (bool) ($p['integrado'] ?? false),
+        ], array_values($informadas));
+
+        $soma = round(array_sum(array_column($parcelas, 'valor')), 2);
+        if ($soma + 0.009 < $total) {
+            throw new NegocioException('Os pagamentos somam R$ '.number_format($soma, 2, ',', '.').' e a venda é de R$ '.number_format($total, 2, ',', '.').'. Faltam R$ '.number_format($total - $soma, 2, ',', '.').'.');
+        }
+
+        $troco = round($soma - $total, 2);
+        $emDinheiro = round(array_sum(array_column(array_filter($parcelas, fn ($p) => $p['forma'] === 'dinheiro'), 'valor')), 2);
+        if ($troco > 0.009 && $troco > $emDinheiro + 0.009) {
+            throw new NegocioException('Só o dinheiro pode passar do valor da venda (troco). Ajuste os valores do cartão/Pix.');
+        }
+
+        // Troco sai das parcelas em dinheiro (da última para a primeira).
+        $restante = $troco;
+        for ($i = count($parcelas) - 1; $i >= 0 && $restante > 0.009; $i--) {
+            if ($parcelas[$i]['forma'] !== 'dinheiro') {
+                continue;
+            }
+            $abater = min($restante, $parcelas[$i]['valor']);
+            $parcelas[$i]['valor'] = round($parcelas[$i]['valor'] - $abater, 2);
+            $restante = round($restante - $abater, 2);
+        }
+
+        return [
+            'parcelas' => array_values(array_filter($parcelas, fn ($p) => $p['valor'] > 0.009)),
+            'troco' => max(0, $troco),
+        ];
     }
 
     /**

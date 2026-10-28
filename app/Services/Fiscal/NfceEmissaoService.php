@@ -28,9 +28,10 @@ class NfceEmissaoService
     ) {}
 
     /**
+     * @param  string|list<array{forma:string, valor:float}>|null  $formaPagamento  uma forma ou, no pagamento dividido, as parcelas
      * @param  list<array{descricao:string, quantidade:float|int, valor_unitario:float, ncm?:?string, cfop?:?string, cst_icms?:?string, csosn?:?string, origem?:?int, unidade?:string, ean?:?string}>  $itens
      */
-    public function emitir(Empresa $empresa, Unidade $unidade, ?Cliente $cliente, ?string $formaPagamento, DocumentoFiscal $documento, array $itens, ?Terminal $terminal = null): DocumentoFiscal
+    public function emitir(Empresa $empresa, Unidade $unidade, ?Cliente $cliente, string|array|null $formaPagamento, DocumentoFiscal $documento, array $itens, ?Terminal $terminal = null): DocumentoFiscal
     {
         if ($itens === []) {
             throw new NegocioException('Não há produtos para emitir NFC-e.');
@@ -176,7 +177,7 @@ class NfceEmissaoService
         Empresa $empresa,
         Unidade $unidade,
         ?Cliente $cliente,
-        ?string $formaPagamento,
+        string|array|null $formaPagamento,
         array $itens,
         int $serie,
         int $numero,
@@ -355,10 +356,12 @@ class NfceEmissaoService
         $pag->vTroco = null;
         $make->tagpag($pag);
 
-        $detPag = new stdClass;
-        $detPag->tPag = $this->mapaFormaPagamento($formaPagamento);
-        $detPag->vPag = number_format($vProd - $vDesc, 2, '.', '');
-        $make->tagdetPag($detPag);
+        foreach (self::detalhesPagamento($formaPagamento, round($vProd - $vDesc, 2)) as $parcela) {
+            $detPag = new stdClass;
+            $detPag->tPag = $this->mapaFormaPagamento($parcela['forma']);
+            $detPag->vPag = number_format($parcela['valor'], 2, '.', '');
+            $make->tagdetPag($detPag);
+        }
 
         if (filled($empresa->observacao_padrao_nfce)) {
             $inf = new stdClass;
@@ -382,6 +385,43 @@ class NfceEmissaoService
 
             return $bruto - min($bruto, max(0, (float) ($i['desconto'] ?? 0)));
         }), 2);
+    }
+
+    /**
+     * Um detPag por forma. No pagamento dividido as parcelas são somadas por
+     * forma e escaladas ao valor da nota (a venda pode ter ingressos fora da
+     * NFC-e); o arredondamento fica na última, para a soma bater com o vNF.
+     *
+     * @return list<array{forma: ?string, valor: float}>
+     */
+    public static function detalhesPagamento(string|array|null $formaPagamento, float $vNF): array
+    {
+        $porForma = [];
+        foreach (is_array($formaPagamento) ? $formaPagamento : [] as $parcela) {
+            $forma = (string) ($parcela['forma'] ?? 'outro');
+            $porForma[$forma] = ($porForma[$forma] ?? 0) + max(0, (float) ($parcela['valor'] ?? 0));
+        }
+        $porForma = array_filter($porForma, fn ($v) => $v > 0.009);
+        $soma = array_sum($porForma);
+
+        if ($soma <= 0) {
+            return [['forma' => is_string($formaPagamento) ? $formaPagamento : 'outro', 'valor' => $vNF]];
+        }
+
+        $detalhes = [];
+        $acumulado = 0.0;
+        $formas = array_keys($porForma);
+        foreach ($formas as $i => $forma) {
+            $valor = $i === count($formas) - 1
+                ? round($vNF - $acumulado, 2)
+                : round($vNF * $porForma[$forma] / $soma, 2);
+            $acumulado = round($acumulado + $valor, 2);
+            if ($valor > 0.009) {
+                $detalhes[] = ['forma' => $forma, 'valor' => $valor];
+            }
+        }
+
+        return $detalhes;
     }
 
     protected function mapaFormaPagamento(?string $forma): string

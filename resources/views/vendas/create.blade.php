@@ -102,6 +102,17 @@
 .pdv-pgto__cel--alerta strong { color:#b45309; }
 .pdv-pgto__cel--troco strong { color:var(--pdv-green); }
 .pdv-pgto__input { width:100%; border:1px solid var(--pdv-border); border-radius:6px; padding:7px 8px; }
+.pdv-dividir { width:100%; margin-top:8px; border:1px dashed #94a3b8; background:#fff; color:#334155; border-radius:8px; padding:8px; font-size:12px; font-weight:700; }
+.pdv-dividir small { font-weight:600; color:var(--pdv-muted); }
+.pdv-dividir:hover { border-color:var(--pdv-blue); color:var(--pdv-blue); }
+.pdv-parcelas { margin-top:10px; }
+.pdv-parcelas__topo { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; margin-bottom:6px; }
+.pdv-parcelas__sair { background:none; border:0; color:var(--pdv-blue); font-size:11px; font-weight:600; text-decoration:underline; }
+.pdv-parcelas__dica { font-size:11px; color:var(--pdv-muted); margin:0 0 6px; }
+.pdv-parcelas__erro { font-size:11px; color:#b91c1c; font-weight:600; margin:6px 0 0; }
+.pdv-parcela { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.pdv-parcela__nome { flex:1; min-width:0; font-size:12px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pdv-parcela__valor { width:110px; flex:none; text-align:right; }
 .pdv-finalizar { margin-top:auto; display:flex; align-items:center; justify-content:center; gap:12px; width:100%; border:0; border-radius:10px; background:var(--pdv-green); color:#fff; padding:16px; font-weight:800; letter-spacing:.04em; }
 .pdv-finalizar:hover:not(:disabled) { background:var(--pdv-green-dark); }
 .pdv-finalizar:disabled { opacity:.45; cursor:not-allowed; }
@@ -373,14 +384,43 @@
                                     $legendasForma = ['dinheiro' => 'Troco', 'cartao_credito' => 'Cartão', 'cartao_debito' => 'Cartão', 'transferencia' => 'Banco'];
                                 @endphp
                                 @foreach ($formasPagamento as $forma)
-                                    <button type="button" class="pdv-pgto-esp {{ $classesForma[$forma->tipo] ?? 'pgto-outro' }}" :class="{ 'pdv-pgto-esp--ativa': formaPagamentoId === {{ $forma->id }} }" @click="selecionarForma({{ $forma->id }})">
+                                    <button type="button" class="pdv-pgto-esp {{ $classesForma[$forma->tipo] ?? 'pgto-outro' }}" :class="{ 'pdv-pgto-esp--ativa': ! dividido && formaPagamentoId === {{ $forma->id }} }" @click="dividido ? adicionarParcela({{ $forma->id }}) : selecionarForma({{ $forma->id }})">
                                         <span>{{ mb_strtoupper($forma->nome) }}</span>
                                         <small>{{ $forma->tipo === 'pix' ? ($forma->ehPixIntegrado() ? 'QR Code no caixa' : 'Manual') : ($legendasForma[$forma->tipo] ?? $forma->tipo_label) }}</small>
                                     </button>
                                 @endforeach
                             </div>
 
-                            <div class="pdv-pgto__totais">
+                            <button type="button" class="pdv-dividir" x-show="! dividido" @click="iniciarDivisao()">➕ Dividir pagamento <small>(ex.: dinheiro + cartão + Pix)</small></button>
+
+                            {{-- Pagamento dividido: cada toque numa forma acima adiciona uma parcela com o que falta. --}}
+                            <div class="pdv-parcelas" x-show="dividido" x-cloak>
+                                <div class="pdv-parcelas__topo">
+                                    <strong>Pagamento dividido</strong>
+                                    <button type="button" class="pdv-parcelas__sair" @click="cancelarDivisao()">voltar para uma forma</button>
+                                </div>
+                                <p class="pdv-parcelas__dica" x-show="parcelas.length === 0">Toque nas formas acima para adicionar. O valor já vem com o que falta pagar.</p>
+                                <template x-for="(parcela, i) in parcelas" :key="parcela.chave">
+                                    <div class="pdv-parcela">
+                                        <span class="pdv-parcela__nome" x-text="nomeForma(parcela.forma_pagamento_id)"></span>
+                                        <input type="number" min="0.01" step="0.01" class="pdv-pgto__input pdv-parcela__valor" x-model.number="parcela.valor" @focus="$event.target.select()">
+                                        <button type="button" class="pdv-del" title="Remover" @click="removerParcela(i)">✕</button>
+                                    </div>
+                                </template>
+                                <div class="pdv-pgto__totais">
+                                    <div class="pdv-pgto__cel">
+                                        <span class="pdv-pgto__cel-lbl">Pago</span>
+                                        <strong x-text="formatar(somaParcelas)"></strong>
+                                    </div>
+                                    <div class="pdv-pgto__cel" :class="restante > 0.009 ? 'pdv-pgto__cel--alerta' : 'pdv-pgto__cel--troco'">
+                                        <span class="pdv-pgto__cel-lbl" x-text="trocoDividido > 0.009 ? 'Troco' : 'Falta'"></span>
+                                        <strong x-text="formatar(trocoDividido > 0.009 ? trocoDividido : restante)"></strong>
+                                    </div>
+                                </div>
+                                <p class="pdv-parcelas__erro" x-show="erroDivisao" x-text="erroDivisao"></p>
+                            </div>
+
+                            <div class="pdv-pgto__totais" x-show="! dividido">
                                 <div class="pdv-pgto__cel">
                                     <span class="pdv-pgto__cel-lbl">Forma selecionada</span>
                                     <strong x-text="rotuloForma"></strong>
@@ -557,6 +597,7 @@
                     <template x-if="! pixCarregando && pix">
                         <div>
                             <div class="pdv-resumo__linha"><span>Valor</span><strong class="text-lg" x-text="formatar(pix.valor)"></strong></div>
+                            <p class="text-xs text-slate-500 mt-1" x-show="dividido">Parte em Pix do pagamento dividido (total da venda <span x-text="formatar(total)"></span>). As demais formas já devem estar recebidas no balcão.</p>
 
                             <template x-if="pix.status === 'pendente'">
                                 <div class="pdv-pix__qr">
@@ -612,6 +653,16 @@
                 <input type="hidden" name="forma_pagamento_id" x-bind:value="formaPagamentoId">
                 <input type="hidden" name="emitir_nfce" x-bind:value="emitirNfce ? 1 : 0">
                 <input type="hidden" name="observacao" x-bind:value="observacaoComTroco">
+                <template x-if="dividido">
+                    <span>
+                        <template x-for="(parcela, i) in parcelas" :key="'pg-' + parcela.chave">
+                            <span>
+                                <input type="hidden" :name="'pagamentos[' + i + '][forma_pagamento_id]'" :value="parcela.forma_pagamento_id">
+                                <input type="hidden" :name="'pagamentos[' + i + '][valor]'" :value="Number(parcela.valor || 0).toFixed(2)">
+                            </span>
+                        </template>
+                    </span>
+                </template>
                 <template x-for="(item, indice) in itensParaEnvio" :key="'campo-' + item.chave">
                     <span>
                         <input type="hidden" :name="'itens[' + indice + '][' + (item.tipo === 'produto' ? 'produto_id' : 'tipo_entrada_id') + ']'" :value="item.id">
@@ -640,6 +691,9 @@
                         formasPagamento: @json($formasPagamento->map->paraTela()->values()),
                         formaPagamentoId: null,
                         formaPagamento: 'dinheiro',
+                        dividido: false,
+                        parcelas: [],
+                        maxParcelas: {{ \App\Http\Requests\Venda\StoreVendaRequest::MAX_PARCELAS }},
                         observacao: '',
                         descontoGeral: 0,
                         descontoItemValor: 0,
@@ -734,8 +788,34 @@
                             }
                             return itens;
                         },
+                        get somaParcelas() {
+                            return Math.round(this.parcelas.reduce((s, p) => s + (Number(p.valor) || 0), 0) * 100) / 100;
+                        },
+                        get restante() {
+                            return Math.max(0, Math.round((this.total - this.somaParcelas) * 100) / 100);
+                        },
+                        get trocoDividido() {
+                            return Math.max(0, Math.round((this.somaParcelas - this.total) * 100) / 100);
+                        },
+                        get parcelaIntegrada() {
+                            return this.parcelas.find((p) => this.formaPorId(p.forma_pagamento_id)?.integrado) || null;
+                        },
+                        // Mesmas regras do servidor, para avisar antes de enviar.
+                        get erroDivisao() {
+                            if (! this.dividido || ! this.parcelas.length) return '';
+                            if (this.parcelas.some((p) => ! (Number(p.valor) > 0))) return 'Informe o valor de cada forma (ou remova a que não vai usar).';
+                            if (this.parcelas.filter((p) => this.formaPorId(p.forma_pagamento_id)?.integrado).length > 1) return 'Use no máximo um Pix com QR Code por venda.';
+                            if (this.trocoDividido > 0.009) {
+                                const emDinheiro = this.parcelas
+                                    .filter((p) => this.formaPorId(p.forma_pagamento_id)?.tipo === 'dinheiro')
+                                    .reduce((s, p) => s + (Number(p.valor) || 0), 0);
+                                if (this.trocoDividido > emDinheiro + 0.009) return 'Só o dinheiro pode passar do total (troco). Ajuste o valor do cartão/Pix.';
+                            }
+                            return '';
+                        },
                         get observacaoComTroco() {
                             let obs = this.observacao || '';
+                            if (this.dividido) return obs;
                             if (this.formaPagamento === 'dinheiro' && this.valorRecebido > 0) {
                                 const extra = `Recebido: ${this.formatar(this.valorRecebido)} | Troco: ${this.formatar(this.troco)}`;
                                 obs = obs ? `${obs} | ${extra}` : extra;
@@ -745,6 +825,42 @@
 
                         formatar(valor) {
                             return 'R$ ' + Number(valor || 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                        },
+
+                        formaPorId(id) {
+                            return this.formasPagamento.find((f) => f.id === Number(id)) || null;
+                        },
+                        nomeForma(id) {
+                            return this.formaPorId(id)?.nome || '—';
+                        },
+
+                        iniciarDivisao() {
+                            this.dividido = true;
+                            this.parcelas = [];
+                        },
+                        cancelarDivisao() {
+                            this.dividido = false;
+                            this.parcelas = [];
+                        },
+                        adicionarParcela(id) {
+                            const forma = this.formaPorId(id);
+                            if (! forma) return;
+                            if (this.parcelas.length >= this.maxParcelas) {
+                                alert(`No máximo ${this.maxParcelas} formas por venda.`);
+                                return;
+                            }
+                            if (forma.integrado && this.parcelaIntegrada) {
+                                alert('Já tem um Pix com QR Code nesta venda. Ajuste o valor dele.');
+                                return;
+                            }
+                            this.parcelas.push({ chave: this.proximaChave++, forma_pagamento_id: forma.id, valor: this.restante });
+                            this.$nextTick(() => {
+                                const campos = this.$root.querySelectorAll('.pdv-parcela__valor');
+                                campos[campos.length - 1]?.focus();
+                            });
+                        },
+                        removerParcela(i) {
+                            this.parcelas.splice(i, 1);
                         },
 
                         selecionarForma(id) {
@@ -897,6 +1013,7 @@
                             this.mensagemCodigo = '';
                             this.ultimoItem = '';
                             this.valorRecebido = 0;
+                            this.cancelarDivisao();
                             this.iniciarVenda();
                         },
 
@@ -934,6 +1051,29 @@
                                 return;
                             }
                             if (! this.precisaPerguntarFiscal) this.emitirNfce = false;
+                            if (this.dividido) {
+                                const problema = ! this.parcelas.length
+                                    ? 'Adicione as formas de pagamento (toque nelas) ou volte para uma forma só.'
+                                    : (this.erroDivisao || (this.restante > 0.009 ? `Ainda falta ${this.formatar(this.restante)} para fechar a venda.` : ''));
+                                if (problema) {
+                                    alert(problema);
+                                    this.fiscalDecidido = false;
+                                    return;
+                                }
+                                // forma_pagamento_id da 1ª parcela só para a validação padrão; o servidor usa as parcelas.
+                                this.formaPagamentoId = this.parcelas[0].forma_pagamento_id;
+                                this.formaPagamento = this.formaPorId(this.formaPagamentoId)?.tipo || this.formaPagamento;
+                                if (this.parcelaIntegrada) {
+                                    this.$nextTick(() => this.iniciarPixGateway());
+                                    return;
+                                }
+                                if (this.trocoDividido > 0.009 && ! confirm(`Troco de ${this.formatar(this.trocoDividido)} em dinheiro. Confirmar a venda?`)) {
+                                    this.fiscalDecidido = false;
+                                    return;
+                                }
+                                this.enviarFormulario();
+                                return;
+                            }
                             if (this.formaPagamento === 'dinheiro') {
                                 if (! this.valorRecebido || this.valorRecebido < this.total) this.valorRecebido = this.total;
                                 this.dlgTroco = true;

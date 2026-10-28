@@ -90,7 +90,16 @@ class VendaFiscalService
                 'valor_total' => NfceEmissaoService::totalItens($itens),
             ]);
 
-            $formaFiscal = $venda->forma_pagamento === 'multiplo' ? 'outro' : $venda->forma_pagamento;
+            // Pagamento dividido: cada forma vira um detPag na nota (o valor é
+            // ajustado ao total da NFC-e, que não inclui ingressos/serviços).
+            $formaFiscal = $venda->forma_pagamento;
+            if ($venda->forma_pagamento === 'multiplo') {
+                $formaFiscal = $venda->pagamentos()
+                    ->where('status', 'aprovado')
+                    ->get(['metodo_pagamento', 'valor'])
+                    ->map(fn ($p) => ['forma' => $p->metodo_pagamento, 'valor' => (float) $p->valor])
+                    ->values()->all() ?: 'outro';
+            }
 
             // Série do terminal do caixa que fez a venda (ou a padrão da empresa).
             return $this->nfce->emitir($empresa, $venda->unidade, $venda->cliente, $formaFiscal, $documento, $itens, $venda->caixa?->terminal);

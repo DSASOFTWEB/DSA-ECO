@@ -113,6 +113,7 @@ Route::middleware('auth')->group(function () {
     Route::get('clientes/buscar', [ClienteController::class, 'buscar'])->name('clientes.buscar');
     Route::resource('clientes', ClienteController::class);
     Route::post('clientes/{cliente}/dependentes', [DependenteController::class, 'store'])->name('clientes.dependentes.store');
+    Route::put('clientes/{cliente}/dependentes/{dependente}', [DependenteController::class, 'update'])->name('clientes.dependentes.update');
     Route::delete('clientes/{cliente}/dependentes/{dependente}', [DependenteController::class, 'destroy'])->name('clientes.dependentes.destroy');
 
     Route::resource('planos', PlanoController::class)->except(['show']);

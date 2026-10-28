@@ -48,6 +48,35 @@ class Dependente extends Model
      *
      * @return list<string>
      */
+    /**
+     * Parentesco do cadastro na forma da lista atual. Cadastros antigos
+     * (texto livre, ex.: "ESPOSA", "FILHA") são reconhecidos para o
+     * formulário de edição abrir com a opção certa; desconhecido = null.
+     */
+    public function parentescoNaLista(): ?string
+    {
+        $atual = (string) $this->parentesco;
+        if (in_array($atual, self::niveisParentesco(), true)) {
+            return $atual;
+        }
+
+        $chave = \Illuminate\Support\Str::of($atual)->ascii()->lower()->replaceMatches('/[^a-z]/', '')->toString();
+
+        return match (true) {
+            $chave === '' => null,
+            in_array($chave, ['esposa', 'esposo', 'marido', 'mulher', 'conjuge', 'companheiro', 'companheira'], true) => self::PARENTESCO_CONJUGE,
+            str_starts_with($chave, 'filh') || str_starts_with($chave, 'enteado') => self::PARENTESCO_FILHO,
+            str_starts_with($chave, 'sobrinh') => self::PARENTESCO_SOBRINHO,
+            str_starts_with($chave, 'ti') && strlen($chave) <= 5 => self::PARENTESCO_TIO,
+            in_array($chave, ['pai', 'mae', 'paimae', 'padrasto', 'madrasta'], true) => self::PARENTESCO_PAI_MAE,
+            str_starts_with($chave, 'irma') => self::PARENTESCO_IRMAO,
+            str_starts_with($chave, 'net') => self::PARENTESCO_NETO,
+            str_starts_with($chave, 'avo') => self::PARENTESCO_AVO,
+            str_starts_with($chave, 'prim') => self::PARENTESCO_PRIMO,
+            default => null,
+        };
+    }
+
     public static function niveisParentesco(): array
     {
         return [

@@ -148,43 +148,88 @@
                     @endcan
                 </div>
 
-                <form id="form-dependente" method="POST" action="{{ route('clientes.dependentes.store', $cliente) }}" class="mb-4 {{ $errors->hasAny(['nome', 'parentesco', 'data_nascimento', 'cpf']) ? '' : 'hidden' }} grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3">
+                @php
+                    $campoDep = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white/90';
+                    $errosAdicionar = $errors->hasAny(['nome', 'parentesco', 'data_nascimento', 'cpf']);
+                @endphp
+                <form id="form-dependente" method="POST" action="{{ route('clientes.dependentes.store', $cliente) }}" class="mb-4 {{ $errosAdicionar ? '' : 'hidden' }} grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 dark:bg-white/[0.03]">
                     @csrf
-                    <input type="text" name="nome" value="{{ old('nome') }}" placeholder="Nome" required class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                    <select name="parentesco" required class="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700">
+                    <input type="text" name="nome" value="{{ $errosAdicionar ? old('nome') : '' }}" placeholder="Nome completo" required class="col-span-2 {{ $campoDep }}">
+                    <select name="parentesco" required class="{{ $campoDep }}">
                         <option value="">Parentesco</option>
                         @foreach (\App\Models\Dependente::niveisParentesco() as $nivel)
-                            <option value="{{ $nivel }}" @selected(old('parentesco') === $nivel)>{{ $nivel }}</option>
+                            <option value="{{ $nivel }}" @selected($errosAdicionar && old('parentesco') === $nivel)>{{ $nivel }}</option>
                         @endforeach
                     </select>
-                    <input type="date" name="data_nascimento" value="{{ old('data_nascimento') }}" required class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                    <button class="rounded-lg bg-sky-700 px-3 py-2 text-sm font-medium text-white">Salvar</button>
-                    @error('parentesco')
-                        <p class="col-span-2 text-xs text-rose-600">{{ $message }}</p>
-                    @enderror
-                    @error('nome')
-                        <p class="col-span-2 text-xs text-rose-600">{{ $message }}</p>
-                    @enderror
+                    <input type="date" name="data_nascimento" value="{{ $errosAdicionar ? old('data_nascimento') : '' }}" required title="Data de nascimento" class="{{ $campoDep }}">
+                    <input type="text" name="cpf" value="{{ $errosAdicionar ? old('cpf') : '' }}" placeholder="CPF (opcional)" inputmode="numeric" class="{{ $campoDep }}">
+                    <button class="rounded-lg bg-sky-700 px-3 py-2 text-sm font-medium text-white hover:bg-sky-800">Salvar</button>
+                    @foreach (['nome', 'parentesco', 'data_nascimento', 'cpf'] as $campoErro)
+                        @error($campoErro)<p class="col-span-2 text-xs text-rose-600">{{ $message }}</p>@enderror
+                    @endforeach
                 </form>
 
-                <ul class="divide-y divide-slate-50 text-sm">
+                <ul class="divide-y divide-slate-100 text-sm dark:divide-gray-800">
                     @forelse ($cliente->dependentes as $dependente)
-                        <li class="flex items-center justify-between py-2">
-                            <span>{{ $dependente->nome }} <span class="text-slate-400">({{ $dependente->parentesco ?: 'dependente' }})</span></span>
-                            <div class="flex items-center gap-3">
-                                @if ($dependente->carteirinha)
-                                    <a href="{{ route('carteirinhas.imprimir', $dependente->carteirinha) }}" target="_blank" class="text-xs text-sky-700 hover:underline">Imprimir</a>
-                                    <a href="{{ route('carteirinhas.show', $dependente->carteirinha) }}" class="inline-flex items-center gap-1 text-xs text-sky-700 hover:underline">
-                                        Ver
-                                    </a>
-                                @else
-                                    <span class="text-xs text-slate-400">Sem carteirinha</span>
-                                @endif
-                                <form method="POST" action="{{ route('clientes.dependentes.destroy', [$cliente, $dependente]) }}" onsubmit="return confirm('Remover este dependente?')">
-                                    @csrf @method('DELETE')
-                                    <button class="text-rose-600 hover:underline">remover</button>
-                                </form>
+                        @php
+                            // Erro ao salvar a edição deste dependente: reabre o formulário dele com o que foi digitado.
+                            $bagEdicao = $errors->getBag('dependente'.$dependente->id);
+                            $comErro = $bagEdicao->any();
+                            $valor = fn (string $campo, $atual) => $comErro ? old($campo) : $atual;
+                        @endphp
+                        <li class="py-2" x-data="{ editando: @js($comErro) }">
+                            <div class="flex items-center justify-between gap-3">
+                                <span>
+                                    {{ $dependente->nome }} <span class="text-slate-400">({{ $dependente->parentesco ?: 'dependente' }})</span>
+                                    <span class="block text-xs text-slate-400">
+                                        {{ $dependente->data_nascimento?->format('d/m/Y') }}@if ($dependente->data_nascimento) · {{ $dependente->data_nascimento->age }} anos @endif
+                                        @if ($dependente->cpf) · CPF {{ $dependente->cpf }} @endif
+                                    </span>
+                                </span>
+                                <div class="flex shrink-0 items-center gap-3">
+                                    @if ($dependente->carteirinha)
+                                        <a href="{{ route('carteirinhas.imprimir', $dependente->carteirinha) }}" target="_blank" class="text-xs text-sky-700 hover:underline">Imprimir</a>
+                                        <a href="{{ route('carteirinhas.show', $dependente->carteirinha) }}" class="inline-flex items-center gap-1 text-xs text-sky-700 hover:underline">Ver</a>
+                                    @else
+                                        <span class="text-xs text-slate-400">Sem carteirinha</span>
+                                    @endif
+                                    @can('update', $dependente)
+                                        <button type="button" @click="editando = ! editando" class="text-xs font-semibold text-amber-700 hover:underline dark:text-amber-400" x-text="editando ? 'cancelar' : 'editar'">editar</button>
+                                    @endcan
+                                    @can('delete', $dependente)
+                                        <form method="POST" action="{{ route('clientes.dependentes.destroy', [$cliente, $dependente]) }}" onsubmit="return confirm('Remover este dependente?')">
+                                            @csrf @method('DELETE')
+                                            <button class="text-xs text-rose-600 hover:underline">remover</button>
+                                        </form>
+                                    @endcan
+                                </div>
                             </div>
+
+                            @can('update', $dependente)
+                                <form x-show="editando" x-cloak method="POST" action="{{ route('clientes.dependentes.update', [$cliente, $dependente]) }}" class="mt-2 grid grid-cols-2 gap-2 rounded-lg bg-amber-50/60 p-3 dark:bg-amber-500/5">
+                                    @csrf @method('PUT')
+                                    <input type="text" name="nome" value="{{ $valor('nome', $dependente->nome) }}" placeholder="Nome completo" required class="col-span-2 {{ $campoDep }}">
+                                    @php
+                                        // Cadastro antigo ("ESPOSA", "FILHA"...) abre já na opção equivalente da lista.
+                                        $parentescoAtual = $valor('parentesco', $dependente->parentescoNaLista() ?? $dependente->parentesco);
+                                        $legado = $dependente->parentescoNaLista() === null && filled($dependente->parentesco);
+                                    @endphp
+                                    <select name="parentesco" required class="{{ $campoDep }}">
+                                        @if ($legado)
+                                            <option value="{{ $dependente->parentesco }}" @selected($parentescoAtual === $dependente->parentesco)>{{ $dependente->parentesco }} (atual)</option>
+                                        @endif
+                                        @foreach (\App\Models\Dependente::niveisParentesco() as $nivel)
+                                            <option value="{{ $nivel }}" @selected($parentescoAtual === $nivel)>{{ $nivel }}</option>
+                                        @endforeach
+                                    </select>
+                                    <input type="date" name="data_nascimento" value="{{ $valor('data_nascimento', $dependente->data_nascimento?->toDateString()) }}" required title="Data de nascimento" class="{{ $campoDep }}">
+                                    <input type="text" name="cpf" value="{{ $valor('cpf', $dependente->cpf) }}" placeholder="CPF (opcional)" inputmode="numeric" class="{{ $campoDep }}">
+                                    <button class="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700">Salvar alterações</button>
+                                    @foreach ($bagEdicao->all() as $mensagem)
+                                        <p class="col-span-2 text-xs text-rose-600">{{ $mensagem }}</p>
+                                    @endforeach
+                                </form>
+                            @endcan
                         </li>
                     @empty
                         <li class="py-4 text-center text-slate-400">Nenhum dependente cadastrado.</li>

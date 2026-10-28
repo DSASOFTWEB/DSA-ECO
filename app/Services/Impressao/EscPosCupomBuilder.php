@@ -25,6 +25,7 @@ class EscPosCupomBuilder
      *   valorRecebido?: ?float,
      *   troco?: ?float,
      *   obsLimpa?: ?string,
+     *   pagamentos?: list<array{forma: string, valor: float}>,
      * }  $meta
      */
     public function montar(Venda $venda, array $meta = []): string
@@ -111,7 +112,14 @@ class EscPosCupomBuilder
             default => (string) $venda->forma_pagamento,
         };
         $out .= $this->separador('PAGAMENTO');
-        $out .= $this->linhaPar($forma, $this->moeda($venda->valor_total));
+        if (! empty($meta['pagamentos'])) {
+            // Pagamento dividido: uma linha por forma.
+            foreach ($meta['pagamentos'] as $pg) {
+                $out .= $this->linhaPar((string) $pg['forma'], $this->moeda($pg['valor']));
+            }
+        } else {
+            $out .= $this->linhaPar($forma, $this->moeda($venda->valor_total));
+        }
         if (isset($meta['valorRecebido']) && $meta['valorRecebido'] !== null) {
             $out .= $this->linhaPar('Valor recebido', $this->moeda($meta['valorRecebido']));
         }

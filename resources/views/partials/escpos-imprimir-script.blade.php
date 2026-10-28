@@ -2,6 +2,7 @@
     Envia um .bin ESC/POS gerado no servidor para a impressora térmica:
     agente local (impressao.agente_url da empresa) → Web Serial → download.
     Uso: imprimirEscPos({ url, agente, colunas, arquivo, status: el, botao: el })
+    Devolve true quando chegou à impressora (agente ou Web Serial).
 --}}
 <script>
 async function imprimirEscPos({ url, agente, colunas, arquivo, status, botao }) {
@@ -25,7 +26,7 @@ async function imprimirEscPos({ url, agente, colunas, arquivo, status, botao }) 
                     body: JSON.stringify({ columns: colunas, cut: true, payload_base64: btoa(binario) }),
                     signal: ctrl.signal,
                 });
-                if (r.ok) { avisar('Enviado à impressora.'); return; }
+                if (r.ok) { avisar('Enviado à impressora.'); return true; }
             } catch (e) { /* agente fora do ar: tenta Web Serial */ } finally { clearTimeout(timer); }
         }
 
@@ -37,7 +38,7 @@ async function imprimirEscPos({ url, agente, colunas, arquivo, status, botao }) 
                 const writer = port.writable.getWriter();
                 try { await writer.write(bytes); } finally { writer.releaseLock(); await port.close(); }
                 avisar('Enviado via Web Serial.');
-                return;
+                return true;
             } catch (e) { /* cancelou a porta: cai no download */ }
         }
 
@@ -52,5 +53,6 @@ async function imprimirEscPos({ url, agente, colunas, arquivo, status, botao }) 
     } finally {
         if (botao) botao.disabled = false;
     }
+    return false;
 }
 </script>

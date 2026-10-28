@@ -124,6 +124,26 @@ class PdvPagamentoDivididoTest extends TestCase
         $this->assertEquals(30, $movs->sum('valor'));
     }
 
+    public function test_comprovante_mostra_cada_forma_e_o_troco(): void
+    {
+        $this->post(route('vendas.store'), $this->venda([
+            ['forma_pagamento_id' => $this->credito->id, 'valor' => 20],
+            ['forma_pagamento_id' => $this->dinheiro->id, 'valor' => 50],
+        ]));
+        $venda = Venda::latest('id')->firstOrFail();
+
+        $this->get(route('vendas.comprovante', $venda))->assertOk()
+            ->assertSeeInOrder(['PAGAMENTO', 'Cartão de crédito', 'R$ 20,00', 'Dinheiro', 'R$ 50,00', 'Troco', 'R$ 40,00'])
+            ->assertDontSee('Multiplo')
+            ->assertDontSee('OBSERVACOES');
+
+        $bytes = $this->get(route('vendas.comprovante.escpos', $venda))->assertOk()->getContent();
+        $texto = iconv('CP850', 'UTF-8', $bytes);
+        $this->assertMatchesRegularExpression('/Cartão de crédito\s+R\$ 20,00/u', $texto);
+        $this->assertMatchesRegularExpression('/Dinheiro\s+R\$ 50,00/u', $texto);
+        $this->assertMatchesRegularExpression('/Troco\s+R\$ 40,00/u', $texto);
+    }
+
     public function test_tres_formas_iguais_ao_total(): void
     {
         $manual = FormaPagamento::create(['empresa_id' => $this->empresa->id, 'nome' => 'Pix chave', 'tipo' => 'pix', 'ativo' => true]);

@@ -50,7 +50,7 @@
         @if (in_array($impressaoModo, ['escpos', 'ambos'], true))
             <button type="button" class="escpos" id="btn-escpos">Imprimir ESC/POS</button>
         @endif
-        <a href="{{ $voltarUrl }}" class="nova">{{ $documento->hospedagem_id ? 'Voltar à hospedagem' : ($documento->origem === 'venda_mesa' ? 'Voltar às mesas' : 'Nova venda') }}</a>
+        <a href="{{ $voltarUrl }}" class="nova">{{ $documento->hospedagem_id ? 'Voltar à hospedagem' : ($documento->origem === 'venda_mesa' ? 'Voltar às mesas' : '➕ Nova venda (Esc)') }}</a>
         @if ($documento->venda_id)
             <a href="{{ route('vendas.show', $documento->venda_id) }}">Detalhes da venda</a>
         @endif
@@ -140,12 +140,25 @@
             botao: document.getElementById('btn-escpos'),
         });
 
-        document.getElementById('btn-escpos')?.addEventListener('click', imprimirDanfce);
+        const VOLTAR_URL = @json($voltarUrl);
+        // Venda recém-finalizada no PDV: impresso o cupom, já abre a próxima venda.
+        const CONTINUAR_PDV = @json((bool) session('pdv_continuar') && $documento->origem === 'venda_pdv');
+        const aposImprimir = () => {
+            if (! CONTINUAR_PDV) return;
+            document.getElementById('status').textContent = 'Impresso. Abrindo nova venda...';
+            setTimeout(() => { window.location.href = VOLTAR_URL; }, 600);
+        };
+
+        document.getElementById('btn-escpos')?.addEventListener('click', async () => { if (await imprimirDanfce()) aposImprimir(); });
+        window.addEventListener('afterprint', aposImprimir);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); window.location.href = VOLTAR_URL; }
+        });
 
         // Imprime sozinho ao abrir (como o cupom do PDV); ?ver=1 só mostra.
-        window.addEventListener('load', () => {
+        window.addEventListener('load', async () => {
             if (new URLSearchParams(window.location.search).has('ver')) return;
-            if (MODO === 'escpos') { imprimirDanfce(); return; }
+            if (MODO === 'escpos') { if (await imprimirDanfce()) aposImprimir(); return; }
             setTimeout(() => window.print(), 250);
         });
     </script>

@@ -19,6 +19,7 @@ use App\Services\Impressao\EscPosCupomBuilder;
 use App\Services\QrCodeService;
 use App\Services\Relatorios\VoucherEntradaPdfExport;
 use App\Services\VendaService;
+use App\Support\Financeiro;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
@@ -95,6 +96,10 @@ class VendaController extends Controller
             return back()->withInput()->with('erro', $e->getMessage());
         }
 
+        // Recém-saído do PDV: depois de imprimir, o cupom volta sozinho para
+        // uma venda nova (sem passar pela lista de vendas).
+        session()->flash('pdv_continuar', true);
+
         // "F4 emitir NFC-e" na finalização: autorizada, vai direto para o
         // cupom fiscal (DANFE); se falhar, a venda segue e o comprovante avisa.
         if ($request->boolean('emitir_nfce')) {
@@ -159,6 +164,7 @@ class VendaController extends Controller
             'valorRecebido' => $meta['valorRecebido'],
             'troco' => $meta['troco'],
             'obsLimpa' => $meta['obsLimpa'],
+            'pagamentosCupom' => $meta['pagamentos'],
             'escposUrl' => route('vendas.comprovante.escpos', $venda),
             'escposAgenteUrl' => $impressao['agente_url'],
             'escposColunas' => $impressao['colunas'],
@@ -216,7 +222,42 @@ class VendaController extends Controller
             'valorRecebido' => $valorRecebido,
             'troco' => $troco,
             'obsLimpa' => $obsLimpa,
+            'pagamentos' => $this->pagamentosDoCupom($venda, (float) $troco),
         ];
+    }
+
+    /**
+     * Pagamento dividido (dinheiro + cartão + Pix...): uma linha por forma.
+     * O dinheiro aparece com o valor entregue pelo cliente (líquido + troco),
+     * como em qualquer cupom. Venda com uma forma só devolve [] e o cupom
+     * mostra a linha única de sempre.
+     *
+     * @return list<array{forma: string, valor: float}>
+     */
+    protected function pagamentosDoCupom(Venda $venda, float $troco): array
+    {
+        $pagamentos = $venda->pagamentos()->where('status', 'aprovado')->orderBy('id')->get(['metodo_pagamento', 'valor']);
+
+        if ($pagamentos->count() < 2 && $venda->forma_pagamento !== 'multiplo') {
+            return [];
+        }
+
+        $linhas = $pagamentos->map(fn ($p) => [
+            'tipo' => (string) $p->metodo_pagamento,
+            'forma' => Financeiro::FORMAS_PAGAMENTO[$p->metodo_pagamento]['label'] ?? ucfirst(str_replace('_', ' ', (string) $p->metodo_pagamento)),
+            'valor' => (float) $p->valor,
+        ])->all();
+
+        if ($troco > 0) {
+            foreach (array_reverse(array_keys($linhas)) as $i) {
+                if ($linhas[$i]['tipo'] === 'dinheiro') {
+                    $linhas[$i]['valor'] = round($linhas[$i]['valor'] + $troco, 2);
+                    break;
+                }
+            }
+        }
+
+        return array_map(fn ($l) => ['forma' => $l['forma'], 'valor' => $l['valor']], $linhas);
     }
 
     /**
@@ -243,6 +284,8 @@ class VendaController extends Controller
 
         $obsLimpa = trim(preg_replace('/\s*\|\s*Recebido:.*?Troco:\s*R\$\s*[\d.,]+/iu', '', $observacao) ?? '');
         $obsLimpa = trim(preg_replace('/Recebido:\s*R\$\s*[\d.,]+\s*\|\s*Troco:\s*R\$\s*[\d.,]+/iu', '', $obsLimpa) ?? '');
+        // Pagamento dividido grava só "Troco: R$ x" (sem o "Recebido").
+        $obsLimpa = trim(preg_replace('/\s*\|?\s*Troco:\s*R\$\s*[\d.,]+/iu', '', $obsLimpa) ?? '', " |\t\n");
         $obsLimpa = $obsLimpa !== '' ? $obsLimpa : null;
 
         return [$valorRecebido, $troco, $obsLimpa];

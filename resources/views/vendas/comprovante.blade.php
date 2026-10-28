@@ -245,6 +245,7 @@
             'pix' => 'Pix',
             'cartao_credito' => 'Cartão crédito',
             'cartao_debito' => 'Cartão débito',
+            'multiplo' => 'Várias formas',
             default => ucfirst(str_replace('_', ' ', (string) $venda->forma_pagamento)),
         };
         $vendaIdPad = str_pad((string) $venda->id, 6, '0', STR_PAD_LEFT);
@@ -269,6 +270,7 @@
     @endphp
 
     <div class="cupom-toolbar no-print">
+        <a href="{{ route('vendas.create') }}" id="btn-nova-venda" class="btn-print" style="background:#1d4ed8">➕ Nova venda <small style="opacity:.8">(Esc)</small></a>
         @if ($mostrarDom)
             <button type="button" class="btn-print" id="btn-dom" style="{{ $primarioEscpos ? 'background:#334155' : '' }}" onclick="window.print()">Imprimir DOM 80mm</button>
         @endif
@@ -279,7 +281,6 @@
         @if ($nfce = $venda->nfceAutorizada())
             <a href="{{ route('fiscal.danfce', $nfce) }}" class="btn-print" style="background:#047857">🧾 Imprimir NFC-e nº {{ $nfce->numero }}</a>
         @endif
-        <a href="{{ route('vendas.create') }}" class="btn-print" style="background:#1d4ed8">Nova venda</a>
         @if ($venda->status === 'pago' && $venda->ehEntradaAvulsa())
             <a href="{{ route('vendas.voucher', $venda) }}" target="_blank">Baixar PDF voucher</a>
         @endif
@@ -385,10 +386,17 @@
 
             <div class="cupom-thermal__sep">PAGAMENTO</div>
             <div class="cupom-thermal__totais">
-                <div class="cupom-thermal__tot-linha cupom-thermal__tot-linha--pgto">
-                    <span>{{ $formaLabel }}</span>
-                    <span>{{ $fmt($venda->valor_total) }}</span>
-                </div>
+                @forelse ($pagamentosCupom ?? [] as $pg)
+                    <div class="cupom-thermal__tot-linha cupom-thermal__tot-linha--pgto">
+                        <span>{{ $pg['forma'] }}</span>
+                        <span>{{ $fmt($pg['valor']) }}</span>
+                    </div>
+                @empty
+                    <div class="cupom-thermal__tot-linha cupom-thermal__tot-linha--pgto">
+                        <span>{{ $formaLabel }}</span>
+                        <span>{{ $fmt($venda->valor_total) }}</span>
+                    </div>
+                @endforelse
                 @if ($valorRecebido !== null)
                     <div class="cupom-thermal__tot-linha">
                         <span>Valor recebido</span>
@@ -470,10 +478,25 @@
         const IMPRESSAO_MODO = @json($impressaoModo ?? 'dom');
         const IMPRESSAO_AUTO = @json((bool) ($impressaoAuto ?? false));
         const statusEl = document.getElementById('escpos-status');
+        const NOVA_VENDA_URL = @json(route('vendas.create'));
+        // Recém-saído do PDV: depois de imprimir já volta para a próxima venda.
+        const CONTINUAR_PDV = @json((bool) session('pdv_continuar'));
 
         function setStatus(msg) {
             if (statusEl) statusEl.textContent = msg || '';
         }
+
+        function novaVenda() {
+            window.location.href = NOVA_VENDA_URL;
+        }
+
+        function aposImprimir() {
+            if (! CONTINUAR_PDV) return;
+            setStatus('Impresso. Abrindo nova venda...');
+            setTimeout(novaVenda, 600);
+        }
+
+        window.addEventListener('afterprint', aposImprimir);
 
         async function baixarEscPosBytes() {
             const res = await fetch(ESCPOS_URL, { credentials: 'same-origin', headers: { 'Accept': 'application/octet-stream' } });
@@ -538,6 +561,7 @@
                 setStatus('Tentando agente local (' + ESCPOS_AGENTE + ')...');
                 if (await enviarAgenteLocal(bytes)) {
                     setStatus('Enviado ao agente ESC/POS.');
+                    aposImprimir();
                     return;
                 }
 
@@ -546,6 +570,7 @@
                     try {
                         if (await enviarWebSerial(bytes)) {
                             setStatus('Enviado via Web Serial.');
+                            aposImprimir();
                             return;
                         }
                     } catch (e) {
@@ -580,6 +605,11 @@
 
         document.addEventListener('keydown', (e) => {
             if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+            if (e.key === 'Escape' || e.key === 'n' || e.key === 'N') {
+                e.preventDefault();
+                novaVenda();
+                return;
+            }
             if (e.key === 'Enter' || e.key === 'p' || e.key === 'P') {
                 e.preventDefault();
                 imprimirPadrao();

@@ -131,6 +131,11 @@ class PdvPixController extends Controller
             session()->flash('fiscal', $cobrancaPix->dados_venda['fiscal_venda']);
         }
 
+        // Venda do PDV: o cupom volta sozinho para uma venda nova após imprimir.
+        if (isset($resposta['redirect']) && ! $cobrancaPix->hospedagem_id && ! $cobrancaPix->atendimento_id) {
+            session()->flash('pdv_continuar', true);
+        }
+
         return response()->json($resposta);
     }
 

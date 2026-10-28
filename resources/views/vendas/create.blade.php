@@ -102,6 +102,13 @@
 .pdv-pgto__cel--alerta strong { color:#b45309; }
 .pdv-pgto__cel--troco strong { color:var(--pdv-green); }
 .pdv-pgto__input { width:100%; border:1px solid var(--pdv-border); border-radius:6px; padding:7px 8px; }
+.pdv-desc { display:flex; gap:8px; align-items:stretch; }
+.pdv-desc__modo { display:inline-flex; border:1px solid var(--pdv-border); border-radius:6px; overflow:hidden; flex:none; }
+.pdv-desc__modo button { border:0; background:#fff; padding:0 14px; font-weight:800; color:#475569; }
+.pdv-desc__modo button + button { border-left:1px solid var(--pdv-border); }
+.pdv-desc__modo button.is-ativo { background:var(--pdv-blue); color:#fff; }
+.pdv-desc__previa { margin:8px 0 0; font-size:12px; color:var(--pdv-muted); }
+.pdv-desc__previa strong { color:#0f172a; }
 .pdv-dividir { width:100%; margin-top:8px; border:1px dashed #94a3b8; background:#fff; color:#334155; border-radius:8px; padding:8px; font-size:12px; font-weight:700; }
 .pdv-dividir small { font-weight:600; color:var(--pdv-muted); }
 .pdv-dividir:hover { border-color:var(--pdv-blue); color:var(--pdv-blue); }
@@ -362,7 +369,7 @@
                         <div class="pdv-rapidas">
                             <button type="button" class="pdv-rapida" @click="abrirCliente()"><span>CLIENTE</span><small>F7</small></button>
                             <button type="button" class="pdv-rapida" @click="dlgObs = true"><span>OBSERVAÇÕES</span><small>—</small></button>
-                            <button type="button" class="pdv-rapida" @click="dlgDesconto = true"><span>DESCONTO</span><small>—</small></button>
+                            <button type="button" class="pdv-rapida" @click="abrirDescontoGeral()"><span>DESCONTO</span><small x-text="descontoGeral > 0 ? (descontoGeralModo === 'percentual' ? (Number(descontoGeralEntrada) || 0) + '% · ' : '') + formatar(descontoGeral) : 'R$ ou %'"></small></button>
                         </div>
 
                         <div class="pdv-card">
@@ -502,11 +509,18 @@
             {{-- Modal desconto geral --}}
             <div class="pdv-modal" x-show="dlgDesconto" x-cloak>
                 <div class="pdv-modal__card" @click.outside="dlgDesconto = false">
-                    <h3>Desconto geral (R$)</h3>
-                    <p class="mb-2 text-xs text-slate-500">Será aplicado no primeiro item da venda no envio.</p>
-                    <input type="number" min="0" step="0.01" class="pdv-pgto__input" x-model.number="descontoGeral">
+                    <h3>Desconto geral</h3>
+                    <p class="mb-2 text-xs text-slate-500">Sobre a venda inteira (subtotal <span x-text="formatar(subtotal - descontoItens)"></span>).</p>
+                    <div class="pdv-desc">
+                        <div class="pdv-desc__modo">
+                            <button type="button" :class="{ 'is-ativo': descontoGeralModo === 'valor' }" @click="descontoGeralModo = 'valor'; $refs.campoDescGeral.focus()">R$</button>
+                            <button type="button" :class="{ 'is-ativo': descontoGeralModo === 'percentual' }" @click="descontoGeralModo = 'percentual'; $refs.campoDescGeral.focus()">%</button>
+                        </div>
+                        <input type="number" min="0" :max="descontoGeralModo === 'percentual' ? 100 : null" step="0.01" class="pdv-pgto__input" x-ref="campoDescGeral" x-model.number="descontoGeralEntrada" @keydown.enter.prevent="dlgDesconto = false" @focus="$event.target.select()">
+                    </div>
+                    <p class="pdv-desc__previa">Desconto: <strong x-text="formatar(descontoGeral)"></strong> · Total: <strong x-text="formatar(total)"></strong></p>
                     <div class="pdv-modal__actions">
-                        <button type="button" class="pdv-btn" @click="descontoGeral = 0; dlgDesconto = false">Limpar</button>
+                        <button type="button" class="pdv-btn" @click="descontoGeralEntrada = 0; dlgDesconto = false">Limpar</button>
                         <button type="button" class="pdv-btn pdv-btn--primary" @click="dlgDesconto = false">Aplicar</button>
                     </div>
                 </div>
@@ -516,8 +530,15 @@
             <div class="pdv-modal" x-show="dlgDescontoItem" x-cloak>
                 <div class="pdv-modal__card" @click.outside="dlgDescontoItem = false">
                     <h3>Desconto do item</h3>
-                    <p class="mb-2 text-sm text-slate-600" x-text="itens[selecionado]?.nome || ''"></p>
-                    <input type="number" min="0" step="0.01" class="pdv-pgto__input" x-model.number="descontoItemValor">
+                    <p class="mb-2 text-sm text-slate-600"><span x-text="itens[selecionado]?.nome || ''"></span> · <span x-text="formatar(brutoSelecionado)"></span></p>
+                    <div class="pdv-desc">
+                        <div class="pdv-desc__modo">
+                            <button type="button" :class="{ 'is-ativo': descontoItemModo === 'valor' }" @click="descontoItemModo = 'valor'; $refs.campoDescItem.focus()">R$</button>
+                            <button type="button" :class="{ 'is-ativo': descontoItemModo === 'percentual' }" @click="descontoItemModo = 'percentual'; $refs.campoDescItem.focus()">%</button>
+                        </div>
+                        <input type="number" min="0" :max="descontoItemModo === 'percentual' ? 100 : null" step="0.01" class="pdv-pgto__input" x-ref="campoDescItem" x-model.number="descontoItemValor" @keydown.enter.prevent="confirmarDescontoItem()" @focus="$event.target.select()">
+                    </div>
+                    <p class="pdv-desc__previa">Desconto: <strong x-text="formatar(descontoItemCalculado)"></strong> · Item fica: <strong x-text="formatar(brutoSelecionado - descontoItemCalculado)"></strong></p>
                     <div class="pdv-modal__actions">
                         <button type="button" class="pdv-btn" @click="dlgDescontoItem = false">Cancelar</button>
                         <button type="button" class="pdv-btn pdv-btn--primary" @click="confirmarDescontoItem()">OK</button>
@@ -695,8 +716,10 @@
                         parcelas: [],
                         maxParcelas: {{ \App\Http\Requests\Venda\StoreVendaRequest::MAX_PARCELAS }},
                         observacao: '',
-                        descontoGeral: 0,
+                        descontoGeralEntrada: 0,
+                        descontoGeralModo: 'valor',
                         descontoItemValor: 0,
+                        descontoItemModo: 'valor',
                         valorRecebido: 0,
                         proximaChave: 1,
                         salvando: false,
@@ -749,8 +772,25 @@
                         get descontoItens() {
                             return this.itens.reduce((s, i) => s + (i.desconto || 0), 0);
                         },
+                        // Desconto geral em R$ ou % (o % acompanha se itens mudarem),
+                        // limitado ao que sobra depois dos descontos por item.
+                        get descontoGeral() {
+                            const base = Math.max(0, this.subtotal - this.descontoItens);
+                            const entrada = Math.max(0, Number(this.descontoGeralEntrada) || 0);
+                            const valor = this.descontoGeralModo === 'percentual' ? base * Math.min(entrada, 100) / 100 : entrada;
+                            return Math.round(Math.min(valor, base) * 100) / 100;
+                        },
                         get descontoTotal() {
-                            return this.descontoItens + Math.max(0, Number(this.descontoGeral) || 0);
+                            return this.descontoItens + this.descontoGeral;
+                        },
+                        get brutoSelecionado() {
+                            const item = this.itens[this.selecionado];
+                            return item ? item.preco * item.quantidade : 0;
+                        },
+                        get descontoItemCalculado() {
+                            const entrada = Math.max(0, Number(this.descontoItemValor) || 0);
+                            const valor = this.descontoItemModo === 'percentual' ? this.brutoSelecionado * Math.min(entrada, 100) / 100 : entrada;
+                            return Math.round(Math.min(valor, this.brutoSelecionado) * 100) / 100;
                         },
                         get total() {
                             return Math.max(0, this.subtotal - this.descontoTotal);
@@ -781,10 +821,14 @@
                         },
                         get itensParaEnvio() {
                             const itens = this.itens.map((i) => ({ ...i, desconto: Number(i.desconto) || 0 }));
-                            let geral = Math.max(0, Number(this.descontoGeral) || 0);
-                            if (geral > 0 && itens.length) {
-                                const max = itens[0].preco * itens[0].quantidade - itens[0].desconto;
-                                itens[0].desconto += Math.min(geral, Math.max(0, max));
+                            // Desconto geral distribuído item a item (o que não cabe num passa ao próximo).
+                            let geral = this.descontoGeral;
+                            for (const item of itens) {
+                                if (geral <= 0.0049) break;
+                                const max = Math.max(0, item.preco * item.quantidade - item.desconto);
+                                const parte = Math.round(Math.min(geral, max) * 100) / 100;
+                                item.desconto = Math.round((item.desconto + parte) * 100) / 100;
+                                geral = Math.round((geral - parte) * 100) / 100;
                             }
                             return itens;
                         },
@@ -971,17 +1015,23 @@
                                 alert('Selecione um item na lista antes de aplicar desconto.');
                                 return;
                             }
+                            // Reabre em R$ com o desconto atual do item.
+                            this.descontoItemModo = 'valor';
                             this.descontoItemValor = this.itens[this.selecionado].desconto || 0;
                             this.dlgDescontoItem = true;
+                            this.$nextTick(() => this.$refs.campoDescItem?.focus());
                         },
 
                         confirmarDescontoItem() {
                             const item = this.itens[this.selecionado];
                             if (! item) { this.dlgDescontoItem = false; return; }
-                            const bruto = item.preco * item.quantidade;
-                            const numero = Math.max(0, Number(this.descontoItemValor) || 0);
-                            item.desconto = Math.min(numero, bruto);
+                            item.desconto = this.descontoItemCalculado;
                             this.dlgDescontoItem = false;
+                        },
+
+                        abrirDescontoGeral() {
+                            this.dlgDesconto = true;
+                            this.$nextTick(() => this.$refs.campoDescGeral?.focus());
                         },
 
                         abrirCliente() {
@@ -1008,7 +1058,8 @@
                             this.selecionado = null;
                             this.cliente = null;
                             this.observacao = '';
-                            this.descontoGeral = 0;
+                            this.descontoGeralEntrada = 0;
+                            this.descontoGeralModo = 'valor';
                             this.codigoDigitado = '';
                             this.mensagemCodigo = '';
                             this.ultimoItem = '';

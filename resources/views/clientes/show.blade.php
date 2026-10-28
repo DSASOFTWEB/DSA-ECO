@@ -151,7 +151,17 @@
                 @php
                     $campoDep = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white/90';
                     $errosAdicionar = $errors->hasAny(['nome', 'parentesco', 'data_nascimento', 'cpf']);
+                    // Mesmo limite que o cadastro aplica (plano do contrato ativo).
+                    $limiteDep = $cliente->contratoAtivo?->plano?->max_dependentes;
+                    $limiteAtingido = $limiteDep !== null && $cliente->dependentes->count() >= $limiteDep;
                 @endphp
+                @if ($limiteAtingido)
+                    <p class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                        {{ (int) $limiteDep === 0
+                            ? 'O plano "'.$cliente->contratoAtivo->plano->nome.'" não inclui dependentes. Para cadastrar, mude o contrato para um plano com dependentes.'
+                            : 'Limite do plano "'.$cliente->contratoAtivo->plano->nome.'" atingido ('.$limiteDep.' dependente(s)).' }}
+                    </p>
+                @endif
                 <form id="form-dependente" method="POST" action="{{ route('clientes.dependentes.store', $cliente) }}" class="mb-4 {{ $errosAdicionar ? '' : 'hidden' }} grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 dark:bg-white/[0.03]">
                     @csrf
                     <input type="text" name="nome" value="{{ $errosAdicionar ? old('nome') : '' }}" placeholder="Nome completo" required class="col-span-2 {{ $campoDep }}">

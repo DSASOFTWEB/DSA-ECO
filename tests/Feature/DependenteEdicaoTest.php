@@ -117,6 +117,26 @@ class DependenteEdicaoTest extends TestCase
         $this->assertDatabaseHas('dependentes', ['id' => $this->dependente->id, 'nome' => 'MARIA CLRA VIERA']);
     }
 
+    public function test_plano_sem_dependentes_avisa_em_vez_de_dar_erro(): void
+    {
+        $plano = \App\Models\Plano::factory()->create(['empresa_id' => $this->empresa->id, 'nome' => 'Plano Individual', 'max_dependentes' => 0]);
+        \App\Models\Contrato::create([
+            'empresa_id' => $this->empresa->id, 'unidade_id' => $this->titular->unidade_id, 'cliente_id' => $this->titular->id,
+            'plano_id' => $plano->id, 'data_inicio' => now(), 'dia_vencimento' => 10, 'valor_mensal' => 100, 'status' => 'ativo',
+        ]);
+
+        $this->get(route('clientes.show', $this->titular))->assertSee('não inclui dependentes');
+
+        $this->from(route('clientes.show', $this->titular))
+            ->post(route('clientes.dependentes.store', $this->titular), [
+                'nome' => 'NOVO DEP', 'data_nascimento' => '2018-01-01', 'parentesco' => Dependente::niveisParentesco()[0],
+            ])
+            ->assertRedirect(route('clientes.show', $this->titular))
+            ->assertSessionHas('erro', fn ($e) => str_contains($e, '"Plano Individual" do cliente não inclui dependentes'));
+
+        $this->assertDatabaseMissing('dependentes', ['nome' => 'NOVO DEP']);
+    }
+
     public function test_adicionar_aceita_cpf_e_guarda_so_os_digitos(): void
     {
         $this->post(route('clientes.dependentes.store', $this->titular), [

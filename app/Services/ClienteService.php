@@ -79,7 +79,11 @@ class ClienteService
             $totalAtual = $cliente->dependentes()->count();
 
             if ($totalAtual >= $limiteDoContrato) {
-                throw new NegocioException("O plano do cliente permite no máximo {$limiteDoContrato} dependente(s).");
+                $plano = $contratoAtivo->plano->nome;
+
+                throw new NegocioException((int) $limiteDoContrato === 0
+                    ? "O plano \"{$plano}\" do cliente não inclui dependentes. Para cadastrar, mude o contrato para um plano com dependentes."
+                    : "O plano \"{$plano}\" permite no máximo {$limiteDoContrato} dependente(s) e o cliente já tem {$totalAtual}.");
             }
         }
 

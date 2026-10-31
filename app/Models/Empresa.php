@@ -36,6 +36,8 @@ class Empresa extends Model
 
     public const GATEWAY_PIX_MERCADOPAGO = 'mercadopago';
 
+    public const GATEWAY_PIX_SICREDI = 'sicredi';
+
     protected $fillable = [
         'nome', 'razao_social', 'cnpj',         'ie', 'im', 'cnae', 'regime_tributario', 'aut_xml', 'codigo_municipio_ibge', 'codigo_servico_hospedagem_lc116', 'codigo_tributacao_municipal_hospedagem', 'aliquota_iss_hospedagem',
         'logo_path', 'email', 'telefone',
@@ -279,6 +281,7 @@ class Empresa extends Model
             self::GATEWAY_PIX_NENHUM => 'Nenhum (Pix conferido manualmente)',
             self::GATEWAY_PIX_MERCADOPAGO => 'Mercado Pago — Pix (QR Code dinâmico)',
             self::GATEWAY_PIX_ITAU => 'Itaú — Pix Recebimentos (QR Code dinâmico)',
+            self::GATEWAY_PIX_SICREDI => 'Sicredi — API Pix (QR Code dinâmico)',
         ];
     }
 
@@ -344,6 +347,54 @@ class Empresa extends Model
                 'certificado_validade' => $validade,
                 'certificado_assunto' => Arr::get($this->configuracoes, 'gateway_pix.itau.certificado_assunto'),
             ],
+            'sicredi' => $this->configuracaoSicrediPix($expiracao),
+        ];
+    }
+
+    /**
+     * Credenciais da API Pix Sicredi (configuracoes->gateway_pix->sicredi).
+     * Mesma guarda do Itaú: segredo e par mTLS cifrados com a APP_KEY.
+     *
+     * @return array{client_id: string, client_secret: string, chave_pix: string, tipo_chave: string, ambiente: string, url_homologacao: string, expiracao_minutos: int, tem_certificado: bool, certificado_validade: ?\Illuminate\Support\Carbon, certificado_assunto: ?string, csr_gerado_em: ?\Illuminate\Support\Carbon, csr_nome_parceiro: ?string}
+     */
+    protected function configuracaoSicrediPix(int $expiracao): array
+    {
+        $base = 'gateway_pix.sicredi.';
+        $certificados = app(\App\Services\Integrations\Pix\SicrediCertificadoService::class);
+
+        try {
+            $segredo = filled($cifrado = Arr::get($this->configuracoes, $base.'client_secret')) ? Crypt::decryptString($cifrado) : '';
+        } catch (DecryptException) {
+            $segredo = '';
+        }
+
+        $chavePix = (string) Arr::get($this->configuracoes, $base.'chave_pix', '');
+        $tipoChave = (string) Arr::get($this->configuracoes, $base.'tipo_chave', '');
+        if (! array_key_exists($tipoChave, \App\Services\Integrations\Pix\CertificadoPixService::TIPOS_CHAVE)) {
+            $tipoChave = $chavePix !== '' ? $certificados->detectarTipo($chavePix) : 'cnpj';
+        }
+
+        $data = function (string $campo) use ($base): ?\Illuminate\Support\Carbon {
+            try {
+                return filled($v = Arr::get($this->configuracoes, $base.$campo)) ? \Illuminate\Support\Carbon::parse($v) : null;
+            } catch (\Throwable) {
+                return null;
+            }
+        };
+
+        return [
+            'client_id' => (string) Arr::get($this->configuracoes, $base.'client_id', ''),
+            'client_secret' => $segredo,
+            'chave_pix' => $chavePix,
+            'tipo_chave' => $tipoChave,
+            'ambiente' => Arr::get($this->configuracoes, $base.'ambiente') === 'homologacao' ? 'homologacao' : 'producao',
+            'url_homologacao' => (string) Arr::get($this->configuracoes, $base.'url_homologacao', ''),
+            'expiracao_minutos' => $expiracao,
+            'tem_certificado' => $certificados->temCertificado($this),
+            'certificado_validade' => $data('certificado_validade'),
+            'certificado_assunto' => Arr::get($this->configuracoes, $base.'certificado_assunto'),
+            'csr_gerado_em' => $data('csr_gerado_em'),
+            'csr_nome_parceiro' => Arr::get($this->configuracoes, $base.'csr_nome_parceiro'),
         ];
     }
 
@@ -367,6 +418,16 @@ class Empresa extends Model
 
         if ($config['provedor'] === self::GATEWAY_PIX_MERCADOPAGO) {
             return $this->temMercadoPagoUtilizavel();
+        }
+
+        if ($config['provedor'] === self::GATEWAY_PIX_SICREDI) {
+            $sicredi = $config['sicredi'];
+
+            return $sicredi['client_id'] !== ''
+                && $sicredi['client_secret'] !== ''
+                && $sicredi['chave_pix'] !== ''
+                && $sicredi['tem_certificado']
+                && ($sicredi['ambiente'] === 'producao' || $sicredi['url_homologacao'] !== '');
         }
 
         if ($config['provedor'] !== self::GATEWAY_PIX_ITAU) {

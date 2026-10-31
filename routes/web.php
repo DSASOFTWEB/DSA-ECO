@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DependenteController;
 use App\Http\Controllers\Admin\DocumentoFiscalController;
 use App\Http\Controllers\Admin\EmpresaController;
+use App\Http\Controllers\Admin\SicrediPixController;
 use App\Http\Controllers\Admin\FinanceiroController;
 use App\Http\Controllers\Admin\FoodController;
 use App\Http\Controllers\Admin\FormaPagamentoController;
@@ -300,6 +301,10 @@ Route::middleware('auth')->group(function () {
     Route::get('empresa/consultar-cnpj', [EmpresaController::class, 'consultarCnpj'])->name('empresa.consultar-cnpj');
     Route::get('empresa/certificado', [EmpresaController::class, 'downloadCertificado'])->name('empresa.certificado.download');
     Route::delete('empresa/certificado', [EmpresaController::class, 'destroyCertificado'])->name('empresa.certificado.destroy');
+    Route::post('empresa/pix/sicredi/csr', [SicrediPixController::class, 'gerarCsr'])->name('empresa.pix.sicredi.csr');
+    Route::get('empresa/pix/sicredi/csr', [SicrediPixController::class, 'baixarCsr'])->name('empresa.pix.sicredi.csr.download');
+    Route::post('empresa/pix/sicredi/testar', [SicrediPixController::class, 'testar'])->middleware('throttle:6,1')->name('empresa.pix.sicredi.testar');
+    Route::get('empresa/pix/sicredi/passo-a-passo', [SicrediPixController::class, 'passoAPasso'])->name('empresa.pix.sicredi.passo-a-passo');
 
     Route::get('cidades', [CidadeController::class, 'index'])->name('cidades.index');
     Route::post('cidades/sincronizar', [CidadeController::class, 'sincronizar'])->name('cidades.sincronizar');

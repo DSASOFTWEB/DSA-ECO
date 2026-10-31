@@ -19,6 +19,8 @@
                 'gateway_pix_provedor', 'gateway_pix_expiracao_minutos', 'mercadopago_access_token', 'mercadopago_public_key',
                 'mercadopago_webhook_secret', 'itau_client_id', 'itau_client_secret', 'itau_chave_pix', 'itau_tipo_chave',
                 'itau_certificado', 'itau_chave_privada', 'confirmacao',
+                'sicredi_client_id', 'sicredi_client_secret', 'sicredi_chave_pix', 'sicredi_tipo_chave',
+                'sicredi_ambiente', 'sicredi_url_homologacao', 'sicredi_certificado', 'sicredi_chave_privada',
             ]],
             'gerencial' => ['rotulo' => 'Gerencial', 'icone' => 'sliders-horizontal', 'campos' => [
                 'evolution_base_url', 'evolution_api_key', 'evolution_instance', 'impressao_modo', 'impressao_colunas',
@@ -281,6 +283,154 @@
                             </div>
                             @error('itau_certificado')<p class="mt-2 text-xs text-rose-600">{{ $message }}</p>@enderror
                             @error('itau_chave_privada')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                    </div>
+                </template>
+
+                @php
+                    $sc = $gw['sicredi'];
+                    $sicrediCsr = app(\App\Services\Integrations\Pix\SicrediCertificadoService::class);
+                    $sicrediEtapas = [
+                        ['titulo' => 'Adesão na cooperativa', 'ok' => $sc['client_id'] !== '' || $sc['tem_certificado'] || $sc['csr_gerado_em'], 'texto' => 'Termo de adesão à API Pix + cadastro no Portal do Desenvolvedor.'],
+                        ['titulo' => 'CSR gerado aqui', 'ok' => (bool) $sc['csr_gerado_em'] || $sc['tem_certificado'], 'texto' => 'Envie o .csr no Portal (Certificados e Credenciais).'],
+                        ['titulo' => 'Certificado enviado', 'ok' => $sc['tem_certificado'], 'texto' => 'O certificado que o Sicredi assinar.'],
+                        ['titulo' => 'Credenciais e chave Pix', 'ok' => $sc['client_id'] !== '' && $sc['client_secret'] !== '' && $sc['chave_pix'] !== '', 'texto' => 'Client ID/Secret gerados no Portal.'],
+                    ];
+                @endphp
+                <template x-if="provedor === 'sicredi'">
+                    <div class="contents" x-data="{ ambiente: @js(old('sicredi_ambiente', $sc['ambiente'])) }">
+                        <div class="sm:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-500/30 dark:bg-emerald-500/5">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <p class="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Como ativar o Pix Sicredi</p>
+                                    <p class="mt-0.5 text-xs text-emerald-800/80 dark:text-emerald-300/80">A liberação é feita pelo Sicredi (alguns dias). Siga as etapas; o PDF explica cada uma para levar à cooperativa.</p>
+                                </div>
+                                <a href="{{ route('empresa.pix.sicredi.passo-a-passo') }}" class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800">
+                                    <x-lucide-file-down class="h-4 w-4" /> Passo a passo (PDF)
+                                </a>
+                            </div>
+                            <ol class="mt-3 grid gap-2 sm:grid-cols-4">
+                                @foreach ($sicrediEtapas as $i => $etapa)
+                                    <li class="rounded-lg border bg-white p-2.5 text-xs dark:bg-white/[0.03] {{ $etapa['ok'] ? 'border-emerald-300 dark:border-emerald-500/40' : 'border-slate-200 dark:border-gray-700' }}">
+                                        <span class="flex items-center gap-1.5 font-semibold {{ $etapa['ok'] ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-600 dark:text-gray-300' }}">
+                                            <span class="grid h-5 w-5 place-items-center rounded-full text-[10px] {{ $etapa['ok'] ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 dark:bg-gray-700 dark:text-gray-300' }}">{{ $etapa['ok'] ? '✓' : $i + 1 }}</span>
+                                            {{ $etapa['titulo'] }}
+                                        </span>
+                                        <span class="mt-1 block text-slate-500 dark:text-gray-400">{{ $etapa['texto'] }}</span>
+                                    </li>
+                                @endforeach
+                            </ol>
+                        </div>
+
+                        {{-- CSR: a chave privada nasce e fica aqui; o cliente só leva o .csr ao Portal --}}
+                        <div class="sm:col-span-2 rounded-xl border border-slate-200 p-4 dark:border-gray-700">
+                            <p class="text-sm font-semibold text-slate-700 dark:text-white/90">CSR (pedido de certificado)</p>
+                            <p class="mt-0.5 text-xs text-slate-500">O sistema gera a chave privada e o CSR no padrão exigido pelo Sicredi — não precisa de OpenSSL. Registre o .csr no Portal do Desenvolvedor em <em>Certificados e Credenciais → Registrar Novo CSR</em>.</p>
+                            <div class="mt-3 flex flex-wrap items-end gap-3">
+                                <div class="min-w-[220px] flex-1">
+                                    <label class="block text-xs font-medium text-slate-600">Nome do parceiro (vai no certificado)</label>
+                                    <div class="mt-1 flex items-center rounded-lg border border-slate-300 text-sm dark:border-gray-700">
+                                        <span class="shrink-0 whitespace-nowrap pl-3 text-slate-400">api-parceiros-</span>
+                                        <input type="text" form="sicredi-gerar-csr" name="nome_parceiro" value="{{ $sc['csr_nome_parceiro'] ?: $sicrediCsr->nomeParceiroPadrao($empresa) }}" maxlength="40" class="!min-h-9 w-full !border-0 bg-transparent px-1 py-2 !ring-0">
+                                        <span class="shrink-0 whitespace-nowrap pr-3 text-slate-400">.sicredi.net</span>
+                                    </div>
+                                </div>
+                                <button type="submit" form="sicredi-gerar-csr" class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-gray-700 dark:hover:bg-white/5">
+                                    {{ $sc['csr_gerado_em'] ? 'Gerar novo CSR' : 'Gerar CSR' }}
+                                </button>
+                                @if ($sicrediCsr->csrPendente($empresa))
+                                    <a href="{{ route('empresa.pix.sicredi.csr.download') }}" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-600">
+                                        <x-lucide-download class="h-4 w-4" /> Baixar .csr
+                                    </a>
+                                @endif
+                            </div>
+                            @if ($sc['csr_gerado_em'] && $sicrediCsr->csrPendente($empresa))
+                                <p class="mt-2 text-xs text-amber-700 dark:text-amber-300">CSR gerado em {{ $sc['csr_gerado_em']->format('d/m/Y H:i') }} — aguardando o certificado do Sicredi. Quando ele sair, envie abaixo (só o certificado: a chave já está guardada aqui).</p>
+                            @endif
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Client ID</label>
+                            <input type="text" name="sicredi_client_id" value="{{ old('sicredi_client_id', $sc['client_id']) }}" autocomplete="off" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            @error('sicredi_client_id')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Client Secret</label>
+                            <input type="password" name="sicredi_client_secret" value="" autocomplete="new-password" placeholder="{{ $sc['client_secret'] !== '' ? '••••••••••• (já configurado — deixe em branco pra manter)' : 'Gerado no Portal do Desenvolvedor' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            @error('sicredi_client_secret')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Tipo da chave Pix</label>
+                            <select name="sicredi_tipo_chave" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                @foreach (\App\Services\Integrations\Pix\CertificadoPixService::TIPOS_CHAVE as $valor => $rotulo)
+                                    <option value="{{ $valor }}" @selected(old('sicredi_tipo_chave', $sc['tipo_chave']) === $valor)>{{ $rotulo }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Chave Pix recebedora</label>
+                            <input type="text" name="sicredi_chave_pix" value="{{ old('sicredi_chave_pix', $sc['chave_pix']) }}" placeholder="Chave da conta Sicredi da empresa" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            <p class="mt-1 text-xs text-slate-400">Precisa ser chave da conta Sicredi (não de outro banco). CNPJ/CPF só números.</p>
+                            @error('sicredi_chave_pix')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Ambiente</label>
+                            <select name="sicredi_ambiente" x-model="ambiente" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                <option value="producao">Produção (cobranças reais)</option>
+                                <option value="homologacao">Homologação (testes)</option>
+                            </select>
+                        </div>
+                        <div x-show="ambiente === 'homologacao'" x-cloak>
+                            <label class="block text-sm font-medium text-slate-700">URL de homologação</label>
+                            <input type="url" name="sicredi_url_homologacao" value="{{ old('sicredi_url_homologacao', $sc['url_homologacao']) }}" placeholder="https://... (informada pelo Sicredi)" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            <p class="mt-1 text-xs text-slate-400">Não é pública: o Sicredi envia junto com as credenciais de teste.</p>
+                            @error('sicredi_url_homologacao')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div class="sm:col-span-2 rounded-xl border {{ $sc['tem_certificado'] ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70' }} p-4">
+                            <p class="text-sm font-semibold {{ $sc['tem_certificado'] ? 'text-emerald-800' : 'text-amber-800' }}">
+                                {{ $sc['tem_certificado'] ? 'Certificado mTLS ativo (salvo no banco e no arquivo)' : 'Certificado mTLS ainda não cadastrado' }}
+                            </p>
+                            @if ($sc['tem_certificado'])
+                                <p class="mt-1 text-xs text-emerald-700">
+                                    @if ($sc['certificado_assunto']) {{ $sc['certificado_assunto'] }} · @endif
+                                    @if ($sc['certificado_validade'])
+                                        Válido até {{ $sc['certificado_validade']->format('d/m/Y') }}
+                                        @if ($sc['certificado_validade']->isPast())
+                                            <span class="font-semibold text-rose-600">(expirado — gere novo CSR e renove no Portal)</span>
+                                        @elseif ($sc['certificado_validade']->lte(now()->addDays(30)))
+                                            <span class="font-semibold text-amber-700">(vence em breve — renove no Portal)</span>
+                                        @endif
+                                    @endif
+                                </p>
+                            @else
+                                <p class="mt-1 text-xs text-amber-700">Envie o certificado que o Sicredi disponibilizar no Portal (.cer, .crt ou .pem — o .cer binário é convertido sozinho).</p>
+                            @endif
+                            <div class="mt-3 grid gap-4 sm:grid-cols-2">
+                                <x-file-input
+                                    name="sicredi_certificado"
+                                    :label="$sc['tem_certificado'] ? 'Substituir certificado' : 'Certificado assinado pelo Sicredi'"
+                                    accept=".cer,.crt,.pem,.der"
+                                    icon="file-check"
+                                    :placeholder="$sc['tem_certificado'] ? 'Mantém o atual — escolha só para renovar' : 'Nenhum arquivo selecionado'"
+                                />
+                                <x-file-input
+                                    name="sicredi_chave_privada"
+                                    label="Chave privada (.key) — só se o CSR foi gerado fora do sistema"
+                                    accept=".key,.pem"
+                                    icon="key-round"
+                                    placeholder="Opcional"
+                                />
+                            </div>
+                            @error('sicredi_certificado')<p class="mt-2 text-xs text-rose-600">{{ $message }}</p>@enderror
+                            @error('sicredi_chave_privada')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div class="sm:col-span-2 flex flex-wrap items-center gap-3">
+                            <button type="submit" form="sicredi-testar" class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50 dark:bg-transparent" @disabled(! ($sc['client_id'] !== '' && $sc['client_secret'] !== '' && $sc['tem_certificado']))>
+                                <x-lucide-plug-zap class="h-4 w-4" /> Testar conexão com o Sicredi
+                            </button>
+                            <span class="text-xs text-slate-400">Salve as credenciais e o certificado antes de testar. O teste só autentica — não cria cobrança.</span>
                         </div>
                     </div>
                 </template>
@@ -664,6 +814,15 @@
             </a>
         </form>
     </section>
+
+    {{-- Ações do Pix Sicredi (botões ficam na aba Financeiro, ligados por form="...") --}}
+    <form id="sicredi-gerar-csr" method="POST" action="{{ route('empresa.pix.sicredi.csr') }}" class="hidden"
+        onsubmit="return {{ $empresa->configuracaoGatewayPix()['sicredi']['csr_gerado_em'] ? "confirm('Gerar um NOVO CSR? O anterior deixa de valer: o certificado precisará ser emitido a partir do novo.')" : 'true' }}">
+        @csrf
+    </form>
+    <form id="sicredi-testar" method="POST" action="{{ route('empresa.pix.sicredi.testar') }}" class="hidden">
+        @csrf
+    </form>
 
     @if ($empresa->temCertificadoDigital())
         <form id="empresa-remover-certificado" method="POST" action="{{ route('empresa.certificado.destroy') }}" class="hidden" onsubmit="return confirm('Remover o certificado digital e a senha cadastrada?')">

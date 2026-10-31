@@ -6,6 +6,7 @@ use App\Exceptions\NegocioException;
 use App\Models\Empresa;
 use App\Services\Fiscal\CertificadoA1Service;
 use App\Services\Integrations\Pix\ItauCertificadoService;
+use App\Services\Integrations\Pix\SicrediCertificadoService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,7 @@ class EmpresaService
     public function __construct(
         protected CertificadoA1Service $certificadoA1,
         protected ItauCertificadoService $itauCertificado,
+        protected SicrediCertificadoService $sicrediCertificado,
     ) {}
 
     public function atualizar(Empresa $empresa, array $dados, ?UploadedFile $logo = null, ?UploadedFile $certificado = null): Empresa
@@ -29,6 +31,8 @@ class EmpresaService
             'impressao_modo', 'impressao_colunas', 'impressao_agente_url', 'impressao_auto_imprimir',
             'gateway_pix_provedor', 'gateway_pix_expiracao_minutos', 'itau_client_id', 'itau_client_secret',
             'itau_chave_pix', 'itau_tipo_chave', 'itau_certificado', 'itau_chave_privada',
+            'sicredi_client_id', 'sicredi_client_secret', 'sicredi_chave_pix', 'sicredi_tipo_chave',
+            'sicredi_ambiente', 'sicredi_url_homologacao', 'sicredi_certificado', 'sicredi_chave_privada',
         ];
 
         $camposFiscaisSecretos = [
@@ -167,6 +171,7 @@ class EmpresaService
                 'provedor' => $integracoes['gateway_pix_provedor'],
                 'expiracao_minutos' => (int) ($integracoes['gateway_pix_expiracao_minutos'] ?? $expiracaoAtual) ?: 10,
                 'itau' => $itau,
+                'sicredi' => $this->dadosSicredi($empresa, $configuracoes['gateway_pix']['sicredi'] ?? [], $integracoes),
             ];
         }
 
@@ -178,6 +183,7 @@ class EmpresaService
 
             // Garante cópia em disco mesmo se só havia PEM no banco (deploy).
             $this->itauCertificado->garantirArquivos($empresa->fresh());
+            $this->sicrediCertificado->garantirArquivos($empresa->fresh());
 
             if (isset($dados['certificado_arquivo'])) {
                 $gravado = Storage::disk('local')->put(
@@ -266,6 +272,71 @@ class EmpresaService
             'certificado' => $certificado ?? $certParaConferir,
             'chave_privada' => $chave ?? $chaveParaConferir,
         ];
+    }
+
+    /**
+     * Credenciais Sicredi: em branco mantém o salvo. O certificado assinado
+     * pode chegar sozinho — a chave é a gerada aqui com o CSR (ou a que já
+     * estava salva); se o cliente gerou o CSR por fora, envia a .key junto.
+     */
+    protected function dadosSicredi(Empresa $empresa, array $atual, array $integracoes): array
+    {
+        $tipoChave = $integracoes['sicredi_tipo_chave'] ?? null;
+        $chavePix = $integracoes['sicredi_chave_pix'] ?? null;
+        if (filled($chavePix)) {
+            $tipoChave = filled($tipoChave) ? $tipoChave : $this->sicrediCertificado->detectarTipo($chavePix);
+            $chavePix = $this->sicrediCertificado->normalizarChave($chavePix, $tipoChave);
+        }
+
+        $segredo = $integracoes['sicredi_client_secret'] ?? null;
+        $sicredi = $this->mesclarSemApagar($atual, [
+            'client_id' => isset($integracoes['sicredi_client_id']) ? trim($integracoes['sicredi_client_id']) : null,
+            'client_secret' => filled($segredo) ? Crypt::encryptString(trim($segredo)) : null,
+            'chave_pix' => $chavePix,
+            'tipo_chave' => $tipoChave,
+            'ambiente' => $integracoes['sicredi_ambiente'] ?? null,
+            'url_homologacao' => isset($integracoes['sicredi_url_homologacao']) ? rtrim($integracoes['sicredi_url_homologacao'], '/') : null,
+        ]);
+
+        $certificado = $integracoes['sicredi_certificado'] ?? null;
+        $chave = $integracoes['sicredi_chave_privada'] ?? null;
+        if (! $certificado instanceof UploadedFile && ! $chave instanceof UploadedFile) {
+            return $sicredi;
+        }
+
+        $certPem = $certificado instanceof UploadedFile
+            ? $this->sicrediCertificado->paraPem((string) $certificado->get())
+            : $this->sicrediCertificado->lerDoBanco($empresa)['certificado'];
+        $chavesCandidatas = array_filter([
+            $chave instanceof UploadedFile ? (string) $chave->get() : null,
+            $this->sicrediCertificado->chaveDoCsr($empresa),
+            $this->sicrediCertificado->lerDoBanco($empresa)['chave_privada'],
+        ]);
+
+        if (! $certPem || @openssl_x509_read($certPem) === false) {
+            throw ValidationException::withMessages(['sicredi_certificado' => 'O certificado do Sicredi não é válido (.cer, .crt ou .pem).']);
+        }
+        if ($chavesCandidatas === []) {
+            throw ValidationException::withMessages(['sicredi_chave_privada' => 'Gere o CSR por aqui ou envie a chave privada (.key) usada para gerar o CSR.']);
+        }
+
+        foreach ($chavesCandidatas as $chavePem) {
+            if (@openssl_pkey_get_private($chavePem) !== false && @openssl_x509_check_private_key($certPem, $chavePem)) {
+                $sicredi = array_merge($sicredi, $this->sicrediCertificado->gravarPar($empresa, $certPem, $chavePem));
+                // Certificado casou: o CSR pendente já cumpriu o papel.
+                unset($sicredi['csr_pem'], $sicredi['csr_chave_privada_pem']);
+                $sicredi['csr_concluido_em'] = now()->toIso8601String();
+                $this->sicrediCertificado->limparCacheToken($empresa);
+
+                return $sicredi;
+            }
+        }
+
+        throw ValidationException::withMessages([
+            'sicredi_certificado' => $chave instanceof UploadedFile
+                ? 'A chave privada não corresponde ao certificado (ou está protegida por senha).'
+                : 'Este certificado não corresponde ao último CSR gerado aqui. Envie o certificado do CSR mais recente (ou a .key usada para gerá-lo).',
+        ]);
     }
 
     /**

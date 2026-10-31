@@ -31,6 +31,7 @@ class GatewayPixResolver
         return match ($gateway) {
             Empresa::GATEWAY_PIX_ITAU => new ItauPixGateway($empresa),
             Empresa::GATEWAY_PIX_MERCADOPAGO => new MercadoPagoPixGateway($empresa),
+            Empresa::GATEWAY_PIX_SICREDI => new SicrediPixGateway($empresa),
             default => null,
         };
     }

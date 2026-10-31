@@ -57,6 +57,15 @@ class UpdateEmpresaRequest extends FormRequest
             'gateway_pix_expiracao_minutos' => ['nullable', 'integer', 'min:1', 'max:60'],
             'itau_certificado' => ['nullable', 'file', 'extensions:crt,pem,cer', 'max:64'],
             'itau_chave_privada' => ['nullable', 'file', 'extensions:key,pem', 'max:64'],
+            'sicredi_client_id' => ['nullable', 'string', 'max:120'],
+            'sicredi_client_secret' => ['nullable', 'string', 'max:255'],
+            'sicredi_chave_pix' => ['nullable', 'string', 'max:77'],
+            'sicredi_tipo_chave' => ['nullable', 'string', Rule::in(array_keys(\App\Services\Integrations\Pix\CertificadoPixService::TIPOS_CHAVE))],
+            'sicredi_ambiente' => ['nullable', Rule::in(['producao', 'homologacao'])],
+            'sicredi_url_homologacao' => ['nullable', 'url:https', 'max:255'],
+            // Sicredi costuma entregar o certificado em .cer (DER) — convertido para PEM ao salvar.
+            'sicredi_certificado' => ['nullable', 'file', 'extensions:crt,pem,cer,der', 'max:64'],
+            'sicredi_chave_privada' => ['nullable', 'file', 'extensions:key,pem', 'max:64'],
 
             // Impressão do cupom PDV
             'impressao_modo' => ['required', 'in:dom,escpos,ambos'],
@@ -113,6 +122,12 @@ class UpdateEmpresaRequest extends FormRequest
                 return;
             }
 
+            if ($this->input('gateway_pix_provedor') === Empresa::GATEWAY_PIX_SICREDI) {
+                $this->validarSicredi($validator, $empresa);
+
+                return;
+            }
+
             if ($this->input('gateway_pix_provedor') !== Empresa::GATEWAY_PIX_ITAU) {
                 return;
             }
@@ -134,6 +149,32 @@ class UpdateEmpresaRequest extends FormRequest
                 $validator->errors()->add('itau_certificado', 'Envie o certificado (.crt) e a chave privada (.key) emitidos pelo Itaú.');
             }
         });
+    }
+
+    /**
+     * Para ativar: credenciais + chave Pix + certificado. A chave privada pode
+     * ser a gerada aqui junto com o CSR (aí basta enviar o certificado).
+     */
+    protected function validarSicredi(Validator $validator, ?Empresa $empresa): void
+    {
+        $atual = $empresa?->configuracaoGatewayPix()['sicredi'] ?? [];
+
+        $faltando = [
+            'sicredi_client_id' => ! filled($this->input('sicredi_client_id')) && ! filled($atual['client_id'] ?? null),
+            'sicredi_client_secret' => ! filled($this->input('sicredi_client_secret')) && ! filled($atual['client_secret'] ?? null),
+            'sicredi_chave_pix' => ! filled($this->input('sicredi_chave_pix')) && ! filled($atual['chave_pix'] ?? null),
+        ];
+        foreach (array_filter($faltando) as $campo => $_) {
+            $validator->errors()->add($campo, 'Obrigatório para ativar o Pix Sicredi.');
+        }
+
+        if ($this->input('sicredi_ambiente') === 'homologacao' && ! filled($this->input('sicredi_url_homologacao')) && ! filled($atual['url_homologacao'] ?? null)) {
+            $validator->errors()->add('sicredi_url_homologacao', 'Informe a URL de homologação enviada pelo Sicredi.');
+        }
+
+        if (! ($atual['tem_certificado'] ?? false) && ! $this->hasFile('sicredi_certificado')) {
+            $validator->errors()->add('sicredi_certificado', 'Envie o certificado assinado que o Sicredi liberou no Portal do Desenvolvedor.');
+        }
     }
 
     protected function prepareForValidation(): void

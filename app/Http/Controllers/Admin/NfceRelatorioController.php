@@ -81,7 +81,9 @@ class NfceRelatorioController extends Controller
         Gate::authorize('auditoria.visualizar');
         $dados = $request->validate(['mes' => ['required', 'date_format:Y-m']]);
 
-        $fechamento = $this->service->solicitar(Carbon::createFromFormat('Y-m', $dados['mes'])->startOfMonth(), $request->user());
+        // "!" zera os campos não informados: sem ele o Carbon completa com o dia
+        // de hoje e, num dia 31, "2026-09" vira 1º de outubro.
+        $fechamento = $this->service->solicitar(Carbon::createFromFormat('!Y-m', $dados['mes'])->startOfMonth(), $request->user());
 
         return back()->with(...match ($fechamento->status) {
             FechamentoFiscal::STATUS_PRONTO => ['sucesso', "Mês {$fechamento->rotuloCompetencia()} fechado: {$fechamento->quantidade} NFC-e no pacote {$fechamento->arquivo_nome}."],

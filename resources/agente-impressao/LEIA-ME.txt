@@ -1,0 +1,41 @@
+AGENTE DE IMPRESSAO 80mm (ESC/POS) - DSA
+=========================================
+
+Para que serve
+--------------
+Faz o sistema imprimir os cupons (venda, NFC-e, fechamento de caixa, QR Pix)
+direto na impressora termica, com a fonte da propria impressora: texto
+preto, nitido e sem as falhas da impressao pelo navegador.
+
+Instalar (no computador do caixa)
+---------------------------------
+1. Extraia este ZIP em qualquer pasta (ex.: Area de Trabalho).
+2. De dois cliques em INSTALAR.bat.
+3. Digite o numero da impressora termica na lista (ou R para impressora
+   de rede/IP) e confirme.
+4. Responda S para imprimir a pagina de teste.
+
+No sistema: Minha Empresa > aba Gerencial > Impressao:
+   - Modo: ESC/POS (ou "Ambos")
+   - URL do agente: http://127.0.0.1:9110 (o padrao)
+   - Clique em "Testar agente" para conferir.
+
+O agente fica oculto e inicia sozinho sempre que o Windows ligar.
+Instale em cada computador que imprime cupons.
+
+Trocar de impressora
+--------------------
+Rode o INSTALAR.bat de novo e escolha a outra impressora.
+
+Remover
+-------
+De dois cliques em DESINSTALAR.bat.
+
+Problemas
+---------
+- "Agente nao respondeu": veja o arquivo agente.log em
+  %LOCALAPPDATA%\DSA-AgenteImpressao (cole esse caminho no Explorer).
+- Saiu caractere estranho: a impressora precisa estar com a pagina de
+  codigo CP850 (padrao da maioria das Epson, Elgin, Bematech e Daruma).
+- O agente so aceita pedidos deste computador e do site do sistema
+  configurado no download.

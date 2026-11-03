@@ -1,5 +1,8 @@
 * text=auto eol=lf
 
+# Agente de impressão roda no Windows (.bat/.ps1 precisam de CRLF).
+resources/agente-impressao/* text eol=crlf
+
 *.blade.php diff=html
 *.css diff=css
 *.html diff=html

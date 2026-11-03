@@ -750,10 +750,34 @@
                     @error('impressao_colunas')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                 </div>
 
-                <div>
+                <div x-data="{
+                        testando: false, resultado: null,
+                        async testar() {
+                            this.testando = true; this.resultado = null;
+                            const url = (this.$refs.agenteUrl.value || 'http://127.0.0.1:9110').replace(/\/$/, '');
+                            try {
+                                const r = await fetch(url + '/status', { signal: AbortSignal.timeout(3000) });
+                                const d = await r.json();
+                                this.resultado = r.ok && d.ok
+                                    ? { ok: true, texto: 'Agente funcionando — impressora: ' + (d.impressora || 'não escolhida') }
+                                    : { ok: false, texto: d.erro || 'O agente respondeu com erro.' };
+                            } catch (e) {
+                                this.resultado = { ok: false, texto: 'Agente não encontrado neste computador. Baixe e rode o INSTALAR.bat.' };
+                            } finally { this.testando = false; }
+                        },
+                    }">
                     <label class="form-label">URL do agente ESC/POS</label>
-                    <input type="url" name="impressao_agente_url" value="{{ old('impressao_agente_url', $imp['agente_url']) }}" placeholder="http://127.0.0.1:9110" class="form-control mt-1">
-                    <p class="mt-1 text-xs text-slate-400">Serviço local na máquina do caixa (POST /print). Deixe o padrão se usar Web Serial ou download .bin.</p>
+                    <input type="url" name="impressao_agente_url" x-ref="agenteUrl" value="{{ old('impressao_agente_url', $imp['agente_url']) }}" placeholder="http://127.0.0.1:9110" class="form-control mt-1">
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <a href="{{ route('empresa.agente-impressao') }}" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600">
+                            <x-lucide-download class="h-3.5 w-3.5" /> Baixar agente (Windows)
+                        </a>
+                        <button type="button" @click="testar()" :disabled="testando" class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5">
+                            <x-lucide-plug-zap class="h-3.5 w-3.5" /> <span x-text="testando ? 'Testando...' : 'Testar agente'"></span>
+                        </button>
+                    </div>
+                    <p x-show="resultado" x-cloak class="mt-2 text-xs font-medium" :class="resultado?.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600'" x-text="resultado?.texto"></p>
+                    <p class="mt-1 text-xs text-slate-400">Programa leve que imprime direto na térmica, com texto preto e nítido. Instale no computador de cada caixa (extraia o ZIP e rode o INSTALAR.bat). Deixe o padrão se usar Web Serial ou download .bin.</p>
                     @error('impressao_agente_url')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                 </div>
 

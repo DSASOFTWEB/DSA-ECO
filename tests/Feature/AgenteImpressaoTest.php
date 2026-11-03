@@ -40,6 +40,10 @@ class AgenteImpressaoTest extends TestCase
         $this->assertContains(rtrim(config('app.url'), '/'), $config['origens'], 'só aceita o site do sistema');
         $this->assertSame('', $config['impressora']);
 
+        // A CSP precisa deixar o navegador falar com o agente local (só loopback).
+        $csp = $this->get(route('empresa.edit'))->headers->get('Content-Security-Policy');
+        $this->assertStringContainsString("connect-src 'self' http://127.0.0.1:* http://localhost:*;", $csp);
+
         $bat = $zip->getFromName('DSA-AgenteImpressao/INSTALAR.bat');
         $this->assertStringContainsString("\r\n", $bat);
         $this->assertDoesNotMatchRegularExpression("/(?<!\r)\n/", $bat, '.bat com CRLF');

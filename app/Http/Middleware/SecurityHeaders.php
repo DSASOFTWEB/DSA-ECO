@@ -22,6 +22,9 @@ use Symfony\Component\HttpFoundation\Response;
  * navegador só permite com 'unsafe-eval' na CSP. Sem isso o Alpine falha
  * silenciosamente (sem erro visível na tela, só no console do navegador) e
  * a página inteira "trava" — nenhum clique/atalho responde.
+ *
+ * connect-src libera só o loopback (127.0.0.1/localhost, qualquer porta)
+ * para o agente de impressão local — nada fora da máquina do caixa.
  */
 class SecurityHeaders
 {
@@ -44,7 +47,9 @@ class SecurityHeaders
             "style-src 'self' 'unsafe-inline'; ".
             "img-src 'self' data: blob:; ".
             "font-src 'self' data:; ".
-            "connect-src 'self'; ".
+            // Loopback: agente de impressão ESC/POS na máquina do caixa
+            // (http://127.0.0.1:9110). Sem isso o navegador barra o fetch.
+            "connect-src 'self' http://127.0.0.1:* http://localhost:*; ".
             "frame-ancestors 'none'; ".
             "base-uri 'self'; ".
             "form-action 'self'"

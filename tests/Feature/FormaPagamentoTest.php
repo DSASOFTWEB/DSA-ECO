@@ -358,7 +358,7 @@ class FormaPagamentoTest extends TestCase
         $bytes = $bin->getContent();
         $this->assertStringContainsString("\x1D(k", $bytes, 'QR nativo ESC/POS (GS ( k)');
         $this->assertStringContainsString($cobranca->pix_copia_e_cola, $bytes);
-        $this->assertStringEndsWith("\x1D\x56\x00", $bytes, 'corta o papel no fim');
+        $this->assertStringEndsWith(\App\Services\Impressao\EscPosCupomBuilder::CORTE, $bytes, 'avança e corta o papel no fim');
     }
 
     public function test_nao_imprime_qr_code_de_outra_empresa(): void

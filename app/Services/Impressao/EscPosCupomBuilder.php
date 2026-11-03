@@ -26,6 +26,7 @@ class EscPosCupomBuilder
      *   troco?: ?float,
      *   obsLimpa?: ?string,
      *   pagamentos?: list<array{forma: string, valor: float}>,
+     *   acessos?: list<array{nome: string, codigo: string}>,
      * }  $meta
      */
     public function montar(Venda $venda, array $meta = []): string
@@ -98,10 +99,16 @@ class EscPosCupomBuilder
             $out .= $this->linhaPar('Desconto', '- '.$this->moeda($venda->desconto));
         }
 
+        // Venda com ingresso usa o modelo de portaria (TOTAL destacado, código
+        // de barras e QR por entrada); só produto de consumo mantém o modelo simples.
+        $acessos = $meta['acessos'] ?? [];
+        $modeloIngresso = $acessos !== [];
+
         $out .= $this->separadorDuplo();
-        $out .= $this->cmdBold(true);
+        // Altura dupla (largura normal mantém o alinhamento das colunas).
+        $out .= $this->cmdBold(true).($modeloIngresso ? "\x1D\x21\x01" : '');
         $out .= $this->linhaPar('TOTAL', $this->moeda($venda->valor_total));
-        $out .= $this->cmdBold(false);
+        $out .= ($modeloIngresso ? "\x1D\x21\x00" : '').$this->cmdBold(false);
         $out .= $this->separadorDuplo();
 
         $forma = match ($venda->forma_pagamento) {
@@ -140,6 +147,28 @@ class EscPosCupomBuilder
         $out .= $this->linhaPar('Codigo', str_pad((string) $venda->id, 6, '0', STR_PAD_LEFT));
         if ($venda->unidade) {
             $out .= $this->linhaPar('Unidade', $venda->unidade->nome);
+        }
+
+        if ($modeloIngresso) {
+            // Mesmo código da tela (Nº da venda com 13 dígitos), legível por leitor.
+            $out .= "\n".$this->cmdAlign(1);
+            $out .= $this->codigoBarras(str_pad((string) $venda->id, 13, '0', STR_PAD_LEFT));
+
+            // O QR é o que a portaria lê para validar a entrada.
+            $out .= $this->cmdAlign(0).$this->separador('INGRESSOS / QR');
+            $out .= $this->cmdAlign(1);
+            $out .= $this->linha('Escaneie na portaria para validar');
+            foreach ($acessos as $i => $acesso) {
+                $out .= "\n".$this->cmdBold(true);
+                $out .= $this->linha($this->truncar((string) $acesso['nome'], $this->colunas));
+                $out .= $this->cmdBold(false);
+                $out .= $this->qrCode((string) $acesso['codigo'], 7);
+                $out .= $this->cmdBold(true).$this->linha((string) $acesso['codigo']).$this->cmdBold(false);
+                if ($i < count($acessos) - 1) {
+                    $out .= $this->linha(str_repeat('- ', intdiv($this->colunas, 2)));
+                }
+            }
+            $out .= $this->cmdAlign(0).$this->separadorFino().$this->cmdAlign(1);
         }
 
         $out .= "\n";
@@ -184,6 +213,27 @@ class EscPosCupomBuilder
             ."\x1D(k\x03\x00\x31\x51\x30";                             // imprime
     }
 
+    /**
+     * Código de barras CODE128 nativo (GS k, modo B) com o número impresso
+     * embaixo. Só imprime se couber na largura (módulo de 2 pontos).
+     */
+    protected function codigoBarras(string $dados): string
+    {
+        $largura = (11 * (strlen($dados) + 2) + 13) * 2;
+        if ($largura > ($this->colunas >= 48 ? 576 : 384)) {
+            return $this->linha($dados);
+        }
+
+        $conteudo = '{B'.$dados;
+
+        return "\x1D\x68\x50"   // altura 80 pontos
+            ."\x1D\x77\x02"     // módulo 2 pontos
+            ."\x1D\x48\x02"     // número embaixo
+            ."\x1D\x66\x00"     // fonte A no número
+            ."\x1D\x6B\x49".chr(strlen($conteudo)).$conteudo
+            ."\n";
+    }
+
     /** GS ! — 1 = normal, 2 = altura e largura dobradas. */
     protected function cmdTamanhoTexto(int $fator): string
     {
@@ -192,10 +242,18 @@ class EscPosCupomBuilder
         return "\x1D\x21".chr(($n << 4) | $n);
     }
 
+    /**
+     * Avança e corta. A lâmina fica ~15mm acima da cabeça: o corte imediato
+     * (GS V 0) cortava em cima do texto ou era ignorado em várias POS-80.
+     * ESC d 4 dá margem no fim do cupom; GS V 65 n (função B) puxa o papel
+     * até a lâmina + n pontos e corta — aceito por Epson, Elgin, Bematech,
+     * Xprinter/Gprinter (POS-80) e Daruma.
+     */
+    public const CORTE = "\x1B\x64\x04\x1D\x56\x41\x10";
+
     protected function cmdCut(): string
     {
-        // GS V 0 — full cut
-        return "\x1D\x56\x00";
+        return self::CORTE;
     }
 
     protected function linha(string $texto): string

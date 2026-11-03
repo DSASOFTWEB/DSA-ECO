@@ -91,12 +91,12 @@ class CaixaBobinaTest extends TestCase
         $this->assertMatchesRegularExpression('/DINHEIRO NA GAVETA\s+R\$ 344,00/', $texto);
         $this->assertStringContainsString('Caixa conferido, sem diferenca', $texto);
         $this->assertMatchesRegularExpression('/Cartão de débito\s+R\$ 60,00/u', $texto);
-        $this->assertStringContainsString("\x1D\x56\x00", $resposta->getContent(), 'corta o papel');
+        $this->assertStringEndsWith(\App\Services\Impressao\EscPosCupomBuilder::CORTE, $resposta->getContent(), 'avança até a lâmina e corta');
 
         // Linhas cabem em 48 colunas.
         foreach (explode("\n", $texto) as $linha) {
             // Tira os comandos (ESC @, ESC a n, ESC E n, GS V 0) antes de medir.
-            $visivel = preg_replace('/\x1B@|\x1B[aE][\x00-\x02]|\x1DV\x00/', '', $linha);
+            $visivel = preg_replace('/\x1B@|\x1B[aE][\x00-\x02]|\x1Bd\x04|\x1DVA\x10/', '', $linha);
             $this->assertLessThanOrEqual(48, mb_strlen($visivel), $visivel);
         }
     }

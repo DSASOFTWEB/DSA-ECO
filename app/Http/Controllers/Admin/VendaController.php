@@ -134,7 +134,7 @@ class VendaController extends Controller
 
         $venda->load(['itens.produto', 'itens.tipoEntrada', 'cliente', 'unidade', 'vendedor', 'empresa']);
 
-        $acessos = $venda->acessos()->whereNotNull('venda_item_id')->with('vendaItem.tipoEntrada')->get();
+        $acessos = $this->acessosDoCupom($venda);
 
         $qrCodes = $acessos->mapWithKeys(fn ($acesso) => [
             $acesso->id => $acesso->codigo_validacao ? $this->qrCodeService->gerarDataUri($acesso->codigo_validacao, 130) : null,
@@ -188,7 +188,13 @@ class VendaController extends Controller
         $colunas = $venda->empresa?->configuracaoImpressao()['colunas']
             ?? (int) config('parque.escpos_colunas', EscPosCupomBuilder::COLUNAS_80MM);
 
-        $bytes = (new EscPosCupomBuilder($colunas))->montar($venda, $this->metaCupom($venda));
+        // Mesmos ingressos da tela: sem o QR no papel a portaria não valida a entrada.
+        $acessos = $this->acessosDoCupom($venda)
+            ->filter(fn ($a) => filled($a->codigo_validacao))
+            ->map(fn ($a) => ['nome' => $a->vendaItem?->tipoEntrada?->nome ?? 'Entrada', 'codigo' => (string) $a->codigo_validacao])
+            ->values()->all();
+
+        $bytes = (new EscPosCupomBuilder($colunas))->montar($venda, $this->metaCupom($venda) + ['acessos' => $acessos]);
 
         $nome = 'cupom-venda-'.str_pad((string) $venda->id, 6, '0', STR_PAD_LEFT).'.bin';
 
@@ -197,6 +203,12 @@ class VendaController extends Controller
             'Content-Disposition' => 'attachment; filename="'.$nome.'"',
             'X-Escpos-Columns' => (string) $colunas,
         ]);
+    }
+
+    /** Ingressos da venda que saem no cupom (tela e ESC/POS). */
+    protected function acessosDoCupom(Venda $venda): Collection
+    {
+        return $venda->acessos()->whereNotNull('venda_item_id')->with('vendaItem.tipoEntrada')->get();
     }
 
     /**

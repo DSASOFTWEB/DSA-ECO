@@ -34,7 +34,7 @@ class ContaAtendimentoEscPosBuilder
         $linhas[] = $this->duasColunas('Subtotal', 'R$ '.number_format((float) $atendimento->subtotal, 2, ',', '.'));
         $linhas[] = $this->duasColunas('TOTAL', 'R$ '.number_format((float) $atendimento->valor_total, 2, ',', '.'));
         $linhas[] = $this->centralizar('Documento sem valor fiscal');
-        $linhas[] = "\n\n\n\x1D\x56\x00";
+        $linhas[] = EscPosCupomBuilder::CORTE;
 
         return implode("\n", $linhas);
     }

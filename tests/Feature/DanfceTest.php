@@ -85,7 +85,7 @@ class DanfceTest extends TestCase
         $this->assertStringContainsString('https://www.sefaz.pb.gov.br/nfce?p=', $bytes);
         $this->assertStringContainsString('REFRIGERANTE LATA', $bytes);
         $this->assertStringContainsString('SEM VALOR FISCAL', $bytes);
-        $this->assertStringEndsWith("\x1D\x56\x00", $bytes);
+        $this->assertStringEndsWith(\App\Services\Impressao\EscPosCupomBuilder::CORTE, $bytes);
     }
 
     public function test_nao_imprime_nfce_nao_autorizada_nem_de_outra_empresa(): void

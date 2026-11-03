@@ -67,7 +67,9 @@ $teste = Read-Host 'Imprimir uma pagina de teste agora? (S/N)'
 if ($teste -match '^[Ss]') {
     $esc = [char]27; $gs = [char]29
     $texto = "$esc@$esc" + 'a' + [char]1 + "$esc" + 'E' + [char]1 + "AGENTE DE IMPRESSAO DSA`n$esc" + 'E' + [char]0 +
-        "Teste OK - $(Get-Date -Format 'dd/MM/yyyy HH:mm')`n`nSe este texto saiu nitido,`no sistema ja pode imprimir`nos cupons por aqui.`n`n`n`n$gs" + 'V' + [char]0
+        "Teste OK - $(Get-Date -Format 'dd/MM/yyyy HH:mm')`n`nSe este texto saiu nitido,`no sistema ja pode imprimir`nos cupons por aqui.`n" +
+        # Avanca ate a lamina e corta (ESC d 4 + GS V 65 16), igual aos cupons do sistema.
+        "$esc" + 'd' + [char]4 + "$gs" + 'V' + [char]65 + [char]16
     $b64 = [Convert]::ToBase64String([System.Text.Encoding]::GetEncoding(850).GetBytes($texto))
     try {
         Invoke-RestMethod -Uri ("http://127.0.0.1:{0}/print" -f $cfg.porta) -Method Post -ContentType 'application/json' -Body (@{ payload_base64 = $b64 } | ConvertTo-Json) | Out-Null

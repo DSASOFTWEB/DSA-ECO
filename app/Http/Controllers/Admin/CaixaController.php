@@ -10,6 +10,8 @@ use App\Http\Requests\Caixa\MovimentarCaixaRequest;
 use App\Models\Caixa;
 use App\Models\Terminal;
 use App\Services\CaixaService;
+use App\Services\Impressao\CaixaEscPosBuilder;
+use App\Services\Relatorios\CaixaFechamentoResumo;
 use App\Services\Relatorios\CaixaPdfExport;
 use App\Services\VendaService;
 use Illuminate\Contracts\View\View;
@@ -54,6 +56,38 @@ class CaixaController extends Controller
         $this->authorize('view', $caixa);
 
         return $export->gerar($caixa)->stream("caixa-{$caixa->id}.pdf");
+    }
+
+    /**
+     * Fechamento (ou parcial) na bobina 80mm: imprime sozinho ao abrir,
+     * pelo navegador ou ESC/POS, conforme a configuração de impressão.
+     */
+    public function bobina(Caixa $caixa, CaixaFechamentoResumo $resumo): View
+    {
+        $this->authorize('view', $caixa);
+
+        $impressao = $caixa->empresa->configuracaoImpressao();
+
+        return view('caixas.bobina', [
+            'r' => $resumo->montar($caixa),
+            'impressaoModo' => $impressao['modo'],
+            'escposColunas' => $impressao['colunas'],
+            'escposAgenteUrl' => $impressao['agente_url'],
+            'comMovimentacoes' => ! request()->boolean('resumido'),
+        ]);
+    }
+
+    public function bobinaEscpos(Caixa $caixa, CaixaFechamentoResumo $resumo): Response
+    {
+        $this->authorize('view', $caixa);
+
+        $bytes = (new CaixaEscPosBuilder($caixa->empresa->configuracaoImpressao()['colunas']))
+            ->montarFechamento($resumo->montar($caixa), ! request()->boolean('resumido'));
+
+        return response($bytes, 200, [
+            'Content-Type' => 'application/octet-stream',
+            'Content-Disposition' => "attachment; filename=\"fechamento-caixa-{$caixa->id}.bin\"",
+        ]);
     }
 
     public function abrir(AbrirCaixaRequest $request): RedirectResponse

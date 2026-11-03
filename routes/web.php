@@ -157,6 +157,8 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('caixas', CaixaController::class)->only(['index', 'show']);
     Route::get('caixas/{caixa}/pdf', [CaixaController::class, 'pdf'])->name('caixas.pdf');
+    Route::get('caixas/{caixa}/bobina', [CaixaController::class, 'bobina'])->name('caixas.bobina');
+    Route::get('caixas/{caixa}/bobina/escpos', [CaixaController::class, 'bobinaEscpos'])->name('caixas.bobina.escpos');
     Route::post('caixas/abrir', [CaixaController::class, 'abrir'])->name('caixas.abrir');
     Route::post('caixas/{caixa}/movimentar', [CaixaController::class, 'movimentar'])->name('caixas.movimentar');
     Route::post('caixas/{caixa}/fechar', [CaixaController::class, 'fechar'])->name('caixas.fechar');

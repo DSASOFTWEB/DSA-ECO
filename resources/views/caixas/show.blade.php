@@ -6,7 +6,10 @@
     @if (session('caixa_recem_fechado') === $caixa->id)
         <div class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
             <span>Caixa fechado! Confira o resumo e imprima o comprovante de fechamento.</span>
-            <a href="{{ route('caixas.pdf', $caixa) }}" target="_blank" class="shrink-0 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-700">Abrir para impressão</a>
+            <span class="flex shrink-0 flex-wrap gap-2">
+                <a href="{{ route('caixas.bobina', $caixa) }}" class="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-700">🧾 Imprimir na bobina 80mm</a>
+                <a href="{{ route('caixas.pdf', $caixa) }}" target="_blank" class="rounded-lg border border-emerald-400 px-4 py-2 font-semibold text-emerald-800 hover:bg-emerald-100 dark:text-emerald-300">PDF A4</a>
+            </span>
         </div>
     @endif
 
@@ -17,6 +20,7 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ route('caixas.bobina', $caixa) }}" class="inline-flex h-10 items-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5">🧾 {{ $caixa->estaAberto() ? 'Parcial na bobina 80mm' : 'Fechamento na bobina 80mm' }}</a>
             <a href="{{ route('caixas.pdf', $caixa) }}" target="_blank" class="inline-flex h-10 items-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5">Ver/imprimir PDF do caixa</a>
 
             @if ($caixa->estaAberto())

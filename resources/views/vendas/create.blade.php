@@ -220,6 +220,9 @@
                     @if ($caixasDisponiveis->count() > 1)
                         <a href="{{ route('vendas.create', ['trocar_terminal' => 1]) }}" class="pdv-header__btn">Trocar terminal</a>
                     @endif
+                    @can('registrarMovimentacao', $caixaAberto)
+                        <button type="button" class="pdv-header__btn" @click="$dispatch('abrir-sangria', 'sangria')" title="Sangria / suprimento de caixa (F9)">Sangria / Suprimento <kbd class="pdv-kbd">F9</kbd></button>
+                    @endcan
                     <a href="{{ route('caixas.show', $caixaAberto) }}" class="pdv-header__btn">Caixa</a>
                     <a href="{{ route('vendas.index') }}" class="pdv-header__btn pdv-header__btn--close" title="Sair do PDV">✕</a>
                 </div>
@@ -472,6 +475,7 @@
                     <span><kbd>F4</kbd> Finalizar</span>
                     <span><kbd>F6</kbd> Desconto</span>
                     <span><kbd>F7</kbd> Cliente</span>
+                    <span><kbd>F9</kbd> Sangria/Suprimento</span>
                     <span><kbd>ESC</kbd> Cancelar</span>
                 </span>
             </footer>
@@ -545,6 +549,11 @@
                     </div>
                 </div>
             </div>
+
+            @can('registrarMovimentacao', $caixaAberto)
+                {{-- Sangria / suprimento (F9) sem sair do PDV --}}
+                @include('caixas.partials.sangria-suprimento', ['caixa' => $caixaAberto])
+            @endcan
 
             {{-- Modal troco / confirmar dinheiro --}}
             <div class="pdv-modal" x-show="dlgTroco" x-cloak>
@@ -1259,6 +1268,16 @@
                         onKeydown(evento) {
                             const alvo = evento.target;
                             const emCampoTexto = ['INPUT', 'TEXTAREA', 'SELECT'].includes(alvo.tagName);
+                            // Janela de sangria/suprimento aberta: os atalhos do PDV ficam parados
+                            // (o Esc dela não pode virar "cancelar venda").
+                            if (document.body.dataset.sangriaAberta) return;
+                            if (evento.key === 'F9') {
+                                evento.preventDefault();
+                                @can('registrarMovimentacao', $caixaAberto)
+                                    window.dispatchEvent(new CustomEvent('abrir-sangria', { detail: 'sangria' }));
+                                @endcan
+                                return;
+                            }
                             if (this.dlgPix) {
                                 if (['F2', 'F4', 'F6', 'F7', 'Escape'].includes(evento.key)) evento.preventDefault();
                                 return;

@@ -43,6 +43,67 @@ class CaixaService
     }
 
     /**
+     * Dinheiro que deve estar na gaveta agora: troco inicial + entradas em
+     * dinheiro − saídas em dinheiro (estornos já entram como lançamento
+     * contrário, então a soma fica certa). Mesmo número do fechamento.
+     */
+    public function dinheiroEmGaveta(Caixa $caixa): float
+    {
+        $movs = $caixa->movimentacoes()->where('forma_pagamento', 'dinheiro');
+
+        return round(
+            (float) $caixa->valor_abertura
+            + (float) (clone $movs)->where('tipo', 'entrada')->sum('valor')
+            - (float) (clone $movs)->where('tipo', 'saida')->sum('valor'),
+            2
+        );
+    }
+
+    /**
+     * Sangria: retira dinheiro da gaveta (ex.: recolher ao cofre). Sempre em
+     * dinheiro e nunca mais do que há na gaveta.
+     */
+    public function sangria(Caixa $caixa, float $valor, string $motivo, User $usuario): CaixaMovimentacao
+    {
+        return DB::transaction(function () use ($caixa, $valor, $motivo, $usuario) {
+            // Trava o caixa: duas sangrias ao mesmo tempo não passam do saldo.
+            $caixa = Caixa::whereKey($caixa->id)->lockForUpdate()->firstOrFail();
+            $this->validarRetiradaOuReforco($caixa, $valor);
+
+            $gaveta = $this->dinheiroEmGaveta($caixa);
+            if ($valor > $gaveta + 0.004) {
+                throw new NegocioException('Sangria maior que o dinheiro na gaveta (R$ '.number_format($gaveta, 2, ',', '.').').');
+            }
+
+            return $caixa->movimentacoes()->create([
+                'tipo' => 'saida', 'categoria' => 'sangria', 'forma_pagamento' => 'dinheiro',
+                'valor' => round($valor, 2), 'descricao' => $motivo, 'usuario_id' => $usuario->id,
+            ]);
+        });
+    }
+
+    /** Suprimento: reforço de troco colocado na gaveta. Sempre em dinheiro. */
+    public function suprimento(Caixa $caixa, float $valor, ?string $motivo, User $usuario): CaixaMovimentacao
+    {
+        $this->validarRetiradaOuReforco($caixa, $valor);
+
+        return $caixa->movimentacoes()->create([
+            'tipo' => 'entrada', 'categoria' => 'suprimento', 'forma_pagamento' => 'dinheiro',
+            'valor' => round($valor, 2), 'descricao' => $motivo ?: 'Reforço de troco', 'usuario_id' => $usuario->id,
+        ]);
+    }
+
+    protected function validarRetiradaOuReforco(Caixa $caixa, float $valor): void
+    {
+        if (! $caixa->estaAberto()) {
+            throw new NegocioException('Não é possível movimentar um caixa fechado.');
+        }
+        if ($valor < 0.01) {
+            throw new NegocioException('Informe um valor maior que zero.');
+        }
+    }
+
+    /**
      * Fecha o caixa calculando o saldo esperado pelo sistema (abertura +
      * entradas - saídas) e registrando a diferença em relação ao valor
      * contado fisicamente pelo operador (sobra ou falta de caixa).

@@ -24,6 +24,10 @@
             <a href="{{ route('caixas.pdf', $caixa) }}" target="_blank" class="inline-flex h-10 items-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5">Ver/imprimir PDF do caixa</a>
 
             @if ($caixa->estaAberto())
+                @can('registrarMovimentacao', $caixa)
+                    <button type="button" @click="$dispatch('abrir-sangria', 'sangria')" class="inline-flex h-10 items-center rounded-lg border border-rose-300 bg-rose-50 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-700 dark:bg-rose-500/10 dark:text-rose-300">− Sangria</button>
+                    <button type="button" @click="$dispatch('abrir-sangria', 'suprimento')" class="inline-flex h-10 items-center rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">+ Suprimento</button>
+                @endcan
                 @can('fechar', $caixa)
                     <form method="POST" action="{{ route('caixas.fechar', $caixa) }}" class="flex gap-2" onsubmit="return confirm('Fechar este caixa?')">
                         @csrf
@@ -37,6 +41,7 @@
 
     @if ($caixa->estaAberto())
         @can('registrarMovimentacao', $caixa)
+            @include('caixas.partials.sangria-suprimento', ['caixa' => $caixa, 'recarregar' => true])
             <form method="POST" action="{{ route('caixas.movimentar', $caixa) }}" x-data="{ tipo: 'entrada' }" class="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 @csrf
                 <select name="tipo" x-model="tipo" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
@@ -103,6 +108,9 @@
                                 {{ $mov->tipo === 'saida' ? '-' : '+' }} R$ {{ number_format($mov->valor, 2, ',', '.') }}
                             </td>
                             <td class="py-2 pl-3 text-right">
+                                @if (in_array($mov->categoria, ['sangria', 'suprimento'], true))
+                                    <a href="{{ route('caixas.movimentacoes.comprovante', [$caixa, $mov]) }}" target="comprovante-caixa" class="mr-2 text-xs text-sky-600 hover:underline">🧾 Comprovante</a>
+                                @endif
                                 @if ($mov->estaEstornada())
                                     <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">Estornada</span>
                                 @elseif ($mov->podeEstornar())

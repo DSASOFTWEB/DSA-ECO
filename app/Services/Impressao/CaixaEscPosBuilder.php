@@ -104,6 +104,56 @@ class CaixaEscPosBuilder extends EscPosCupomBuilder
         return $out;
     }
 
+    /**
+     * Comprovante de sangria (dinheiro que saiu da gaveta) ou suprimento
+     * (reforço de troco), com assinatura de quem entregou e quem recebeu.
+     */
+    public function montarComprovanteMovimentacao(\App\Models\Caixa $caixa, \App\Models\CaixaMovimentacao $mov): string
+    {
+        $sangria = $mov->categoria === 'sangria';
+
+        $out = $this->cmdInit().$this->cmdAlign(1).$this->cmdBold(true);
+        foreach ($this->quebrar($caixa->empresa?->nome ?? $caixa->unidade?->nome ?? 'Estabelecimento') as $l) {
+            $out .= $this->linha($l);
+        }
+        $out .= $this->cmdBold(false).$this->separadorDuplo();
+        $out .= $this->cmdBold(true)."\x1D\x21\x01";
+        $out .= $this->linha($sangria ? 'SANGRIA DE CAIXA' : 'SUPRIMENTO DE CAIXA');
+        $out .= "\x1D\x21\x00".$this->cmdBold(false);
+        $out .= $this->linha('Comprovante N. '.str_pad((string) $mov->id, 6, '0', STR_PAD_LEFT));
+        $out .= $this->cmdAlign(0).$this->separadorFino();
+
+        $out .= $this->linhaPar('Caixa', 'N. '.str_pad((string) $caixa->id, 6, '0', STR_PAD_LEFT));
+        $out .= $this->linhaPar('Terminal', (string) ($caixa->terminal?->nome ?? '-'));
+        $out .= $this->linhaPar('Unidade', (string) ($caixa->unidade?->nome ?? '-'));
+        $out .= $this->linhaPar('Data/Hora', $mov->created_at->format('d/m/Y H:i'));
+        $out .= $this->linhaPar('Operador', (string) ($mov->usuario?->name ?? '-'));
+        $out .= $this->separadorFino();
+
+        $out .= $this->cmdBold(true)."\x1D\x21\x01";
+        $out .= $this->linhaPar($sangria ? 'VALOR RETIRADO' : 'VALOR COLOCADO', $this->moeda($mov->valor));
+        $out .= "\x1D\x21\x00".$this->cmdBold(false);
+        $out .= $this->linhaPar('Forma', 'Dinheiro');
+        if (filled($mov->descricao)) {
+            $out .= $this->linha('Motivo:');
+            foreach ($this->quebrar((string) $mov->descricao) as $l) {
+                $out .= $this->linha('  '.$l);
+            }
+        }
+
+        $out .= "\n\n\n";
+        $out .= $this->linha(str_repeat('_', min(36, $this->colunas)));
+        $out .= $this->linha($sangria ? 'Entregue por (operador do caixa)' : 'Entregue por (quem trouxe o troco)');
+        $out .= "\n\n\n";
+        $out .= $this->linha(str_repeat('_', min(36, $this->colunas)));
+        $out .= $this->linha($sangria ? 'Recebido por (gerente / cofre)' : 'Recebido por (operador do caixa)');
+        $out .= "\n".$this->cmdAlign(1);
+        $out .= $this->linha('Impresso em '.now()->format('d/m/Y H:i'));
+        $out .= $this->cmdCut();
+
+        return $out;
+    }
+
     protected function sinal(float $valor): string
     {
         return $valor > 0.004 ? '+ ' : ($valor < -0.004 ? '- ' : '');

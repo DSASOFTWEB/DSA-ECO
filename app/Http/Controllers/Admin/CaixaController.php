@@ -8,6 +8,7 @@ use App\Http\Requests\Caixa\AbrirCaixaRequest;
 use App\Http\Requests\Caixa\FecharCaixaRequest;
 use App\Http\Requests\Caixa\MovimentarCaixaRequest;
 use App\Models\Caixa;
+use App\Models\CaixaMovimentacao;
 use App\Models\Terminal;
 use App\Services\CaixaService;
 use App\Services\Impressao\CaixaEscPosBuilder;
@@ -15,7 +16,9 @@ use App\Services\Relatorios\CaixaFechamentoResumo;
 use App\Services\Relatorios\CaixaPdfExport;
 use App\Services\VendaService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class CaixaController extends Controller
@@ -90,6 +93,84 @@ class CaixaController extends Controller
         ]);
     }
 
+    /** Dinheiro na gaveta agora (janela de sangria/suprimento). */
+    public function gaveta(Caixa $caixa): JsonResponse
+    {
+        $this->authorize('view', $caixa);
+
+        return response()->json(['dinheiro' => $this->caixaService->dinheiroEmGaveta($caixa)]);
+    }
+
+    /**
+     * Sangria (tira dinheiro da gaveta) ou suprimento (reforço de troco):
+     * sempre em dinheiro, com comprovante 80mm para assinar. Responde JSON
+     * para o PDV e redireciona na tela do caixa.
+     */
+    public function sangriaSuprimento(Request $request, Caixa $caixa, string $tipo): JsonResponse|RedirectResponse
+    {
+        $this->authorize('registrarMovimentacao', $caixa);
+
+        $dados = $request->validate([
+            'valor' => ['required', 'numeric', 'min:0.01', 'max:9999999'],
+            'motivo' => [$tipo === 'sangria' ? 'required' : 'nullable', 'string', 'max:255'],
+        ], ['motivo.required' => 'Informe o motivo da sangria (ex.: recolhimento para o cofre).']);
+
+        try {
+            $mov = $tipo === 'sangria'
+                ? $this->caixaService->sangria($caixa, (float) $dados['valor'], trim($dados['motivo']), $request->user())
+                : $this->caixaService->suprimento($caixa, (float) $dados['valor'], isset($dados['motivo']) ? trim($dados['motivo']) : null, $request->user());
+        } catch (NegocioException $e) {
+            return $request->expectsJson()
+                ? response()->json(['message' => $e->getMessage()], 422)
+                : back()->withInput()->with('erro', $e->getMessage());
+        }
+
+        $rotulo = $tipo === 'sangria' ? 'Sangria' : 'Suprimento';
+        $mensagem = "{$rotulo} de R$ ".number_format((float) $mov->valor, 2, ',', '.').' registrada.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $mensagem,
+                'dinheiro' => $this->caixaService->dinheiroEmGaveta($caixa),
+                'comprovante_url' => route('caixas.movimentacoes.comprovante', [$caixa, $mov]),
+            ], 201);
+        }
+
+        return back()->with('sucesso', $mensagem)->with('comprovante_movimentacao', $mov->id);
+    }
+
+    /** Comprovante 80mm da sangria/suprimento, com linhas de assinatura. */
+    public function comprovanteMovimentacao(Caixa $caixa, CaixaMovimentacao $movimentacao): View
+    {
+        $this->authorize('view', $caixa);
+        abort_unless((int) $movimentacao->caixa_id === (int) $caixa->id, 404);
+
+        $impressao = $caixa->empresa->configuracaoImpressao();
+
+        return view('caixas.comprovante-movimentacao', [
+            'caixa' => $caixa->loadMissing('unidade', 'terminal', 'empresa'),
+            'mov' => $movimentacao->loadMissing('usuario'),
+            'gaveta' => $this->caixaService->dinheiroEmGaveta($caixa),
+            'impressaoModo' => $impressao['modo'],
+            'escposColunas' => $impressao['colunas'],
+            'escposAgenteUrl' => $impressao['agente_url'],
+        ]);
+    }
+
+    public function comprovanteMovimentacaoEscpos(Caixa $caixa, CaixaMovimentacao $movimentacao): Response
+    {
+        $this->authorize('view', $caixa);
+        abort_unless((int) $movimentacao->caixa_id === (int) $caixa->id, 404);
+
+        $bytes = (new CaixaEscPosBuilder($caixa->empresa->configuracaoImpressao()['colunas']))
+            ->montarComprovanteMovimentacao($caixa->loadMissing('unidade', 'terminal', 'empresa'), $movimentacao->loadMissing('usuario'));
+
+        return response($bytes, 200, [
+            'Content-Type' => 'application/octet-stream',
+            'Content-Disposition' => "attachment; filename=\"{$movimentacao->categoria}-{$movimentacao->id}.bin\"",
+        ]);
+    }
+
     public function abrir(AbrirCaixaRequest $request): RedirectResponse
     {
         try {
@@ -110,11 +191,18 @@ class CaixaController extends Controller
 
     public function movimentar(MovimentarCaixaRequest $request, Caixa $caixa): RedirectResponse
     {
+        $dados = $request->validated();
+
         try {
-            $this->caixaService->registrarMovimentacao($caixa, [
-                ...$request->validated(),
-                'usuario_id' => $request->user()->id,
-            ]);
+            // Sangria/suprimento pelo formulário genérico seguem as mesmas regras
+            // dos botões próprios: sempre em dinheiro e sangria limitada à gaveta.
+            if ($dados['tipo'] === 'saida' && $dados['categoria'] === 'sangria') {
+                $this->caixaService->sangria($caixa, (float) $dados['valor'], trim((string) ($dados['descricao'] ?? '')) ?: 'Sangria', $request->user());
+            } elseif ($dados['tipo'] === 'entrada' && $dados['categoria'] === 'suprimento') {
+                $this->caixaService->suprimento($caixa, (float) $dados['valor'], $dados['descricao'] ?? null, $request->user());
+            } else {
+                $this->caixaService->registrarMovimentacao($caixa, [...$dados, 'usuario_id' => $request->user()->id]);
+            }
         } catch (NegocioException $e) {
             return back()->with('erro', $e->getMessage());
         }

@@ -52,6 +52,13 @@ Schedule::command('financeiro:aplicar-atrasos')
     ->withoutOverlapping()
     ->onOneServer();
 
+// Pousada: lê o calendário do Booking.com/Airbnb de cada quarto (iCal) e
+// bloqueia no ERP as datas vendidas lá; reservas canceladas no canal liberam.
+Schedule::command('hospedagem:sincronizar-ical')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
+
 // Pix Itaú: restaura .crt/.key do banco → disco, limpa token OAuth e
 // alerta se o certificado dinâmico estiver perto de vencer (renovação
 // manual no portal Itaú — o banco não perde o PEM no rebuild).

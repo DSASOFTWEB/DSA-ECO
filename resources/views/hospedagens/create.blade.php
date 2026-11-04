@@ -72,13 +72,22 @@
 
         <form method="POST" action="{{ route('hospedagens.store') }}" class="space-y-5">
             @csrf
+            @if ($bloqueio)
+                {{-- Registrando o hóspede de uma reserva vendida no Booking.com (iCal) --}}
+                <input type="hidden" name="bloqueio_id" value="{{ $bloqueio->id }}">
+                <div class="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+                    Reserva do <strong>{{ $bloqueio->origemLabel() }}</strong> · quarto {{ $bloqueio->quarto?->numero }} ·
+                    {{ $bloqueio->inicio->format('d/m/Y') }} a {{ $bloqueio->fim->format('d/m/Y') }}.
+                    Informe o hóspede (dados no extranet ou no e-mail do {{ $bloqueio->origemLabel() }}).
+                </div>
+            @endif
 
             <div>
                 <label class="block text-sm font-medium text-slate-700">Quarto</label>
                 <select name="quarto_id" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                     <option value="">Selecione...</option>
                     @foreach ($quartos as $quarto)
-                        <option value="{{ $quarto->id }}" @selected(old('quarto_id') == $quarto->id)>{{ $quarto->numero }} — {{ $quarto->unidade->nome }} (até {{ $quarto->capacidade_maxima }} pessoas, R$ {{ number_format($quarto->valor_diaria, 2, ',', '.') }}/diária)</option>
+                        <option value="{{ $quarto->id }}" @selected(old('quarto_id', $bloqueio?->quarto_id) == $quarto->id)>{{ $quarto->numero }} — {{ $quarto->unidade->nome }} (até {{ $quarto->capacidade_maxima }} pessoas, R$ {{ number_format($quarto->valor_diaria, 2, ',', '.') }}/diária)</option>
                     @endforeach
                 </select>
                 @error('quarto_id')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
@@ -126,12 +135,12 @@
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Check-in previsto</label>
-                    <input type="date" name="data_checkin_prevista" value="{{ old('data_checkin_prevista', now()->toDateString()) }}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                    <input type="date" name="data_checkin_prevista" value="{{ old('data_checkin_prevista', $bloqueio?->inicio->toDateString() ?? now()->toDateString()) }}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                     @error('data_checkin_prevista')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Check-out previsto</label>
-                    <input type="date" name="data_checkout_prevista" value="{{ old('data_checkout_prevista') }}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                    <input type="date" name="data_checkout_prevista" value="{{ old('data_checkout_prevista', $bloqueio?->fim->toDateString()) }}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                     @error('data_checkout_prevista')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                 </div>
             </div>
@@ -154,7 +163,7 @@
 
             <div>
                 <label class="block text-sm font-medium text-slate-700">Observações</label>
-                <textarea name="observacoes" rows="2" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">{{ old('observacoes') }}</textarea>
+                <textarea name="observacoes" rows="2" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">{{ old('observacoes', $bloqueio ? 'Reserva '.$bloqueio->origemLabel().($bloqueio->resumo ? ' — '.$bloqueio->resumo : '') : '') }}</textarea>
             </div>
 
             <div class="flex justify-end gap-2">

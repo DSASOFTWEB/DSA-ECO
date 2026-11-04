@@ -8,6 +8,7 @@ use App\Http\Requests\Quarto\StoreQuartoRequest;
 use App\Models\Produto;
 use App\Models\Quarto;
 use App\Models\Unidade;
+use App\Services\Hospedagem\IcalQuartoService;
 use App\Services\HospedagemService;
 use App\Services\QuartoEstoqueService;
 use Illuminate\Contracts\View\View;
@@ -52,8 +53,9 @@ class QuartoController extends Controller
         $this->authorize('update', $quarto);
 
         $unidades = Unidade::ativas()->orderBy('nome')->get();
+        $bloqueios = $quarto->bloqueios()->ativos()->with('hospedagem.cliente')->orderBy('inicio')->get();
 
-        return view('quartos.edit', compact('quarto', 'unidades'));
+        return view('quartos.edit', compact('quarto', 'unidades', 'bloqueios'));
     }
 
     public function update(StoreQuartoRequest $request, Quarto $quarto): RedirectResponse
@@ -61,6 +63,66 @@ class QuartoController extends Controller
         $quarto->update($request->validated());
 
         return redirect()->route('quartos.index')->with('sucesso', 'Quarto atualizado com sucesso.');
+    }
+
+    /** Salva o link do calendário do Booking.com e já sincroniza. */
+    public function salvarIcal(Request $request, Quarto $quarto, IcalQuartoService $ical): RedirectResponse
+    {
+        $this->authorize('update', $quarto);
+
+        $dados = $request->validate(['ical_importacao_url' => ['nullable', 'url', 'max:1000']]);
+        $url = trim((string) ($dados['ical_importacao_url'] ?? ''));
+        $quarto->forceFill(['ical_importacao_url' => $url ?: null, 'ical_erro' => null])->save();
+
+        if ($url === '') {
+            $quarto->bloqueios()->whereNull('hospedagem_id')->delete();
+
+            return back()->with('sucesso', 'Sincronização com o calendário externo desligada para este quarto.');
+        }
+
+        return $this->executarSincronizacao($quarto, $ical);
+    }
+
+    public function sincronizarIcal(Quarto $quarto, IcalQuartoService $ical): RedirectResponse
+    {
+        $this->authorize('update', $quarto);
+
+        return $this->executarSincronizacao($quarto, $ical);
+    }
+
+    /** Novo link de exportação (o antigo para de funcionar no Booking). */
+    public function novoLinkIcal(Quarto $quarto): RedirectResponse
+    {
+        $this->authorize('update', $quarto);
+
+        $quarto->forceFill(['ical_token' => \Illuminate\Support\Str::random(40)])->save();
+
+        return back()->with('sucesso', 'Link novo gerado. Atualize o link importado no extranet do Booking.com.');
+    }
+
+    /** Passo a passo da ativação e do uso da sincronização com o Booking.com. */
+    public function icalPassoAPasso(Request $request): \Illuminate\Http\Response
+    {
+        $this->authorize('viewAny', Quarto::class);
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('quartos.pdf.ical-passo-a-passo', [
+            'empresa' => \App\Models\Empresa::findOrFail($request->user()->empresa_id),
+        ])->setPaper('a4')->setOption('isFontSubsettingEnabled', true)->download('passo-a-passo-booking-ical.pdf');
+    }
+
+    protected function executarSincronizacao(Quarto $quarto, IcalQuartoService $ical): RedirectResponse
+    {
+        try {
+            $r = $ical->sincronizar($quarto);
+        } catch (NegocioException $e) {
+            return back()->with('erro', $e->getMessage());
+        }
+
+        $msg = "Calendário sincronizado: {$r['criados']} nova(s), {$r['atualizados']} alterada(s), {$r['removidos']} cancelada(s).";
+
+        return $r['conflitos'] > 0
+            ? back()->with('sucesso', $msg)->with('erro', "Atenção: {$r['conflitos']} reserva(s) do canal caem em datas que já tinham hóspede no ERP (overbooking). Veja os bloqueios em vermelho.")
+            : back()->with('sucesso', $msg);
     }
 
     public function limpar(Quarto $quarto): RedirectResponse

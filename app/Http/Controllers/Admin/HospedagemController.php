@@ -138,7 +138,12 @@ class HospedagemController extends Controller
         $clienteAnterior = old('cliente_id') ? Cliente::find(old('cliente_id')) : null;
         $unidades = Unidade::ativas()->orderBy('nome')->get();
 
-        return view('hospedagens.create', compact('quartos', 'clienteAnterior', 'unidades'));
+        // Vindo do mapa: registrar o hóspede de uma reserva do Booking.com (iCal).
+        $bloqueio = ($id = request()->integer('bloqueio') ?: old('bloqueio_id'))
+            ? \App\Models\QuartoBloqueio::whereNull('hospedagem_id')->find($id)
+            : null;
+
+        return view('hospedagens.create', compact('quartos', 'clienteAnterior', 'unidades', 'bloqueio'));
     }
 
     public function store(StoreHospedagemRequest $request): RedirectResponse

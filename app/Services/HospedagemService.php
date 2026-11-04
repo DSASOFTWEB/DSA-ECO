@@ -49,9 +49,15 @@ class HospedagemService
             $quarto = Quarto::whereKey($dados['quarto_id'])->lockForUpdate()->firstOrFail();
             $cliente = Cliente::findOrFail($dados['cliente_id']);
 
-            $this->garantirDisponibilidade($quarto, $checkin, $checkout);
+            // Registrando o hóspede de uma reserva do Booking.com: o bloqueio
+            // dela não impede (é a mesma estadia) e fica vinculado à hospedagem.
+            $bloqueio = ! empty($dados['bloqueio_id'])
+                ? \App\Models\QuartoBloqueio::where('quarto_id', $quarto->id)->whereNull('hospedagem_id')->find($dados['bloqueio_id'])
+                : null;
 
-            return Hospedagem::create([
+            $this->garantirDisponibilidade($quarto, $checkin, $checkout, null, $bloqueio?->id);
+
+            $hospedagem = Hospedagem::create([
                 'empresa_id' => $quarto->empresa_id,
                 'unidade_id' => $quarto->unidade_id,
                 'quarto_id' => $quarto->id,
@@ -70,6 +76,10 @@ class HospedagemService
                 'observacoes' => $dados['observacoes'] ?? null,
                 'registrado_por_id' => $operador->id,
             ]);
+
+            $bloqueio?->update(['hospedagem_id' => $hospedagem->id, 'conflito' => false]);
+
+            return $hospedagem;
         });
     }
 
@@ -331,17 +341,19 @@ class HospedagemService
             $q->whereIn('status', ['reservado', 'hospedado'])
                 ->with('cliente')
                 ->orderBy('data_checkin_prevista');
-        }])->orderBy('numero')->get();
+        }, 'bloqueios' => fn ($q) => $q->ativos()->queOcupam()->orderBy('inicio')])->orderBy('numero')->get();
 
         return $quartos->map(function (Quarto $quarto) {
             $hospedada = $quarto->hospedagens->firstWhere('status', 'hospedado');
             $reservada = $quarto->hospedagens->firstWhere('status', 'reservado');
+            // Próxima reserva vendida no Booking.com/Airbnb ainda sem hóspede registrado.
+            $bloqueio = $quarto->bloqueios->first();
 
             $status = match (true) {
                 $quarto->status !== 'ativo' => 'bloqueado',
                 $hospedada !== null => 'ocupado',
                 $quarto->precisa_limpeza => 'em_limpeza',
-                $reservada !== null => 'reservado',
+                $reservada !== null || $bloqueio !== null => 'reservado',
                 default => 'disponivel',
             };
 
@@ -349,6 +361,7 @@ class HospedagemService
                 'quarto' => $quarto,
                 'status' => $status,
                 'hospedagem' => $hospedada ?? $reservada,
+                'bloqueio' => $bloqueio,
             ];
         });
     }
@@ -455,7 +468,7 @@ class HospedagemService
      * Impede overbooking: nenhuma outra hospedagem reservada/hospedada pode
      * ter período sobreposto ao pedido, no mesmo quarto.
      */
-    protected function garantirDisponibilidade(Quarto $quarto, Carbon $checkin, Carbon $checkout, ?int $ignorarHospedagemId = null): void
+    protected function garantirDisponibilidade(Quarto $quarto, Carbon $checkin, Carbon $checkout, ?int $ignorarHospedagemId = null, ?int $ignorarBloqueioId = null): void
     {
         $existeConflito = Hospedagem::where('quarto_id', $quarto->id)
             ->whereIn('status', ['reservado', 'hospedado'])
@@ -466,6 +479,20 @@ class HospedagemService
 
         if ($existeConflito) {
             throw new NegocioException("O quarto \"{$quarto->numero}\" já está reservado/ocupado nesse período.");
+        }
+
+        // Datas vendidas em outro canal (iCal do Booking.com etc.).
+        $bloqueio = \App\Models\QuartoBloqueio::withoutGlobalScopes()
+            ->where('quarto_id', $quarto->id)
+            ->queOcupam()
+            ->when($ignorarBloqueioId, fn ($q, $id) => $q->where('id', '!=', $id))
+            ->where('inicio', '<', $checkout->toDateString())
+            ->where('fim', '>', $checkin->toDateString())
+            ->orderBy('inicio')
+            ->first();
+
+        if ($bloqueio) {
+            throw new NegocioException("O quarto \"{$quarto->numero}\" foi vendido no {$bloqueio->origemLabel()} de {$bloqueio->inicio->format('d/m')} a {$bloqueio->fim->format('d/m')}. Se for o mesmo hóspede, registre pela reserva do {$bloqueio->origemLabel()} no mapa de quartos.");
         }
     }
 }

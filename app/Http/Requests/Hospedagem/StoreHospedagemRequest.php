@@ -26,6 +26,8 @@ class StoreHospedagemRequest extends FormRequest
             'data_checkin_prevista' => ['required', 'date'],
             'data_checkout_prevista' => ['required', 'date', 'after:data_checkin_prevista'],
             'observacoes' => ['nullable', 'string', 'max:1000'],
+            // Reserva vinda do Booking.com (bloqueio do iCal) sendo registrada com o hóspede.
+            'bloqueio_id' => ['nullable', 'integer', Rule::exists('quarto_bloqueios', 'id')->where('empresa_id', $empresaId)],
         ];
     }
 }

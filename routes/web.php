@@ -45,6 +45,7 @@ use App\Http\Controllers\Admin\VendaController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\CadastroEmpresaController;
+use App\Http\Controllers\IcalController;
 use App\Http\Controllers\CheckoutPublicoController;
 use App\Http\Controllers\PaginaInicialController;
 use Illuminate\Support\Facades\Route;
@@ -104,6 +105,13 @@ Route::middleware('throttle:20,1')->group(function () {
     Route::post('comprar/{unidade}/verificar-plano', [CheckoutPublicoController::class, 'verificarPlano'])->name('checkout.verificar-plano');
 });
 
+// Calendário .ics do quarto que o Booking.com/Airbnb leem (sem login: o
+// token secreto do link é a chave). Só datas ocupadas, sem dados do hóspede.
+Route::get('ical/quarto/{token}.ics', [IcalController::class, 'quarto'])
+    ->where('token', '[A-Za-z0-9]{40}')
+    ->middleware('throttle:60,1')
+    ->name('ical.quarto');
+
 /*
 |--------------------------------------------------------------------------
 | Painel administrativo (autenticado)
@@ -162,6 +170,11 @@ Route::middleware('auth')->group(function () {
     Route::get('caixas/{caixa}/bobina/escpos', [CaixaController::class, 'bobinaEscpos'])->name('caixas.bobina.escpos');
     Route::post('caixas/abrir', [CaixaController::class, 'abrir'])->name('caixas.abrir');
     Route::post('caixas/{caixa}/movimentar', [CaixaController::class, 'movimentar'])->name('caixas.movimentar');
+    Route::get('caixas/{caixa}/gaveta', [CaixaController::class, 'gaveta'])->name('caixas.gaveta');
+    Route::post('caixas/{caixa}/sangria', [CaixaController::class, 'sangriaSuprimento'])->defaults('tipo', 'sangria')->name('caixas.sangria');
+    Route::post('caixas/{caixa}/suprimento', [CaixaController::class, 'sangriaSuprimento'])->defaults('tipo', 'suprimento')->name('caixas.suprimento');
+    Route::get('caixas/{caixa}/movimentacoes/{movimentacao}/comprovante', [CaixaController::class, 'comprovanteMovimentacao'])->name('caixas.movimentacoes.comprovante');
+    Route::get('caixas/{caixa}/movimentacoes/{movimentacao}/comprovante/escpos', [CaixaController::class, 'comprovanteMovimentacaoEscpos'])->name('caixas.movimentacoes.comprovante.escpos');
     Route::post('caixas/{caixa}/fechar', [CaixaController::class, 'fechar'])->name('caixas.fechar');
 
     Route::get('financeiro/movimentacoes', [MovimentacaoController::class, 'index'])->name('movimentacoes.index');
@@ -221,8 +234,12 @@ Route::middleware('auth')->group(function () {
     Route::get('food/atendimentos/{atendimento}/conta.escpos', [FoodController::class, 'contaEscpos'])->name('food.atendimentos.conta.escpos');
 
     Route::get('quartos/estoque', [QuartoController::class, 'estoqueGeral'])->name('quartos.estoque-geral');
+    Route::get('quartos/ical/passo-a-passo', [QuartoController::class, 'icalPassoAPasso'])->name('quartos.ical.passo-a-passo');
     Route::resource('quartos', QuartoController::class)->only(['index', 'create', 'store', 'edit', 'update']);
     Route::post('quartos/{quarto}/limpar', [QuartoController::class, 'limpar'])->name('quartos.limpar');
+    Route::put('quartos/{quarto}/ical', [QuartoController::class, 'salvarIcal'])->name('quartos.ical.salvar');
+    Route::post('quartos/{quarto}/ical/sincronizar', [QuartoController::class, 'sincronizarIcal'])->middleware('throttle:10,1')->name('quartos.ical.sincronizar');
+    Route::post('quartos/{quarto}/ical/novo-link', [QuartoController::class, 'novoLinkIcal'])->name('quartos.ical.novo-link');
     Route::get('quartos/{quarto}/estoque', [QuartoController::class, 'estoque'])->name('quartos.estoque');
     Route::post('quartos/{quarto}/estoque', [QuartoController::class, 'emprestar'])->name('quartos.estoque.emprestar');
     Route::post('quartos/{quarto}/estoque/{produto}/devolver', [QuartoController::class, 'devolver'])->name('quartos.estoque.devolver');

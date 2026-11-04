@@ -106,8 +106,19 @@
                     @if ($item['hospedagem'])
                         <p class="mt-3 truncate text-sm font-medium text-slate-700 dark:text-slate-200">{{ $item['hospedagem']->cliente->nome }}</p>
                         <p class="text-xs text-slate-400">{{ $item['hospedagem']->data_checkin_prevista->format('d/m/Y') }} — {{ $item['hospedagem']->data_checkout_prevista->format('d/m/Y') }}</p>
-                    @else
+                    @elseif (! ($item['bloqueio'] ?? null))
                         <p class="mt-3 text-sm text-slate-300 dark:text-slate-600">—</p>
+                    @endif
+
+                    @if ($b = $item['bloqueio'] ?? null)
+                        {{-- Vendido no Booking.com/Airbnb (iCal), hóspede ainda não registrado aqui --}}
+                        <div class="mt-2 rounded-lg border px-2.5 py-1.5 text-xs {{ $b->conflito ? 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-700 dark:bg-rose-500/10 dark:text-rose-300' : 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-700 dark:bg-sky-500/10 dark:text-sky-300' }}">
+                            <span class="font-semibold">{{ $b->origemLabel() }}</span> · {{ $b->inicio->format('d/m') }} — {{ $b->fim->format('d/m') }}
+                            @if ($b->conflito) <span class="font-bold">· OVERBOOKING</span> @endif
+                            @can('create', App\Models\Hospedagem::class)
+                                <a href="{{ route('hospedagens.create', ['bloqueio' => $b->id]) }}" class="mt-1 block font-semibold underline">Registrar hóspede</a>
+                            @endcan
+                        </div>
                     @endif
 
                     <div class="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3 dark:border-gray-800">
@@ -117,6 +128,9 @@
                             @can('checkout', $item['hospedagem'])
                                 <a href="{{ route('hospedagens.show', [$item['hospedagem'], 'fechar' => 1]) }}" class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">Fechar conta</a>
                             @endcan
+                        @elseif ($item['status'] === 'reservado' && ! $item['hospedagem'])
+                            {{-- Só reserva do Booking.com: o "Registrar hóspede" está no aviso acima. --}}
+                            <span class="text-xs text-slate-400">Aguardando registro do hóspede</span>
                         @elseif ($item['status'] === 'reservado')
                             <a href="{{ route('hospedagens.show', $item['hospedagem']) }}" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-gray-700 dark:text-slate-300">Ver</a>
                             <a href="{{ route('hospedagens.ficha', $item['hospedagem']) }}" target="_blank" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-gray-700 dark:text-slate-300">🖨 Imprimir ficha</a>

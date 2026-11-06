@@ -27,7 +27,8 @@ class EvolutionApiService
         protected int $maxTentativas = 3,
         protected int $delayMs = 500,
     ) {
-        $this->baseUrl = $baseUrl ?: config('evolution.base_url');
+        // Sem barra no fim: "https://evo/" + "/message/..." daria "//message".
+        $this->baseUrl = rtrim((string) ($baseUrl ?: config('evolution.base_url')), '/');
         $this->apiKey = $apiKey ?: config('evolution.api_key');
         $this->instancia = $instancia ?: config('evolution.instance');
         $this->timeout = $timeout ?: config('evolution.timeout');
@@ -202,13 +203,14 @@ class EvolutionApiService
         $texto = data_get($json, 'response.message') ?? data_get($json, 'message') ?? data_get($json, 'error');
         $texto = is_array($texto) ? implode('; ', \Illuminate\Support\Arr::flatten($texto)) : (string) $texto;
 
-        $motivo = match ($resposta->getStatusCode()) {
-            401, 403 => 'API Key da Evolution recusada.',
-            404 => 'instância não encontrada na Evolution (confira o nome da instância).',
-            413 => 'arquivo grande demais para o servidor da Evolution (limite de upload).',
+        $motivo = match (true) {
+            // POST chegou como GET: a URL redireciona (http → https) e o pedido se perdeu.
+            str_contains($texto.(string) $resposta->getBody(), 'Cannot GET') =>'o endereço da Evolution redireciona e o envio chegou como GET. Use a URL com https:// em Minha Empresa → Gerencial.',
+            in_array($resposta->getStatusCode(), [401, 403], true) => 'API Key da Evolution recusada.',
+            $resposta->getStatusCode() === 404 => 'instância não encontrada na Evolution (confira o nome da instância).',
+            $resposta->getStatusCode() === 413 => 'arquivo grande demais para o servidor da Evolution (limite de upload).',
             default => "Evolution respondeu HTTP {$resposta->getStatusCode()}.",
         };
-
         return new IntegrationException(
             'WhatsApp: '.$motivo.($texto !== '' ? ' Detalhe: '.\Illuminate\Support\Str::limit($texto, 200) : ''),
             servico: 'evolution-api',

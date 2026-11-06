@@ -63,26 +63,58 @@ class EvolutionEnviarDocumentoTest extends TestCase
         }
     }
 
+    public function test_redirecionamento_http_para_https_mantem_o_post(): void
+    {
+        $api = $this->api([
+            new Response(301, ['Location' => 'https://evo.teste/message/sendMedia/pousada']),
+            new Response(201, [], '{"key":{"id":"OK"}}'),
+        ], 'http://evo.teste/');
+
+        $this->assertSame('OK', $api->enviarDocumento('5583999991234', 'eA==', 'a.pdf', 'application/pdf')['key']['id']);
+        $this->assertSame(['POST', 'POST'], $this->metodos, 'não vira GET no redirecionamento');
+        $this->assertSame('5583999991234', $this->enviados[1]['number'], 'corpo reenviado');
+        $this->assertSame('http://evo.teste/message/sendMedia/pousada', $this->urls[0], 'barra final da URL ignorada');
+    }
+
+    public function test_cannot_get_explica_o_problema_do_https(): void
+    {
+        $api = $this->api([new Response(404, [], '{"status":404,"error":"Not Found","response":{"message":["Cannot GET /message/sendText/pousada"]}}')]);
+
+        try {
+            $api->enviarDocumento('5583999991234', 'eA==', 'a.pdf', 'application/pdf');
+            $this->fail('Deveria falhar');
+        } catch (IntegrationException $e) {
+            $this->assertStringContainsString('Use a URL com https://', $e->getMessage());
+        }
+    }
+
+    public array $metodos = [];
+
+    public array $urls = [];
+
     /** Evolution com respostas simuladas, guardando o corpo de cada envio. */
-    protected function api(array $respostas): EvolutionApiService
+    protected function api(array $respostas, string $url = 'https://evo.teste'): EvolutionApiService
     {
         $pilha = HandlerStack::create(new MockHandler($respostas));
         $pilha->push(Middleware::mapRequest(function ($req) {
             $this->enviados[] = json_decode((string) $req->getBody(), true);
+            $this->metodos[] = $req->getMethod();
+            $this->urls[] = (string) $req->getUri();
 
             return $req;
         }));
 
-        return new class($pilha) extends EvolutionApiService
+        return new class($pilha, $url) extends EvolutionApiService
         {
-            public function __construct(private HandlerStack $pilha)
+            public function __construct(private HandlerStack $pilha, string $url)
             {
-                parent::__construct('https://evo.teste', 'chave', 'pousada', 5, 1, 1);
+                parent::__construct($url, 'chave', 'pousada', 5, 1, 1);
             }
 
+            // Mesmas opções do client real, só trocando o transporte pelo simulado.
             protected function client(int $timeoutSegundos, array $opcoesBase = []): Client
             {
-                return new Client(['handler' => $this->pilha, 'http_errors' => true]);
+                return new Client(['handler' => $this->pilha] + parent::client($timeoutSegundos, $opcoesBase)->getConfig());
             }
         };
     }

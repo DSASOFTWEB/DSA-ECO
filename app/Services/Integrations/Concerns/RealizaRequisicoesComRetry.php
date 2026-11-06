@@ -27,6 +27,10 @@ trait RealizaRequisicoesComRetry
             'timeout' => $timeoutSegundos,
             'connect_timeout' => min(5, $timeoutSegundos),
             'http_errors' => true,
+            // Estrito: um redirecionamento (ex.: URL cadastrada com http:// e o
+            // servidor manda para https://) mantém o POST e o corpo — sem isso o
+            // Guzzle repete como GET e a API responde "Cannot GET /message/...".
+            'allow_redirects' => ['max' => 5, 'strict' => true, 'referer' => false, 'protocols' => ['http', 'https']],
         ], $opcoesBase));
     }
 

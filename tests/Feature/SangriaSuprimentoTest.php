@@ -129,6 +129,27 @@ class SangriaSuprimentoTest extends TestCase
             ->assertSee($js(route('caixas.suprimento', $this->caixa)), false);
     }
 
+    public function test_resumo_do_caixa_por_forma_com_grafico(): void
+    {
+        $this->mov('entrada', 'venda', 'pix', 20);
+        app(CaixaService::class)->suprimento($this->caixa, 50, null, $this->operador);
+        app(CaixaService::class)->sangria($this->caixa, 30, 'Cofre', $this->operador);
+
+        $r = app(CaixaFechamentoResumo::class)->montar($this->caixa->fresh());
+
+        // Suprimento não é recebimento: dinheiro 200, débito 80, pix 20 = 300.
+        $this->assertSame(300.0, $r['recebido_total']);
+        $this->assertSame(['dinheiro', 'cartao_debito', 'pix'], array_column($r['recebimentos'], 'chave'));
+        $this->assertEquals([66.7, 26.7, 6.7], array_column($r['recebimentos'], 'percentual'));
+        $this->assertSame(320.0, $r['dinheiro_gaveta'], '100 + 200 + 50 suprimento − 30 sangria');
+        $this->assertSame('conic-gradient(#16a34a 0% 66.7%, #7c3aed 66.7% 93.4%, #0d9488 93.4% 100%)', CaixaFechamentoResumo::gradientePizza($r['recebimentos']));
+
+        $this->get(route('caixas.show', $this->caixa))->assertOk()
+            ->assertSee('conic-gradient(', false)
+            ->assertSeeInOrder(['Recebido', 'R$ 300,00', 'Dinheiro', 'R$ 200,00', '67%', 'Cartão de débito', 'R$ 80,00', 'Pix', 'R$ 20,00'])
+            ->assertSeeInOrder(['Dinheiro na gaveta', 'R$ 320,00']);
+    }
+
     public function test_caixa_fechado_ou_de_outra_empresa_nao_movimenta(): void
     {
         app(CaixaService::class)->fechar($this->caixa, $this->operador, 380);

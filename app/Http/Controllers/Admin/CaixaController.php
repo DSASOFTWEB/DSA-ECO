@@ -50,8 +50,10 @@ class CaixaController extends Controller
         $this->authorize('view', $caixa);
 
         $caixa->load(['movimentacoes.usuario', 'unidade', 'terminal', 'usuarioAbertura', 'usuarioFechamento']);
+        // Mesmos números do fechamento em bobina (totais por forma, gaveta, gráfico).
+        $resumo = app(CaixaFechamentoResumo::class)->montar($caixa);
 
-        return view('caixas.show', compact('caixa'));
+        return view('caixas.show', compact('caixa', 'resumo'));
     }
 
     public function pdf(Caixa $caixa, CaixaPdfExport $export): Response

@@ -79,11 +79,41 @@
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-            <h3 class="mb-3 text-sm font-semibold text-slate-700">Resumo</h3>
-            <dl class="space-y-2 text-sm">
-                <div class="flex justify-between"><dt class="text-slate-400">Abertura</dt><dd>R$ {{ number_format($caixa->valor_abertura, 2, ',', '.') }}</dd></div>
+            @php $brl = fn ($v) => 'R$ '.number_format((float) $v, 2, ',', '.'); @endphp
+            <h3 class="mb-3 text-sm font-semibold text-slate-700 dark:text-white/90">Resumo</h3>
+
+            {{-- Recebido por forma de pagamento (pizza em CSS: conic-gradient) --}}
+            <div class="flex items-center gap-4">
+                <div class="relative h-32 w-32 shrink-0 rounded-full" style="background: {{ \App\Services\Relatorios\CaixaFechamentoResumo::gradientePizza($resumo['recebimentos']) }}"
+                     role="img" aria-label="Recebido por forma de pagamento">
+                    <div style="inset: 22%" class="absolute flex flex-col items-center justify-center rounded-full bg-white text-center dark:bg-gray-900">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Recebido</span>
+                        <span class="text-sm font-bold text-slate-800 dark:text-white">{{ $brl($resumo['recebido_total']) }}</span>
+                    </div>
+                </div>
+                <ul class="min-w-0 flex-1 space-y-1.5 text-sm">
+                    @forelse ($resumo['recebimentos'] as $r)
+                        <li class="flex items-center gap-2">
+                            <span class="h-3 w-3 shrink-0" style="background: {{ $r['cor'] }}; border-radius: 3px"></span>
+                            <span class="min-w-0 flex-1 truncate text-slate-600 dark:text-gray-300">{{ $r['forma'] }}</span>
+                            <span class="whitespace-nowrap font-semibold text-slate-800 dark:text-white">{{ $brl($r['total']) }}</span>
+                            <span class="text-right text-xs text-slate-400" style="width: 2.75rem">{{ number_format($r['percentual'], 0) }}%</span>
+                        </li>
+                    @empty
+                        <li class="text-slate-400">Nenhum recebimento ainda.</li>
+                    @endforelse
+                </ul>
+            </div>
+
+            <dl class="mt-5 space-y-2 border-t border-slate-100 pt-4 text-sm dark:border-gray-800">
+                <div class="flex justify-between"><dt class="text-slate-400">Abertura (troco)</dt><dd>{{ $brl($caixa->valor_abertura) }}</dd></div>
+                <div class="flex justify-between"><dt class="text-slate-400">(+) Entradas</dt><dd class="text-emerald-600">{{ $brl($resumo['entradas']) }}</dd></div>
+                <div class="flex justify-between"><dt class="text-slate-400">(−) Saídas</dt><dd class="text-rose-600">{{ $brl($resumo['saidas']) }}</dd></div>
+                <div class="flex justify-between font-semibold"><dt class="text-slate-600 dark:text-gray-300">{{ $caixa->estaAberto() ? 'Saldo até agora' : 'Saldo do sistema' }}</dt><dd>{{ $brl($resumo['saldo']) }}</dd></div>
+                <div class="flex justify-between rounded-lg bg-emerald-50 px-2 py-1.5 font-semibold text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+                    <dt>💵 Dinheiro na gaveta</dt><dd>{{ $brl($resumo['dinheiro_gaveta']) }}</dd>
+                </div>
                 @if (! $caixa->estaAberto())
-                    <div class="flex justify-between"><dt class="text-slate-400">Sistema</dt><dd>R$ {{ number_format($caixa->valor_fechamento_sistema, 2, ',', '.') }}</dd></div>
                     <div class="flex justify-between"><dt class="text-slate-400">Informado</dt><dd>R$ {{ number_format($caixa->valor_fechamento_informado, 2, ',', '.') }}</dd></div>
                     <div class="flex justify-between"><dt class="text-slate-400">Diferença</dt><dd class="{{ $caixa->diferenca < 0 ? 'text-rose-600' : 'text-emerald-600' }}">R$ {{ number_format($caixa->diferenca, 2, ',', '.') }}</dd></div>
                 @endif

@@ -133,6 +133,7 @@ class NfceRelatorioTest extends TestCase
         $this->nota(901, 19, '2026-09-10 10:00:00');
         $this->post(route('relatorios.nfce.fechar'), ['mes' => '2026-09']);
         $fechamento = FechamentoFiscal::firstOrFail();
+        config(['evolution.base_url' => '', 'evolution.api_key' => '', 'evolution.instance' => '']);
 
         $resposta = $this->post(route('fiscal.fechamentos.whatsapp', $fechamento), ['telefone' => '(83) 99999-1234']);
         $resposta->assertRedirect();

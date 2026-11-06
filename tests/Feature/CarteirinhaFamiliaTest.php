@@ -74,27 +74,39 @@ class CarteirinhaFamiliaTest extends TestCase
         $this->assertLessThanOrEqual(167 * 2, mb_strlen('MARIA APARECIDA DOS SANTOS OLIVEIRA DE ALBUQUERQUE') * 0.7 * $longo);
     }
 
-    public function test_whatsapp_sem_integracao_abre_wa_me_com_link_da_carteirinha(): void
+    public function test_whatsapp_sem_evolution_avisa_e_nao_abre_wa_me(): void
     {
+        config(['evolution.base_url' => '', 'evolution.api_key' => '', 'evolution.instance' => '']);
         [$titular, $cTitular] = $this->familia('JOAO BATISTA FERREIRA', '529.982.247-25');
         $titular->update(['whatsapp' => '(83) 99999-1234']);
 
         $this->get(route('carteirinhas.index', ['busca' => 'JOAO']))->assertOk()->assertSee('WhatsApp')->assertSee('(83) 99999-1234')->assertSee('Família inteira (3)');
-        $this->get(route('carteirinhas.show', $cTitular))->assertOk()->assertSee('Enviar pelo WhatsApp');
+        $this->get(route('carteirinhas.show', $cTitular))->assertOk()
+            ->assertSee('Enviar pelo WhatsApp')
+            ->assertSee('WhatsApp da empresa não configurado');
 
         $resposta = $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+            ->from(route('carteirinhas.show', $cTitular))
             ->post(route('carteirinhas.whatsapp', $cTitular), ['telefone' => '(83) 99999-1234', 'familia' => 1])
-            ->assertRedirect();
-        $destino = $resposta->headers->get('Location');
-        $this->assertStringStartsWith('https://wa.me/5583999991234?text=', $destino);
-        $this->assertStringContainsString(rawurlencode('Olá, Joao! Seguem as carteirinhas da sua família'), $destino);
+            ->assertRedirect(route('carteirinhas.show', $cTitular))
+            ->assertSessionHas('erro', fn ($e) => str_contains($e, 'Evolution API) não configurado'));
+        $this->assertStringNotContainsString('wa.me', (string) $resposta->headers->get('Location'));
+    }
 
-        // O link do PDF só abre assinado.
-        parse_str((string) parse_url($destino, PHP_URL_QUERY), $query);
-        preg_match('#https?://\S+#', $query['text'], $link);
-        auth()->logout();
-        $this->get($link[0])->assertOk()->assertHeader('Content-Type', 'application/pdf');
-        $this->get(route('carteirinhas.compartilhada', $cTitular))->assertForbidden();
+    public function test_usa_a_evolution_configurada_na_empresa_e_mostra_o_erro_da_api(): void
+    {
+        config(['evolution.base_url' => '', 'evolution.api_key' => '', 'evolution.instance' => '']);
+        [, $cTitular] = $this->familia('JOAO BATISTA FERREIRA', '529.982.247-25');
+        $empresa = \App\Models\Empresa::findOrFail($cTitular->cliente->empresa_id);
+        // Configurada pela tela (Minha Empresa → Gerencial), não no .env.
+        $empresa->update(['configuracoes' => ['evolution' => ['base_url' => 'http://127.0.0.1:9', 'api_key' => 'chave', 'instance' => 'pousada']]]);
+
+        $this->get(route('carteirinhas.show', $cTitular))->assertSee('Vai como arquivo PDF pelo WhatsApp da empresa.');
+
+        // API fora do ar: avisa o motivo (antes caía calado no wa.me).
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+            ->post(route('carteirinhas.whatsapp', $cTitular), ['telefone' => '83988887777'])
+            ->assertSessionHas('erro', fn ($e) => str_contains($e, 'Não foi possível enviar pelo WhatsApp para +5583988887777'));
     }
 
     public function test_whatsapp_com_integracao_envia_o_pdf_como_arquivo(): void

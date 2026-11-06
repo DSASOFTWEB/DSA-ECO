@@ -58,7 +58,7 @@ class CarteirinhaController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $whatsappIntegrado = app(EvolutionApiService::class)->configurada();
+        $whatsappIntegrado = $this->whatsappDaEmpresa()->configurada();
 
         return view('carteirinhas.index', compact('carteirinhas', 'whatsappIntegrado'));
     }
@@ -69,7 +69,7 @@ class CarteirinhaController extends Controller
 
         $carteirinha->load(['cliente.carteirinha', 'cliente.dependentes.carteirinha', 'dependente.cliente.carteirinha', 'dependente.cliente.dependentes.carteirinha', 'acessos' => fn ($q) => $q->latest('registrado_em')->limit(30)]);
 
-        $whatsappIntegrado = app(EvolutionApiService::class)->configurada();
+        $whatsappIntegrado = $this->whatsappDaEmpresa()->configurada();
 
         return view('carteirinhas.show', compact('carteirinha', 'whatsappIntegrado'));
     }
@@ -113,9 +113,19 @@ class CarteirinhaController extends Controller
      * Evolution API configurada vai o PDF como arquivo; sem ela, abre o
      * WhatsApp com a mensagem e um link temporário (7 dias) para o PDF.
      */
-    public function enviarWhatsapp(Request $request, Carteirinha $carteirinha, CarteirinhaPdfExport $export, EvolutionApiService $whatsapp): RedirectResponse
+    /**
+     * Envia a carteirinha (ou a da família) como PDF pelo WhatsApp da
+     * empresa (Evolution API). Só pela API: sem ela configurada, ou se o
+     * envio falhar, avisa o motivo — não abre o WhatsApp do computador.
+     */
+    public function enviarWhatsapp(Request $request, Carteirinha $carteirinha, CarteirinhaPdfExport $export): RedirectResponse
     {
         $this->authorize('view', $carteirinha);
+        $whatsapp = $this->whatsappDaEmpresa();
+        if (! $whatsapp->configurada()) {
+            return back()->with('erro', 'WhatsApp da empresa (Evolution API) não configurado. Configure em Minha Empresa → aba Gerencial.');
+        }
+
         $dados = $request->validate([
             'telefone' => ['required', 'string', 'max:20'],
             'familia' => ['sometimes', 'boolean'],
@@ -139,23 +149,21 @@ class CarteirinhaController extends Controller
             .'. Apresente o QR Code na entrada.';
         $arquivo = ($cartoes->count() > 1 ? 'Carteirinhas - ' : 'Carteirinha - ').Str::of($nome)->ascii()->replaceMatches('/[^A-Za-z0-9 ]/', '')->squish().'.pdf';
 
-        if ($whatsapp->configurada()) {
-            try {
-                $whatsapp->enviarDocumento($numero, base64_encode($export->gerar($cartoes)->output()), $arquivo, 'application/pdf', $mensagem);
+        try {
+            $whatsapp->enviarDocumento($numero, base64_encode($export->gerar($cartoes)->output()), $arquivo, 'application/pdf', $mensagem);
+        } catch (IntegrationException $e) {
+            report($e);
 
-                return back()->with('sucesso', ($cartoes->count() > 1 ? "{$cartoes->count()} carteirinhas enviadas" : 'Carteirinha enviada')." pelo WhatsApp para +{$numero}.");
-            } catch (IntegrationException $e) {
-                report($e);
-                // Segue para o link, para não deixar sem envio.
-            }
+            return back()->with('erro', "Não foi possível enviar pelo WhatsApp para +{$numero}: {$e->getMessage()} Confira se o número tem WhatsApp e se a instância da Evolution está conectada.");
         }
 
-        $link = URL::temporarySignedRoute('carteirinhas.compartilhada', now()->addDays(7), array_filter([
-            'carteirinha' => $carteirinha->id,
-            'familia' => $familia ? 1 : null,
-        ]));
+        return back()->with('sucesso', ($cartoes->count() > 1 ? "{$cartoes->count()} carteirinhas enviadas" : 'Carteirinha enviada')." pelo WhatsApp para +{$numero}.");
+    }
 
-        return redirect()->away('https://wa.me/'.$numero.'?text='.rawurlencode($mensagem."\n\nBaixe aqui: ".$link));
+    /** Instância de WhatsApp da empresa do usuário (cai no .env se ela não tiver a própria). */
+    protected function whatsappDaEmpresa(): EvolutionApiService
+    {
+        return EvolutionApiService::paraEmpresa(\App\Models\Empresa::find(request()->user()?->empresa_id));
     }
 
     /** PDF aberto pelo link do WhatsApp (assinado, sem login, 7 dias). */

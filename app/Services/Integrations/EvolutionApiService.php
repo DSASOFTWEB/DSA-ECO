@@ -42,6 +42,11 @@ class EvolutionApiService
      */
     public static function paraEmpresa(?Empresa $empresa): self
     {
+        // Instância registrada no container (testes trocam por um fake) tem prioridade.
+        if (app()->bound(self::class)) {
+            return app(self::class);
+        }
+
         $credenciais = $empresa?->credenciaisEvolution() ?? [];
 
         return new self(

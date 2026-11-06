@@ -11,8 +11,9 @@
         ? collect([$clienteBase->carteirinha])->merge($clienteBase->dependentes->pluck('carteirinha'))->filter()->unique('id')->count()
         : 1;
 @endphp
-<form method="POST" action="{{ route('carteirinhas.whatsapp', $carteirinha) }}" @if (! $whatsappIntegrado) target="_blank" @endif
-      class="flex flex-wrap items-center justify-end gap-2 text-left">
+<form method="POST" action="{{ route('carteirinhas.whatsapp', $carteirinha) }}"
+      class="flex flex-wrap items-center justify-end gap-2 text-left"
+      onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Enviando...'">
     @csrf
     <input type="tel" name="telefone" required value="{{ $numeroPadrao }}" placeholder="(83) 99999-9999"
            class="h-9 w-44 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 outline-none focus:border-emerald-500 dark:border-gray-700 dark:text-white/90">
@@ -22,8 +23,13 @@
             Família inteira ({{ $tamanhoFamilia }})
         </label>
     @endif
-    <button class="h-9 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700">Enviar</button>
-    <p class="w-full text-right text-[11px] font-normal text-gray-400">
-        {{ $whatsappIntegrado ? 'Vai como arquivo PDF pelo WhatsApp da empresa.' : 'Abre o WhatsApp com a mensagem e o link da carteirinha (válido por 7 dias).' }}
-    </p>
+    <button @disabled(! $whatsappIntegrado) class="h-9 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">Enviar</button>
+    @if ($whatsappIntegrado)
+        <p class="w-full text-right text-[11px] font-normal text-gray-400">Vai como arquivo PDF pelo WhatsApp da empresa.</p>
+    @else
+        <p class="w-full text-right text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+            WhatsApp da empresa não configurado: configure a Evolution API em
+            @can('empresa.gerenciar')<a href="{{ route('empresa.edit', ['aba' => 'gerencial']) }}" class="underline">Minha Empresa → Gerencial</a>@else Minha Empresa → Gerencial @endcan.
+        </p>
+    @endif
 </form>

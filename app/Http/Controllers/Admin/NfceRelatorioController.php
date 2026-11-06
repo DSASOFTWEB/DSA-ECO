@@ -54,7 +54,7 @@ class NfceRelatorioController extends Controller
             'filtros' => $filtros,
             'series' => DocumentoFiscal::where('modelo', DocumentoFiscal::MODELO_NFCE)->whereNotNull('serie')->distinct()->orderBy('serie')->pluck('serie'),
             'fechamentos' => FechamentoFiscal::where('modelo', DocumentoFiscal::MODELO_NFCE)->latest('id')->limit(12)->get(),
-            'whatsappIntegrado' => app(EvolutionApiService::class)->configurada(),
+            'whatsappIntegrado' => EvolutionApiService::paraEmpresa(Empresa::find($request->user()->empresa_id))->configurada(),
             'empresa' => Empresa::find($request->user()->empresa_id),
         ]);
     }
@@ -138,8 +138,10 @@ class NfceRelatorioController extends Controller
      * Com a Evolution API configurada, envia o ZIP como documento. Sem ela,
      * abre o WhatsApp Web/app com a mensagem e o link temporário.
      */
-    public function enviarWhatsapp(Request $request, FechamentoFiscal $fechamento, EvolutionApiService $whatsapp): RedirectResponse
+    public function enviarWhatsapp(Request $request, FechamentoFiscal $fechamento): RedirectResponse
     {
+        // WhatsApp da própria empresa (Minha Empresa → Gerencial); o .env é só reserva.
+        $whatsapp = EvolutionApiService::paraEmpresa(Empresa::find($fechamento->empresa_id));
         Gate::authorize('auditoria.visualizar');
         $dados = $request->validate(['telefone' => ['required', 'string', 'max:20']]);
 

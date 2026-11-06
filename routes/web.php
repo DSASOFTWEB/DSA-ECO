@@ -321,7 +321,8 @@ Route::middleware('auth')->group(function () {
     Route::get('empresa/consultar-cnpj', [EmpresaController::class, 'consultarCnpj'])->name('empresa.consultar-cnpj');
     Route::get('empresa/certificado', [EmpresaController::class, 'downloadCertificado'])->name('empresa.certificado.download');
     Route::delete('empresa/certificado', [EmpresaController::class, 'destroyCertificado'])->name('empresa.certificado.destroy');
-    Route::get('empresa/agente-impressao', [AgenteImpressaoController::class, 'download'])->name('empresa.agente-impressao');
+    Route::post('empresa/whatsapp/testar', [\App\Http\Controllers\Admin\WhatsappTesteController::class, 'testar'])->middleware('throttle:6,1')->name('empresa.whatsapp.testar');
+    Route::get('empresa/agente-impressao',[AgenteImpressaoController::class, 'download'])->name('empresa.agente-impressao');
     Route::post('empresa/pix/sicredi/csr',[SicrediPixController::class, 'gerarCsr'])->name('empresa.pix.sicredi.csr');
     Route::get('empresa/pix/sicredi/csr', [SicrediPixController::class, 'baixarCsr'])->name('empresa.pix.sicredi.csr.download');
     Route::post('empresa/pix/sicredi/testar', [SicrediPixController::class, 'testar'])->middleware('throttle:6,1')->name('empresa.pix.sicredi.testar');

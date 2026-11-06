@@ -138,14 +138,14 @@ class EvolutionApiService
             return $this->postarMidia($numero, $v2);
         } catch (IntegrationException $e) {
             if (! $this->erroDeFormato($e)) {
-                throw $this->comMotivo($e);
+                throw $this->explicar($e);
             }
         }
 
         try {
             return $this->postarMidia($numero, $v1);
         } catch (IntegrationException $e) {
-            throw $this->comMotivo($e);
+            throw $this->explicar($e);
         }
     }
 
@@ -185,7 +185,7 @@ class EvolutionApiService
      * Troca o "falha ao comunicar..." genérico pelo que a Evolution respondeu
      * (status + mensagem), para a tela mostrar o motivo real.
      */
-    protected function comMotivo(IntegrationException $e): IntegrationException
+    public function explicar(IntegrationException $e): IntegrationException
     {
         $anterior = $e->getPrevious();
         $resposta = $anterior instanceof \GuzzleHttp\Exception\RequestException ? $anterior->getResponse() : null;

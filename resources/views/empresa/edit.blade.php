@@ -144,6 +144,47 @@
                     <input type="text" name="evolution_instance" value="{{ old('evolution_instance', $evo['instance']) }}" placeholder="ex: parque-aquatico" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                 </div>
             </div>
+
+            {{-- Teste da Evolution: conexão e, com um número, envio de texto + PDF --}}
+            <div class="mt-5 rounded-xl border border-slate-200 p-4 dark:border-gray-700"
+                 x-data="{
+                    telefone: '', testando: false, erro: '', etapas: [],
+                    async testar() {
+                        this.testando = true; this.erro = ''; this.etapas = [];
+                        try {
+                            const r = await fetch(@js(route('empresa.whatsapp.testar')), {
+                                method: 'POST',
+                                headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                                body: JSON.stringify({ telefone: this.telefone }),
+                            });
+                            const d = await r.json().catch(() => ({}));
+                            if (! r.ok) { this.erro = d.message || 'Não foi possível testar.'; return; }
+                            this.etapas = d.etapas;
+                        } catch (e) {
+                            this.erro = 'Sem comunicação com o servidor.';
+                        } finally { this.testando = false; }
+                    },
+                 }">
+                <p class="text-sm font-semibold text-slate-700 dark:text-white/90">Testar WhatsApp</p>
+                <p class="mt-0.5 text-xs text-slate-400">Usa a configuração <strong>salva</strong>. Sem número, só confere a conexão. Com um número, envia uma mensagem de texto e um PDF de teste.</p>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <input type="tel" x-model="telefone" placeholder="(83) 99999-9999 (opcional)" @keydown.enter.prevent="testar()"
+                           class="h-10 w-56 rounded-lg border border-slate-300 bg-transparent px-3 text-sm dark:border-gray-700 dark:text-white/90">
+                    <button type="button" @click="testar()" :disabled="testando"
+                            class="inline-flex h-10 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+                        <x-lucide-plug-zap class="h-4 w-4" /> <span x-text="testando ? 'Testando...' : (telefone ? 'Testar e enviar' : 'Testar conexão')"></span>
+                    </button>
+                </div>
+                <p x-show="erro" x-cloak x-text="erro" class="mt-3 text-xs font-semibold text-rose-600"></p>
+                <ul x-show="etapas.length" x-cloak class="mt-3 space-y-1.5 text-sm">
+                    <template x-for="e in etapas" :key="e.etapa">
+                        <li class="flex items-start gap-2">
+                            <span class="font-bold" :class="e.ok ? 'text-emerald-600' : 'text-rose-600'" x-text="e.ok ? '✓' : '✗'"></span>
+                            <span><strong x-text="e.etapa + ':'"></strong> <span class="text-slate-600 dark:text-gray-300" x-text="e.texto"></span></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
         </section>
 
         @php $gw = $empresa->configuracaoGatewayPix(); @endphp

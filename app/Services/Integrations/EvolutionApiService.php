@@ -117,31 +117,103 @@ class EvolutionApiService
             );
         }
 
+        // Formato da Evolution v2 (campos na raiz).
+        $v2 = [
+            'number' => $numero,
+            'mediatype' => 'document',
+            'mimetype' => $mimetype,
+            'caption' => $legenda,
+            'media' => $base64,
+            'fileName' => $nomeArquivo,
+        ];
+        // Formato da Evolution v1 (dentro de mediaMessage) — o texto (sendText)
+        // funciona nas duas, mas o arquivo não: a v1 recusa o corpo da v2.
+        $v1 = [
+            'number' => $numero,
+            'options' => ['delay' => 1200, 'presence' => 'composing'],
+            'mediaMessage' => ['mediatype' => 'document', 'fileName' => $nomeArquivo, 'caption' => $legenda, 'media' => $base64],
+        ];
+
+        try {
+            return $this->postarMidia($numero, $v2);
+        } catch (IntegrationException $e) {
+            if (! $this->erroDeFormato($e)) {
+                throw $this->comMotivo($e);
+            }
+        }
+
+        try {
+            return $this->postarMidia($numero, $v1);
+        } catch (IntegrationException $e) {
+            throw $this->comMotivo($e);
+        }
+    }
+
+    protected function postarMidia(string $numero, array $corpo): array
+    {
         $client = $this->client(max($this->timeout, 60));
 
         return $this->comRetry(
             servico: 'evolution-api',
             operacao: "enviarDocumento:{$numero}",
-            requisicao: function () use ($client, $numero, $base64, $nomeArquivo, $mimetype, $legenda) {
+            requisicao: function () use ($client, $corpo) {
                 $resposta = $client->post("{$this->baseUrl}/message/sendMedia/{$this->instancia}", [
                     'headers' => [
                         'apikey' => $this->apiKey,
                         'Content-Type' => 'application/json',
                     ],
-                    'json' => [
-                        'number' => $numero,
-                        'mediatype' => 'document',
-                        'mimetype' => $mimetype,
-                        'caption' => $legenda,
-                        'media' => $base64,
-                        'fileName' => $nomeArquivo,
-                    ],
+                    'json' => $corpo,
                 ]);
 
                 return json_decode((string) $resposta->getBody(), true) ?? [];
             },
             maxTentativas: $this->maxTentativas,
             delayMs: $this->delayMs,
+        );
+    }
+
+    /** 400/422 = a Evolution não entendeu o corpo (versão diferente): vale tentar o outro formato. */
+    protected function erroDeFormato(IntegrationException $e): bool
+    {
+        $anterior = $e->getPrevious();
+
+        return $anterior instanceof \GuzzleHttp\Exception\RequestException
+            && in_array($anterior->getResponse()?->getStatusCode(), [400, 422], true);
+    }
+
+    /**
+     * Troca o "falha ao comunicar..." genérico pelo que a Evolution respondeu
+     * (status + mensagem), para a tela mostrar o motivo real.
+     */
+    protected function comMotivo(IntegrationException $e): IntegrationException
+    {
+        $anterior = $e->getPrevious();
+        $resposta = $anterior instanceof \GuzzleHttp\Exception\RequestException ? $anterior->getResponse() : null;
+
+        if (! $resposta) {
+            $motivo = $anterior instanceof \GuzzleHttp\Exception\ConnectException
+                ? 'servidor da Evolution não respondeu (fora do ar ou endereço errado).'
+                : 'erro de comunicação com a Evolution.';
+
+            return new IntegrationException('WhatsApp: '.$motivo, servico: 'evolution-api', previous: $e);
+        }
+
+        $json = json_decode((string) $resposta->getBody(), true) ?? [];
+        $texto = data_get($json, 'response.message') ?? data_get($json, 'message') ?? data_get($json, 'error');
+        $texto = is_array($texto) ? implode('; ', \Illuminate\Support\Arr::flatten($texto)) : (string) $texto;
+
+        $motivo = match ($resposta->getStatusCode()) {
+            401, 403 => 'API Key da Evolution recusada.',
+            404 => 'instância não encontrada na Evolution (confira o nome da instância).',
+            413 => 'arquivo grande demais para o servidor da Evolution (limite de upload).',
+            default => "Evolution respondeu HTTP {$resposta->getStatusCode()}.",
+        };
+
+        return new IntegrationException(
+            'WhatsApp: '.$motivo.($texto !== '' ? ' Detalhe: '.\Illuminate\Support\Str::limit($texto, 200) : ''),
+            servico: 'evolution-api',
+            respostaBruta: ['status' => $resposta->getStatusCode(), 'corpo' => \Illuminate\Support\Str::limit((string) $resposta->getBody(), 500)],
+            previous: $e,
         );
     }
 

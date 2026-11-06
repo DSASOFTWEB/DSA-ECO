@@ -34,6 +34,7 @@ class RelatorioGerencialService
         'produtos' => ['titulo' => 'Vendas por produto', 'descricao' => 'Quantidade e faturamento de cada produto, com participação.', 'icone' => 'box'],
         'tipos-entrada' => ['titulo' => 'Tipos de entrada', 'descricao' => 'Ingressos vendidos por tipo, no PDV e no link externo.', 'icone' => 'ticket'],
         'vendedores' => ['titulo' => 'Vendas por vendedor', 'descricao' => 'Vendas, faturamento e ticket médio de cada operador.', 'icone' => 'users'],
+        'resumo-caixas' => ['titulo' => 'Resumo dos caixas', 'descricao' => 'Todos os caixas juntos: recebido por forma de pagamento (dinheiro, Pix, cartão), com gráfico e o total de cada caixa.', 'icone' => 'report'],
         'caixas' => ['titulo' => 'Terminais e caixas', 'descricao' => 'Cada caixa do período: entradas, saídas e diferença no fechamento.', 'icone' => 'wallet'],
         'mesas' => ['titulo' => 'Faturamento de mesas', 'descricao' => 'Contas fechadas por mesa/comanda, taxa de serviço e ticket.', 'icone' => 'table'],
         'quartos' => ['titulo' => 'Quartos', 'descricao' => 'Hospedagens finalizadas por quarto: diárias, faturamento e ticket.', 'icone' => 'bed'],
@@ -64,6 +65,7 @@ class RelatorioGerencialService
             'tipos-entrada' => 'tiposEntrada',
             'vendedores' => 'vendedores',
             'caixas' => 'caixas',
+            'resumo-caixas' => 'resumoCaixas',
             'mesas' => 'mesas',
             'quartos' => 'quartos',
             'link-externo' => 'linkExterno',
@@ -290,9 +292,10 @@ class RelatorioGerencialService
             ->orderBy('data_abertura')
             ->get();
 
+        // Conta também os estornados: o estorno já entra como lançamento
+        // contrário (ignorar o original somava o estorno sozinho, em dobro).
         $movs = CaixaMovimentacao::query()
             ->whereIn('caixa_id', $caixas->pluck('id'))
-            ->whereNull('estornado_em')
             ->groupBy('caixa_id')
             ->selectRaw("caixa_id, sum(case when tipo = 'entrada' then valor else 0 end) as entradas, sum(case when tipo = 'saida' then valor else 0 end) as saidas")
             ->get()->keyBy('caixa_id');
@@ -344,6 +347,86 @@ class RelatorioGerencialService
                 'titulo' => 'Por terminal',
                 'colunas' => ['terminal' => ['Terminal', 'texto'], 'caixas' => ['Caixas', 'numero'], 'entradas' => ['Entradas', 'moeda'], 'saidas' => ['Saídas', 'moeda'], 'diferenca' => ['Diferença', 'moeda']],
                 'linhas' => $porTerminal,
+            ],
+        ];
+    }
+
+    /**
+     * Todos os caixas juntos no período (pelas movimentações dentro das
+     * datas): recebido por forma de pagamento, com gráfico, e uma linha por
+     * caixa. Suprimento, transferência e ajuste não contam como recebido.
+     */
+    protected function resumoCaixas(): array
+    {
+        $movs = CaixaMovimentacao::query()
+            // whereHas aplica o escopo da empresa do Caixa (a movimentação não tem empresa_id).
+            ->whereHas('caixa', fn ($q) => $q->when($this->unidadeId, fn ($c, $id) => $c->where('unidade_id', $id)))
+            ->whereBetween('created_at', [$this->inicio, $this->fim])
+            ->with(['caixa.terminal', 'caixa.usuarioAbertura'])
+            ->get();
+
+        $recebidos = $movs->where('tipo', 'entrada')->reject(fn ($m) => in_array($m->categoria, CaixaFechamentoResumo::NAO_RECEITA, true));
+        $totalRecebido = round((float) $recebidos->sum('valor'), 2);
+        $somaForma = fn ($colecao, array $formas) => round((float) $colecao->whereIn('forma_pagamento', $formas)->sum('valor'), 2);
+        $cartoes = ['cartao', 'cartao_credito', 'cartao_debito'];
+
+        $porForma = $recebidos->groupBy(fn ($m) => $m->forma_pagamento ?: 'outro')
+            ->map(fn ($g, $forma) => [
+                'chave' => (string) $forma,
+                'forma' => Financeiro::FORMAS_PAGAMENTO[$forma]['label'] ?? 'Outro',
+                'quantidade' => $g->count(),
+                'total' => round((float) $g->sum('valor'), 2),
+                'cor' => CaixaFechamentoResumo::CORES[$forma] ?? CaixaFechamentoResumo::CORES['outro'],
+            ])
+            ->sortByDesc('total')->values()
+            ->map(fn ($f) => $f + ['percentual' => $totalRecebido > 0 ? round($f['total'] / $totalRecebido * 100, 1) : 0.0])
+            ->all();
+
+        $caixaService = app(\App\Services\CaixaService::class);
+        $linhas = $movs->groupBy('caixa_id')->map(function ($g) use ($somaForma, $cartoes, $caixaService) {
+            $caixa = $g->first()->caixa;
+            $rec = $g->where('tipo', 'entrada')->reject(fn ($m) => in_array($m->categoria, CaixaFechamentoResumo::NAO_RECEITA, true));
+            $recebido = round((float) $rec->sum('valor'), 2);
+
+            return [
+                'caixa' => '#'.$caixa->id,
+                'terminal' => $caixa->terminal?->nome ?? '—',
+                'operador' => $caixa->usuarioAbertura?->name ?? '—',
+                'status' => ucfirst((string) $caixa->status),
+                'dinheiro' => $somaForma($rec, ['dinheiro']),
+                'pix' => $somaForma($rec, ['pix']),
+                'cartao' => $somaForma($rec, $cartoes),
+                'outros' => round($recebido - $somaForma($rec, ['dinheiro', 'pix', ...$cartoes]), 2),
+                'recebido' => $recebido,
+                'sangria' => round((float) $g->where('categoria', 'sangria')->sum('valor'), 2),
+                'suprimento' => round((float) $g->where('categoria', 'suprimento')->sum('valor'), 2),
+                // Dinheiro que o caixa tem (aberto) ou teve no fechamento, segundo o sistema.
+                'gaveta' => $caixaService->dinheiroEmGaveta($caixa),
+            ];
+        })->sortBy(fn ($l) => (int) ltrim($l['caixa'], '#'))->values()->all();
+
+        $gavetasAbertas = collect($linhas)->where('status', 'Aberto')->sum('gaveta');
+
+        return [
+            'resumo' => [
+                ['Recebido no período', $totalRecebido, 'moeda', count($linhas).' caixa(s)'],
+                ['Dinheiro', $somaForma($recebidos, ['dinheiro']), 'moeda'],
+                ['Pix', $somaForma($recebidos, ['pix']), 'moeda'],
+                ['Cartões', $somaForma($recebidos, $cartoes), 'moeda', 'crédito + débito'],
+                ['Dinheiro nas gavetas', $gavetasAbertas, 'moeda', 'caixas abertos agora'],
+            ],
+            'grafico' => ['titulo' => 'Recebido por forma de pagamento', 'total' => $totalRecebido, 'fatias' => $porForma],
+            'colunas' => [
+                'caixa' => ['Caixa', 'texto'], 'terminal' => ['Terminal', 'texto'], 'operador' => ['Operador', 'texto'], 'status' => ['Situação', 'texto'],
+                'dinheiro' => ['Dinheiro', 'moeda'], 'pix' => ['Pix', 'moeda'], 'cartao' => ['Cartão', 'moeda'], 'outros' => ['Outros', 'moeda'],
+                'recebido' => ['Recebido', 'moeda'], 'sangria' => ['Sangrias', 'moeda'], 'suprimento' => ['Suprimentos', 'moeda'], 'gaveta' => ['Gaveta', 'moeda'],
+            ],
+            'linhas' => $linhas,
+            'totais' => $this->somar($linhas, ['dinheiro', 'pix', 'cartao', 'outros', 'recebido', 'sangria', 'suprimento', 'gaveta']) + ['caixa' => 'Total'],
+            'secundaria' => [
+                'titulo' => 'Por forma de pagamento',
+                'colunas' => ['forma' => ['Forma', 'texto'], 'quantidade' => ['Lançamentos', 'numero'], 'total' => ['Total', 'moeda'], 'percentual' => ['%', 'percentual']],
+                'linhas' => $porForma,
             ],
         ];
     }

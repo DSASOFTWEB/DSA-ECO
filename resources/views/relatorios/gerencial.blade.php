@@ -99,6 +99,35 @@
         @endforeach
     </div>
 
+    {{-- Gráfico de pizza (CSS conic-gradient), quando o relatório traz "grafico" --}}
+    @if (! empty($relatorio['grafico']))
+        @php $g = $relatorio['grafico']; @endphp
+        <div class="mb-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            <h3 class="mb-4 text-sm font-semibold text-gray-700 dark:text-gray-200">{{ $g['titulo'] }}</h3>
+            <div class="flex flex-wrap items-center gap-6">
+                <div class="relative w-44 shrink-0 rounded-full" role="img" aria-label="{{ $g['titulo'] }}"
+                     style="height: 11rem; background: {{ \App\Services\Relatorios\CaixaFechamentoResumo::gradientePizza($g['fatias']) }}; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                    <div style="inset: 24%" class="absolute flex flex-col items-center justify-center rounded-full bg-white text-center dark:bg-gray-900">
+                        <span class="text-[10px] uppercase tracking-wide text-gray-400">Recebido</span>
+                        <span class="text-base font-bold text-gray-900 dark:text-white">{{ $fmt($g['total'], 'moeda') }}</span>
+                    </div>
+                </div>
+                <ul class="flex-1 space-y-2 text-sm" style="min-width: 240px; max-width: 460px">
+                    @forelse ($g['fatias'] as $f)
+                        <li class="flex items-center gap-3">
+                            <span class="h-3.5 w-3.5 shrink-0" style="background: {{ $f['cor'] }}; border-radius: 3px; -webkit-print-color-adjust: exact; print-color-adjust: exact;"></span>
+                            <span class="flex-1 text-gray-700 dark:text-gray-300">{{ $f['forma'] }}</span>
+                            <span class="font-semibold tabular-nums text-gray-900 dark:text-white">{{ $fmt($f['total'], 'moeda') }}</span>
+                            <span class="text-right text-xs tabular-nums text-gray-400" style="width: 3.5rem">{{ $fmt($f['percentual'], 'percentual') }}</span>
+                        </li>
+                    @empty
+                        <li class="text-gray-400">Sem recebimentos no período.</li>
+                    @endforelse
+                </ul>
+            </div>
+        </div>
+    @endif
+
     @foreach (array_filter([$relatorio, $relatorio['secundaria'] ?? null]) as $tabela)
         @if ($loop->index === 1)
             <h3 class="mb-2 mt-6 text-sm font-semibold text-gray-700 dark:text-gray-200">{{ $tabela['titulo'] }}</h3>

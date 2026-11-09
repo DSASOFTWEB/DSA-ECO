@@ -37,6 +37,14 @@ Schedule::command('mensalidades:cobrar')
     ->withoutOverlapping()
     ->onOneServer();
 
+// A régua só agenda; quem envia é a fila: 1 mensagem por empresa a cada
+// COBRANCA_INTERVALO_MINUTOS (padrão 20), no horário comercial. Disparo em
+// lote leva o WhatsApp a banir o número.
+Schedule::command('mensalidades:enviar-fila')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer();
+
 Schedule::command('inadimplencia:processar')
     ->dailyAt('01:30')
     ->withoutOverlapping()

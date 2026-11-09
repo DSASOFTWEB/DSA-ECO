@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Exceptions\IntegrationException;
 use App\Exceptions\NegocioException;
 use App\Http\Controllers\Controller;
-use App\Jobs\EnviarCobrancaWhatsappJob;
+use App\Services\CobrancaWhatsappFila;
 use App\Models\Mensalidade;
 use App\Services\CaixaService;
 use App\Services\Integrations\MercadoPagoService;
@@ -123,9 +123,23 @@ class MensalidadeController extends Controller
             return back()->with('erro', 'Esta mensalidade já está paga.');
         }
 
-        EnviarCobrancaWhatsappJob::dispatch($mensalidade->id);
+        if (! app(CobrancaWhatsappFila::class)->agendar($mensalidade)) {
+            return back()->with('erro', 'Esta mensalidade já está na fila de envio do WhatsApp.');
+        }
 
-        return back()->with('sucesso', 'Cobrança enviada para a fila de envio.');
+        return back()->with('sucesso', $this->mensagemFila(1, (int) $mensalidade->empresa_id));
+    }
+
+    /** Fila espaçada (anti-banimento): estimativa de quando a última sai. */
+    protected function mensagemFila(int $agendadas, int $empresaId): string
+    {
+        $naFila = app(CobrancaWhatsappFila::class)->naFila($empresaId);
+        $intervalo = (int) config('parque.cobranca_intervalo_minutos', 20);
+        $minutos = max(0, $naFila - 1) * $intervalo;
+        $previsao = $minutos < 60 ? "{$minutos} min" : intdiv($minutos, 60).'h'.str_pad((string) ($minutos % 60), 2, '0', STR_PAD_LEFT);
+
+        return "{$agendadas} cobrança(s) na fila do WhatsApp. Para evitar bloqueio do número, sai 1 mensagem a cada {$intervalo} min"
+            .' (das '.config('parque.cobranca_janela_inicio').'h às '.config('parque.cobranca_janela_fim')."h). Na fila agora: {$naFila} — previsão para esvaziar: {$previsao}.";
     }
 
     /**
@@ -150,15 +164,14 @@ class MensalidadeController extends Controller
                 continue;
             }
 
-            EnviarCobrancaWhatsappJob::dispatch($mensalidade->id);
-            $enviadas++;
+            $enviadas += (int) (bool) app(CobrancaWhatsappFila::class)->agendar($mensalidade);
         }
 
         if ($enviadas === 0) {
-            return back()->with('erro', 'Nenhuma cobrança elegível foi selecionada.');
+            return back()->with('erro', 'Nenhuma cobrança nova para a fila (já pagas, já na fila ou sem seleção).');
         }
 
-        return back()->with('sucesso', "{$enviadas} cobrança(s) enviada(s) para a fila de envio.");
+        return back()->with('sucesso', $this->mensagemFila($enviadas, (int) $request->user()->empresa_id));
     }
 
     public function alterarVencimento(Request $request, Mensalidade $mensalidade): RedirectResponse

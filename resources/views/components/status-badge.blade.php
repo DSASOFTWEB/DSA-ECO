@@ -7,7 +7,7 @@
         'inativo' => 'neutral', 'fechado' => 'neutral', 'cancelado' => 'neutral', 'isento' => 'neutral',
         'bloqueado' => 'danger', 'bloqueada' => 'danger', 'atrasado' => 'danger',
         'falhou' => 'danger', 'recusado' => 'danger', 'expirada' => 'danger',
-        'suspenso' => 'warning', 'em_processamento' => 'warning',
+        'suspenso' => 'warning', 'em_processamento' => 'warning', 'agendado' => 'warning', 'enviando' => 'warning',
         'reservado' => 'warning', 'hospedado' => 'success', 'finalizado' => 'neutral', 'manutencao' => 'danger',
     ];
     $variant = $cores[$status] ?? 'neutral';

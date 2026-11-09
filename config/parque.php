@@ -16,6 +16,12 @@ return [
         array_filter(explode(',', env('COBRANCA_DIAS_APOS_VENCIMENTO', '1,5,10')))
     ),
 
+    // Envio de cobranças por WhatsApp em fila, espaçado (disparo em lote leva a banimento do número):
+    // no máximo 1 mensagem a cada N minutos por empresa, só dentro do horário (hora cheia, 0–23).
+    'cobranca_intervalo_minutos' => max(1, (int) env('COBRANCA_INTERVALO_MINUTOS', 20)),
+    'cobranca_janela_inicio' => (int) env('COBRANCA_JANELA_INICIO', 8),
+    'cobranca_janela_fim' => (int) env('COBRANCA_JANELA_FIM', 20),
+
     // Validade (em horas) do QR Code exibido na carteirinha digital antes de precisar ser recarregado
     'carteirinha_qr_ttl_horas' => (int) env('CARTEIRINHA_QR_TTL_HORAS', 24),
 

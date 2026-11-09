@@ -27,16 +27,19 @@ class EnviarCobrancasCommand extends Command
 
         $agendadas = 0;
 
+        // Empresas que desligaram a cobrança automática (Minha Empresa → Gerencial) ficam de fora.
+        $desligadas = \App\Models\Empresa::all()->reject->cobrancaAutomaticaWhatsapp()->pluck('id')->all();
+
         // 1) Lembrete antes do vencimento
         $dataAlvo = now()->addDays($diasAntes)->toDateString();
-        foreach (Mensalidade::withoutGlobalScopes()->where('status', 'pendente')->whereDate('data_vencimento', $dataAlvo)->get() as $mensalidade) {
+        foreach (Mensalidade::withoutGlobalScopes()->where('status', 'pendente')->whereNotIn('empresa_id', $desligadas)->whereDate('data_vencimento', $dataAlvo)->get() as $mensalidade) {
             $agendadas += (int) (bool) $fila->agendar($mensalidade, tentativa: 0, daRegua: true);
         }
 
         // 2) Régua pós-vencimento
         foreach ($diasApos as $dias) {
             $dataAlvo = now()->subDays($dias)->toDateString();
-            foreach (Mensalidade::withoutGlobalScopes()->where('status', 'atrasado')->whereDate('data_vencimento', $dataAlvo)->get() as $mensalidade) {
+            foreach (Mensalidade::withoutGlobalScopes()->where('status', 'atrasado')->whereNotIn('empresa_id', $desligadas)->whereDate('data_vencimento', $dataAlvo)->get() as $mensalidade) {
                 $agendadas += (int) (bool) $fila->agendar($mensalidade, tentativa: $dias, daRegua: true);
             }
         }

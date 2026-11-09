@@ -47,6 +47,7 @@ class UpdateEmpresaRequest extends FormRequest
             'evolution_base_url' => ['nullable', 'url', 'max:255'],
             'evolution_api_key' => ['nullable', 'string', 'max:255'],
             'evolution_instance' => ['nullable', 'string', 'max:100'],
+            'evolution_cobranca_automatica' => ['nullable', 'boolean'],
 
             // Gateway Pix do PDV — mesma regra: segredo/arquivo em branco mantém o salvo.
             'gateway_pix_provedor' => ['required', Rule::in(array_keys(Empresa::provedoresGatewayPix()))],
@@ -182,6 +183,8 @@ class UpdateEmpresaRequest extends FormRequest
         $this->merge([
             'gateway_pix_provedor' => $this->input('gateway_pix_provedor', Empresa::GATEWAY_PIX_NENHUM),
             'impressao_auto_imprimir' => $this->boolean('impressao_auto_imprimir'),
+            // Checkbox desmarcado não vai no POST: ausente = desligado.
+            'evolution_cobranca_automatica' => $this->boolean('evolution_cobranca_automatica'),
             'nfse_nacional_habilitado' => $this->boolean('nfse_nacional_habilitado'),
             'nfse_auth_mode' => $this->input('nfse_auth_mode', Empresa::NFSE_AUTH_CERTIFICADO),
             'cnae' => preg_replace('/\D+/', '', (string) $this->input('cnae', '')) ?: null,

@@ -27,7 +27,7 @@ class EmpresaService
 
         $camposIntegracao = [
             'mercadopago_access_token', 'mercadopago_public_key', 'mercadopago_webhook_secret',
-            'evolution_base_url', 'evolution_api_key', 'evolution_instance',
+            'evolution_base_url', 'evolution_api_key', 'evolution_instance', 'evolution_cobranca_automatica',
             'impressao_modo', 'impressao_colunas', 'impressao_agente_url', 'impressao_auto_imprimir',
             'gateway_pix_provedor', 'gateway_pix_expiracao_minutos', 'itau_client_id', 'itau_client_secret',
             'itau_chave_pix', 'itau_tipo_chave', 'itau_certificado', 'itau_chave_privada',
@@ -121,6 +121,11 @@ class EmpresaService
             'api_key' => $integracoes['evolution_api_key'] ?? null,
             'instance' => $integracoes['evolution_instance'] ?? null,
         ]);
+        // Liga/desliga a régua automática de cobrança — gravado sempre (false
+        // também), por isso fora do mesclarSemApagar.
+        if (array_key_exists('evolution_cobranca_automatica', $integracoes)) {
+            $configuracoes['evolution']['cobranca_automatica'] = (bool) $integracoes['evolution_cobranca_automatica'];
+        }
 
         // Impressão: campos com default explícito — sempre grava (não usa mesclarSemApagar
         // de senha), inclusive checkbox desmarcado e troca de modo.

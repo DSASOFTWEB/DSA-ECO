@@ -145,6 +145,20 @@
                 </div>
             </div>
 
+            {{-- Liga/desliga a régua automática de cobrança (o envio manual continua) --}}
+            <label class="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                <input type="checkbox" name="evolution_cobranca_automatica" value="1" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                       @checked(old('evolution_cobranca_automatica', $empresa->cobrancaAutomaticaWhatsapp()))>
+                <span>
+                    <span class="font-medium text-gray-800 dark:text-white/90">Enviar cobranças automáticas de mensalidade por WhatsApp</span>
+                    <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                        Lembrete {{ config('parque.cobranca_dias_antes_vencimento') }} dia(s) antes do vencimento e cobranças {{ implode(', ', config('parque.cobranca_dias_apos_vencimento')) }} dia(s) depois,
+                        em fila de 1 mensagem a cada {{ config('parque.cobranca_intervalo_minutos') }} min ({{ config('parque.cobranca_janela_inicio') }}h às {{ config('parque.cobranca_janela_fim') }}h).
+                        Desmarcado, nada é enviado sozinho — o botão "Cobrar por WhatsApp" da mensalidade continua funcionando.
+                    </span>
+                </span>
+            </label>
+
             {{-- Teste da Evolution: conexão e, com um número, envio de texto + PDF --}}
             <div class="mt-5 rounded-xl border border-slate-200 p-4 dark:border-gray-700"
                  x-data="{

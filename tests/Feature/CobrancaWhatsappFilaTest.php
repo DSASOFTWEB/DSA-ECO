@@ -161,6 +161,56 @@ class CobrancaWhatsappFilaTest extends TestCase
         $this->assertSame([], $this->whatsapp->enviados);
     }
 
+    public function test_cobranca_automatica_desligada_na_empresa(): void
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+        Gate::before(fn () => true);
+        $this->actingAs(User::factory()->create(['empresa_id' => $this->empresa->id]));
+        $this->assertTrue($this->empresa->cobrancaAutomaticaWhatsapp(), 'padrão: ligada');
+
+        // Uma automática já agendada antes de desligar.
+        $antiga = $this->mensalidade('83911111111', now()->subDay(), 'atrasado');
+        $this->artisan('mensalidades:cobrar');
+        $this->assertSame(1, Cobranca::where('status', 'agendado')->count());
+
+        // Desmarca na tela (Minha Empresa → Gerencial).
+        $this->get(route('empresa.edit', ['aba' => 'gerencial']))->assertSee('Enviar cobranças automáticas de mensalidade por WhatsApp')
+            ->assertSee('name="evolution_cobranca_automatica" value="1"', false);
+        $this->put(route('empresa.update'), $this->dadosEmpresa())->assertSessionHasNoErrors();
+        $this->assertFalse($this->empresa->fresh()->cobrancaAutomaticaWhatsapp());
+
+        // Régua não agenda mais nada.
+        $this->mensalidade('83922222222', now()->subDays(5), 'atrasado');
+        Cobranca::query()->update(['created_at' => now()->subDay()]);
+        $this->artisan('mensalidades:cobrar');
+        $this->assertSame(1, Cobranca::count());
+
+        // A automática que já estava na fila é cancelada sem sair...
+        $this->artisan('mensalidades:enviar-fila');
+        $this->assertSame('cancelado', Cobranca::where('mensalidade_id', $antiga->id)->value('status'));
+        $this->assertSame([], $this->whatsapp->enviados);
+
+        // ...mas o envio manual continua funcionando.
+        $manual = $this->mensalidade('83933333333', now()->subDay(), 'atrasado');
+        app(CobrancaWhatsappFila::class)->agendar($manual);
+        $this->artisan('mensalidades:enviar-fila');
+        $this->assertCount(1, $this->whatsapp->enviados);
+
+        // Religa.
+        $this->put(route('empresa.update'), $this->dadosEmpresa(['evolution_cobranca_automatica' => '1']))->assertSessionHasNoErrors();
+        $this->assertTrue($this->empresa->fresh()->cobrancaAutomaticaWhatsapp());
+    }
+
+    protected function dadosEmpresa(array $extra = []): array
+    {
+        return array_merge([
+            'nome' => 'Parque Teste', 'regime_tributario' => 'simples', 'impressao_modo' => 'dom', 'impressao_colunas' => 48,
+            'ambiente_nfe' => 2, 'numero_serie_nfe' => 1, 'numero_serie_nfce' => 1, 'numero_serie_nfse' => 1,
+            'numero_ultima_nfe_producao' => 0, 'numero_ultima_nfe_homologacao' => 0, 'numero_ultima_nfce_producao' => 0,
+            'numero_ultima_nfce_homologacao' => 0, 'numero_ultima_nfse' => 0, 'nfse_provider' => 'nacional_gov', 'nfse_auth_mode' => 'certificado',
+        ], $extra);
+    }
+
     protected function mensalidade(string $whatsapp, $vencimento, string $status): Mensalidade
     {
         $cliente = Cliente::factory()->create(['empresa_id' => $this->empresa->id, 'unidade_id' => $this->unidade->id, 'whatsapp' => $whatsapp]);

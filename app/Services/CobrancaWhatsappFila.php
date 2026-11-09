@@ -23,6 +23,8 @@ class CobrancaWhatsappFila
 {
     public const AGENDADO = 'agendado';
 
+    public const ORIGEM_REGUA = 'Régua automática';
+
     /**
      * Põe a mensalidade na fila. Não duplica: se já há uma agendada para ela
      * (ou, na régua, a mesma etapa já saiu hoje), devolve null.
@@ -47,6 +49,8 @@ class CobrancaWhatsappFila
             'canal' => 'whatsapp',
             'status' => self::AGENDADO,
             'tentativa' => $tentativa,
+            // Marca a origem: se a empresa desligar a cobrança automática, as da régua não saem.
+            'mensagem' => $daRegua ? self::ORIGEM_REGUA : null,
         ]);
     }
 
@@ -112,6 +116,13 @@ class CobrancaWhatsappFila
 
         if (! $mensalidade || $mensalidade->estaPaga() || in_array($mensalidade->status, ['cancelado', 'isento'], true)) {
             $cobranca->update(['status' => 'cancelado', 'mensagem' => 'Mensalidade paga/cancelada antes do envio.']);
+
+            return false;
+        }
+
+        // Veio da régua e a empresa desligou a cobrança automática depois de agendar.
+        if ($cobranca->mensagem === self::ORIGEM_REGUA && $cliente?->empresa && ! $cliente->empresa->cobrancaAutomaticaWhatsapp()) {
+            $cobranca->update(['status' => 'cancelado', 'mensagem' => 'Cobrança automática desligada em Minha Empresa → Gerencial.']);
 
             return false;
         }

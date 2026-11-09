@@ -263,6 +263,15 @@ class Empresa extends Model
      * Credenciais PRÓPRIAS desta empresa pra Evolution API (WhatsApp) — ver
      * comentário de credenciaisMercadoPago(), mesma lógica de fallback.
      */
+    /**
+     * Régua automática de cobrança por WhatsApp (lembrete e cobranças após o
+     * vencimento) ligada? Padrão: ligada. O envio manual não depende disto.
+     */
+    public function cobrancaAutomaticaWhatsapp(): bool
+    {
+        return (bool) Arr::get($this->configuracoes, 'evolution.cobranca_automatica', true);
+    }
+
     public function credenciaisEvolution(): array
     {
         return [

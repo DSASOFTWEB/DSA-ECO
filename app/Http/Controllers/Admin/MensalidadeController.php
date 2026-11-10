@@ -49,14 +49,18 @@ class MensalidadeController extends Controller
         $this->authorize('view', $mensalidade);
 
         $mensalidade->load(['contrato.cliente', 'cobrancas', 'pagamentos']);
-        $caixaAberto = $this->caixaService->caixaAbertoDaUnidade(request()->user()->unidade);
+        $caixasAbertos = $this->caixasDisponiveis();
+        // Já vem marcado o caixa em que o operador está (PDV/última baixa) ou o único aberto.
+        $caixaSugerido = $caixasAbertos->firstWhere('id', session('pdv_caixa_id'))?->id
+            ?? ($caixasAbertos->count() === 1 ? $caixasAbertos->first()->id : null);
 
-        return view('mensalidades.show', compact('mensalidade', 'caixaAberto'));
+        return view('mensalidades.show', compact('mensalidade', 'caixasAbertos', 'caixaSugerido'));
     }
 
     /**
      * Baixa manual: usada quando o cliente paga presencialmente
-     * (dinheiro/cartão) na recepção, exigindo um caixa aberto na unidade.
+     * (dinheiro/cartão) na recepção. O operador escolhe em qual caixa/
+     * terminal aberto o dinheiro entra (antes ia para o primeiro encontrado).
      */
     public function baixarManual(Request $request, Mensalidade $mensalidade): RedirectResponse
     {
@@ -64,13 +68,17 @@ class MensalidadeController extends Controller
 
         $dados = $request->validate([
             'metodo_pagamento' => ['required', 'in:dinheiro,cartao_credito,cartao_debito,pix_manual'],
-        ]);
+            'caixa_id' => ['required', 'integer'],
+        ], ['caixa_id.required' => 'Escolha em qual caixa/terminal o pagamento vai entrar.']);
 
-        $caixa = $this->caixaService->caixaAbertoDaUnidade($request->user()->unidade);
+        $caixa = $this->caixasDisponiveis()->firstWhere('id', (int) $dados['caixa_id']);
 
         if (! $caixa) {
-            return back()->with('erro', 'Abra o caixa da unidade antes de registrar o pagamento.');
+            return back()->with('erro', 'O caixa escolhido não está aberto (ou é de outra unidade). Atualize a tela e escolha outro.');
         }
+
+        // Lembra o terminal escolhido (o mesmo que o PDV usa) para as próximas baixas.
+        session(['pdv_caixa_id' => $caixa->id]);
 
         $this->mensalidadeService->marcarComoPaga(
             $mensalidade,
@@ -80,7 +88,19 @@ class MensalidadeController extends Controller
             usuarioId: $request->user()->id,
         );
 
-        return back()->with('sucesso', 'Pagamento registrado com sucesso.');
+        return back()->with('sucesso', 'Pagamento registrado no caixa '.($caixa->terminal?->nome ?? '#'.$caixa->id).'.');
+    }
+
+    /** Caixas abertos que o usuário pode usar: os da unidade dele, ou da empresa toda (sem unidade fixa). */
+    protected function caixasDisponiveis(): \Illuminate\Support\Collection
+    {
+        $user = request()->user();
+
+        return ($user->unidade_id
+            ? $this->caixaService->caixasAbertosDaUnidade((int) $user->unidade_id)
+            : $this->caixaService->caixasAbertosDaEmpresa((int) $user->empresa_id))
+            ->load('usuarioAbertura')
+            ->sortBy(fn ($c) => $c->terminal?->nome)->values();
     }
 
     /**

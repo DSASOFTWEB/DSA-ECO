@@ -50,9 +50,22 @@
                         </form>
 
                         @can('baixarManual', $mensalidade)
-                            @if ($caixaAberto)
+                            @if ($caixasAbertos->isNotEmpty())
                                 <form method="POST" action="{{ route('mensalidades.baixar', $mensalidade) }}" class="flex flex-wrap items-end gap-3">
                                     @csrf
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-slate-500">Caixa / terminal</label>
+                                        <select name="caixa_id" required class="h-11 rounded-lg border border-slate-300 px-3 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                                            @if (! $caixaSugerido)
+                                                <option value="">Escolha o caixa...</option>
+                                            @endif
+                                            @foreach ($caixasAbertos as $cx)
+                                                <option value="{{ $cx->id }}" @selected((int) old('caixa_id', $caixaSugerido) === $cx->id)>
+                                                    {{ $cx->terminal?->nome ?? 'Caixa #'.$cx->id }} — {{ $cx->unidade?->nome }} ({{ $cx->usuarioAbertura?->name }})
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
                                     <div>
                                         <label class="mb-1 block text-xs font-medium text-slate-500">Baixa manual — forma de pagamento</label>
                                         <select name="metodo_pagamento" required class="h-11 rounded-lg border border-slate-300 px-3 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
@@ -66,7 +79,7 @@
                                 </form>
                             @else
                                 <p class="text-sm text-amber-600 dark:text-amber-400">
-                                    Abra o <a href="{{ route('caixas.index') }}" class="underline">caixa da sua unidade</a> para poder registrar a baixa manual desta mensalidade.
+                                    Nenhum caixa aberto. Abra um <a href="{{ route('caixas.index') }}" class="underline">caixa/terminal</a> para poder registrar a baixa manual desta mensalidade.
                                 </p>
                             @endif
                         @endcan
